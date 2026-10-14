@@ -22,7 +22,12 @@
       madhab: store.get('madhab', 'Shafi'),
       notify: store.get('notify', true),
       remind: store.get('remind', 5),
-      mute: store.get('mute', {})
+      mute: store.get('mute', {}),
+      nudge: store.get('nudge', true),               // تذكير لطيف إذا لم تُسجَّل الصلاة
+      adhkarRemind: store.get('adhkarRemind', true),  // أذكار الصباح والمساء والنوم
+      afterRemind: store.get('afterRemind', false),   // أذكار بعد الصلاة
+      fastRemind: store.get('fastRemind', false),     // صيام الاثنين والخميس
+      eventsRemind: store.get('eventsRemind', false)  // الأيام البيض والمناسبات
     };
   }
 
@@ -62,22 +67,80 @@
     ORDER.forEach((k) => { p.adjustments[k] = (p.adjustments[k] || 0) + (+state.adj[k] || 0); });
     return new adhan.PrayerTimes(new adhan.Coordinates(c.lat, c.lon), psDay(date), p);
   }
-  // قائمة الإشعارات للأيام السبعة القادمة: تذكير قبل الصلاة + عند دخول الوقت
+  /* ---- التقويم الهجري ---- */
+  const HIJRI_MONTHS = ['محرم', 'صفر', 'ربيع الأول', 'ربيع الآخر', 'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'];
+  const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const hijriFmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', { timeZone: TZ, day: 'numeric', month: 'numeric', year: 'numeric' });
+  function hijri(date, adj) {
+    const p = hijriFmt.formatToParts(new Date(date.getTime() + (adj || 0) * 864e5));
+    const g = (t) => +p.find((x) => x.type === t).value;
+    return { d: g('day'), m: g('month'), y: g('year') };
+  }
+  const wdFmt = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short' });
+  const weekday = (date) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(wdFmt.format(date));
+  // مناسبات التقويم الهجري: label + kind (eid | fast | night | white)
+  function hijriEvents(h) {
+    const out = [];
+    const add = (label, kind) => out.push({ label, kind });
+    if (h.m === 1 && h.d === 1) add('رأس السنة الهجرية', 'eid');
+    if (h.m === 1 && h.d === 9) add('تاسوعاء (يُستحب صيامه)', 'fast');
+    if (h.m === 1 && h.d === 10) add('يوم عاشوراء', 'fast');
+    if (h.m === 9 && h.d === 1) add('أول أيام رمضان', 'eid');
+    if (h.m === 9 && h.d >= 21) add('العشر الأواخر من رمضان (تُلتمس ليلة القدر)', 'night');
+    if (h.m === 10 && h.d === 1) add('عيد الفطر المبارك', 'eid');
+    if (h.m === 12 && h.d === 9) add('يوم عرفة (يُستحب صيامه لغير الحاج)', 'fast');
+    if (h.m === 12 && h.d === 10) add('عيد الأضحى المبارك', 'eid');
+    if (h.m === 12 && h.d >= 11 && h.d <= 13) add('أيام التشريق', 'eid');
+    if (h.d >= 13 && h.d <= 15 && !(h.m === 12 && h.d === 13) && !(h.m === 9 && false)) add('من الأيام البيض (يُستحب صيامها)', 'white');
+    return out;
+  }
+
+  // قائمة الإشعارات للأيام السبعة القادمة
   function notifications(state, now) {
     now = now || new Date();
+    const nowMs = now.getTime();
     const list = [];
-    if (!state.notify) return list;
     const remind = +state.remind || 0;
+    const dstr = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d);
+    const push = (at, title, body, extra) => { if (at > nowMs) list.push(Object.assign({ at, title, body }, extra || {})); };
     for (let d = 0; d < 7; d++) {
-      const t = calc(state, new Date(now.getTime() + d * 864e5));
-      PRAYERS.forEach((k) => {
+      const day = new Date(nowMs + d * 864e5);
+      const ds = dstr(day);
+      const t = calc(state, day);
+      const ms = (k) => t[k].getTime();
+      // 1) الصلاة: تذكير قبلها + عند دخول الوقت
+      if (state.notify) PRAYERS.forEach((k) => {
         if (state.mute && state.mute[k]) return;
-        const at = t[k].getTime();
-        if (remind > 0 && at - remind * 60000 > now.getTime())
-          list.push({ at: at - remind * 60000, title: `اقتربت صلاة ${NAMES[k]}`, body: `تبقّى ${remind} دقائق على أذان ${NAMES[k]}` });
-        if (at > now.getTime())
-          list.push({ at, title: 'حان وقت الصلاة', body: `حان الآن موعد صلاة ${NAMES[k]}` });
+        if (remind > 0) push(ms(k) - remind * 60000, `اقتربت صلاة ${NAMES[k]}`, `تبقّى ${remind} دقائق على أذان ${NAMES[k]}`);
+        push(ms(k), 'حان وقت الصلاة', `حان الآن موعد صلاة ${NAMES[k]}`);
       });
+      // 2) تذكير لطيف إن لم تُسجَّل الصلاة قبل خروج وقتها
+      if (state.nudge) {
+        const end = { fajr: ms('sunrise'), dhuhr: ms('asr'), asr: ms('maghrib'), maghrib: ms('isha'), isha: ms('isha') + 120 * 60000 };
+        PRAYERS.forEach((k) => {
+          const at = end[k] - (k === 'isha' ? 0 : 15 * 60000);
+          if (at > ms(k) + 20 * 60000) push(at, `هل صليت ${NAMES[k]}؟`, k === 'isha' ? 'سجّل صلاتك إن أدّيتها' : 'سجّل صلاتك قبل خروج الوقت', { tab: 'stats', chk: ds + '|' + k });
+        });
+      }
+      // 3) تذكير الأذكار
+      if (state.adhkarRemind) {
+        if (ms('fajr') + 25 * 60000 < ms('sunrise')) push(ms('fajr') + 25 * 60000, 'أذكار الصباح', 'ابدأ يومك بذكر الله', { tab: 'azkar:morning' });
+        push(ms('asr') + 20 * 60000, 'أذكار المساء', 'حافظ على أذكار المساء', { tab: 'azkar:evening' });
+        push(ms('isha') + 60 * 60000, 'أذكار النوم', 'ختام يومك بذكر الله', { tab: 'azkar:sleep' });
+      }
+      if (state.afterRemind) PRAYERS.forEach((k) => push(ms(k) + 10 * 60000, 'أذكار بعد الصلاة', `بعد صلاة ${NAMES[k]}`, { tab: 'azkar:after' }));
+      // 4) صيام الاثنين والخميس + الأيام البيض والمناسبات: تنبيه مساء اليوم السابق
+      const at = ms('isha') + 30 * 60000;
+      const tomorrow = new Date(nowMs + (d + 1) * 864e5);
+      const wd = weekday(tomorrow);
+      if (state.fastRemind && (wd === 1 || wd === 4)) push(at, `غداً ${WEEKDAYS[wd]}`, 'سنّة الصيام: هل تنوي صيام غدٍ؟', { tab: 'calendar' });
+      if (state.eventsRemind) {
+        const hh = hijri(tomorrow, state.hijriAdj);
+        if (hh.d === 13) push(at, 'غداً أول الأيام البيض', 'يُستحب صيام 13 و14 و15 من الشهر الهجري', { tab: 'calendar' });
+        hijriEvents(hh).filter((e) => e.kind === 'fast' || (e.kind === 'eid' && (hh.m === 9 || hh.d === 10 || hh.m === 1)))
+          .filter((e) => !/الأيام البيض|التشريق/.test(e.label)).slice(0, 1)
+          .forEach((e) => push(at, `غداً: ${e.label}`, `${hh.d} ${HIJRI_MONTHS[hh.m - 1]} ${hh.y}`, { tab: 'calendar' }));
+      }
     }
     list.sort((a, b) => a.at - b.at);
     return list;
@@ -97,5 +160,5 @@
     return out;
   }
 
-  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications, times };
+  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications, times, hijri, hijriEvents, weekday, HIJRI_MONTHS, WEEKDAYS };
 })();

@@ -18,7 +18,7 @@ import org.json.JSONObject;
 
 /** Alarm scheduling + notification helpers shared by the activity and receivers. */
 final class Scheduler {
-    static final int MAX = 150;
+    static final int MAX = 240;
     static final int REFRESH_CODE = 9999;
     static final String CHANNEL = "prayer";
 
@@ -64,6 +64,8 @@ final class Scheduler {
                 Intent in = new Intent(c, AlarmReceiver.class);
                 in.putExtra("title", o.optString("title"));
                 in.putExtra("body", o.optString("body"));
+                if (o.has("tab")) in.putExtra("tab", o.optString("tab"));
+                if (o.has("chk")) in.putExtra("chk", o.optString("chk"));
                 in.putExtra("id", n);
                 setAlarm(c, at, PendingIntent.getBroadcast(c, n, in, flags()), true);
                 n++;
@@ -207,7 +209,22 @@ final class Scheduler {
         return Build.VERSION.SDK_INT < 24 || nm.areNotificationsEnabled();
     }
 
-    static void notifyNow(Context c, int id, String title, String body) {
+    /** Keys like "2026-10-14|asr" of prayers the user already logged (used to skip the gentle reminder). */
+    static void saveLogged(Context c, String json) {
+        c.getSharedPreferences("prayer", Context.MODE_PRIVATE).edit().putString("logged", json).apply();
+    }
+
+    static boolean isLogged(Context c, String key) {
+        try {
+            JSONArray a = new JSONArray(c.getSharedPreferences("prayer", Context.MODE_PRIVATE).getString("logged", "[]"));
+            for (int i = 0; i < a.length(); i++) if (key.equals(a.getString(i))) return true;
+        } catch (Exception e) { /* ignore */ }
+        return false;
+    }
+
+    static void notifyNow(Context c, int id, String title, String body) { notifyNow(c, id, title, body, null); }
+
+    static void notifyNow(Context c, int id, String title, String body, String tab) {
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         Notification.Builder nb;
         if (Build.VERSION.SDK_INT >= 26) {
@@ -217,11 +234,13 @@ final class Scheduler {
             nb = new Notification.Builder(c);
         }
         int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
+        Intent open = new Intent(c, MainActivity.class);
+        if (tab != null) open.putExtra("tab", tab);
         nb.setContentTitle(title)
           .setContentText(body)
           .setStyle(new Notification.BigTextStyle().bigText(body))
           .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-          .setContentIntent(PendingIntent.getActivity(c, 0, new Intent(c, MainActivity.class), f))
+          .setContentIntent(PendingIntent.getActivity(c, 1000 + id, open, f | PendingIntent.FLAG_UPDATE_CURRENT))
           .setAutoCancel(true);
         nm.notify(id, nb.build());
     }
