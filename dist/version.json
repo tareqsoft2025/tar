@@ -1,6 +1,6 @@
 {
-  "versionCode": 14,
-  "versionName": "2.3",
-  "notes": "عرض المواقيت على شاشة القفل وفوق كل الشاشات من الإعدادات",
+  "versionCode": 15,
+  "versionName": "3.0",
+  "notes": "متابعة الصلوات والقضاء والقرآن الكريم والتقويم الهجري والأذكار التلقائية وأقرب المساجد",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

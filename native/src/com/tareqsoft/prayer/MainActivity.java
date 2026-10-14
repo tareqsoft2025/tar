@@ -37,6 +37,7 @@ import org.json.JSONObject;
 
 public class MainActivity extends Activity {
     private WebView web;
+    private String pendingTab;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -51,9 +52,13 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
         s.setGeolocationEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
         web.setWebViewClient(new WebViewClient() {
             @Override
-            public void onPageFinished(WebView v, String url) { checkUpdate(); }
+            public void onPageFinished(WebView v, String url) {
+                checkUpdate();
+                if (pendingTab != null) { openTab(pendingTab); pendingTab = null; }
+            }
         });
         web.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -62,6 +67,7 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(), "AndroidBridge");
+        pendingTab = getIntent().getStringExtra("tab");
         requestPerms();
         maybeSendTest();
         web.loadUrl("file:///android_asset/www/index.html");
@@ -93,6 +99,18 @@ public class MainActivity extends Activity {
         }
         maybeSendTest();
         js("window.nativePermsChanged && window.nativePermsChanged()");
+    }
+
+    private void openTab(String tab) {
+        js("window.openTab && window.openTab(" + JSONObject.quote(tab) + ")");
+    }
+
+    @Override
+    protected void onNewIntent(Intent in) {
+        super.onNewIntent(in);
+        setIntent(in);
+        String tab = in.getStringExtra("tab");
+        if (tab != null && web != null) openTab(tab);
     }
 
     @Override
@@ -232,6 +250,20 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean overlayEnabled() { return OverlayService.enabled(MainActivity.this); }
+
+        @JavascriptInterface
+        public void setLogged(String json) { Scheduler.saveLogged(MainActivity.this, json); }
+
+        /** Opens the maps app on a place (mosque directions). */
+        @JavascriptInterface
+        public void openMap(double lat, double lon, String name) {
+            Uri geo = Uri.parse("geo:" + lat + "," + lon + "?q=" + lat + "," + lon + "(" + Uri.encode(name) + ")");
+            try { startActivity(new Intent(Intent.ACTION_VIEW, geo)); }
+            catch (Exception e) {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=" + lat + "," + lon))); }
+                catch (Exception e2) { /* no handler */ }
+            }
+        }
 
         @JavascriptInterface
         public void setCountdown(boolean on) { Scheduler.setCountdownEnabled(MainActivity.this, on); }

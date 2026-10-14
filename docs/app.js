@@ -75,8 +75,19 @@
       const t = timeParts(e.time);
       const noBell = e.key === 'sunrise';
       const muted = noBell || state.mute[e.key] || !state.notify;
+      const ds = Tracker.dayStr(now);
+      const started = e.time <= now;
+      const logged = !noBell && Tracker.isLogged(ds, e.key);
       li.innerHTML = `<span class="pn">${NAMES[e.key]}</span><span class="pt">${t.hm} ${t.ap}</span>` +
+        (noBell ? '<span class="logb off" style="visibility:hidden"></span>' : `<button class="logb ${logged ? 'on' : ''} ${started ? '' : 'off'}" aria-label="تسجيل صلاة ${NAMES[e.key]}">${icon('check')}</button>`) +
         `<button class="bell ${muted ? 'off' : ''}" ${noBell ? 'disabled' : ''} aria-label="تنبيه ${NAMES[e.key]}">${icon(muted ? 'bell-off' : 'bell')}</button>`;
+      if (!noBell) li.querySelector('.logb').onclick = () => {
+        if (!started) { toast(`لم يحن وقت صلاة ${NAMES[e.key]} بعد`); return; }
+        const on = Tracker.toggle(ds, e.key);
+        toast(on ? `تقبّل الله منك · سُجّلت صلاة ${NAMES[e.key]}` : `أُلغي تسجيل صلاة ${NAMES[e.key]}`);
+        if (navigator.vibrate) navigator.vibrate(on ? 30 : 10);
+        renderTimes(); if (App.screens.stats && isActive('stats')) App.screens.stats();
+      };
       if (!noBell) li.querySelector('.bell').onclick = () => {
         if (!state.notify) { toast('فعّل تنبيهات الصلاة أولاً'); return; }
         state.mute[e.key] = !state.mute[e.key];
@@ -234,13 +245,14 @@
   let mode = hourNow() < 14 ? 'morning' : 'evening';
   function azState() {
     const s = store.get('azkar', null);
-    return s && s.day === today() ? s : { day: today(), morning: {}, evening: {} };
+    const st = s && s.day === today() ? s : { day: today() };
+    ['morning', 'evening', 'after', 'sleep'].forEach((k) => { st[k] = st[k] || {}; });
+    return st;
   }
   function renderAzkar() {
     const st = azState();
     const list = window.AZKAR[mode];
-    $('segMorning').classList.toggle('on', mode === 'morning');
-    $('segEvening').classList.toggle('on', mode === 'evening');
+    document.querySelectorAll('#azSeg .chip').forEach((c) => c.classList.toggle('on', c.dataset.m === mode));
     const box = $('azkarList');
     box.innerHTML = '';
     let done = 0;
@@ -265,9 +277,9 @@
     $('azBar').style.width = (done / list.length * 100) + '%';
     $('azkarProgress').textContent = `أنجزت ${done} من ${list.length}`;
   }
-  $('segMorning').onclick = () => { mode = 'morning'; renderAzkar(); };
-  $('segEvening').onclick = () => { mode = 'evening'; renderAzkar(); };
+  document.querySelectorAll('#azSeg .chip').forEach((c) => c.onclick = () => { mode = c.dataset.m; renderAzkar(); });
   $('azkarReset').onclick = () => { const cur = azState(); cur[mode] = {}; store.set('azkar', cur); renderAzkar(); };
+  window.setAzkarMode = (m) => { mode = m; renderAzkar(); };
 
   /* ---------- التسبيح ---------- */
   const ZIKR = ['سبحان الله', 'الحمد لله', 'الله أكبر', 'لا إله إلا الله', 'أستغفر الله'];
@@ -421,6 +433,10 @@
     if (B && B.setCountdown) B.setCountdown(state.cd);
     toast(state.cd ? 'سيظهر الوقت المتبقي في الإشعارات وعلى شاشة القفل' : 'تم إيقاف عرض الوقت المتبقي');
   };
+  [['nudge', 'nudge'], ['adhkarRemind', 'adhkarRemind'], ['afterRemind', 'afterRemind'], ['fastRemind', 'fastRemind'], ['eventsRemind', 'eventsRemind']].forEach(([id, key]) => {
+    $(id).checked = !!state[key];
+    $(id).onchange = (e) => { state[key] = e.target.checked; store.set(key, state[key]); scheduleNotifications(); };
+  });
   $('remind').value = String(state.remind);
   $('remind').onchange = (e) => { state.remind = +e.target.value; store.set('remind', state.remind); scheduleNotifications(); syncSettingsText(); };
   $('testNotif').onclick = () => {
@@ -463,15 +479,41 @@
   }
 
   /* ---------- التنقل ---------- */
-  function showTab(name) {
-    const navTab = name === 'azkar' ? 'tasbih' : name;
+  const App = { screens: {} };
+  const PARENT = { stats: 'more', qada: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', reader: 'quran' };
+  const stack = [];
+  let current = 'times';
+  const isActive = (n) => current === n;
+  function showTab(name, opts) {
+    opts = opts || {};
+    if (opts.push && current !== name) stack.push(current);
+    if (!opts.push && !opts.back) stack.length = 0;
+    current = name;
+    const navTab = PARENT[name] || name;
     document.querySelectorAll('.dock button').forEach((x) => x.classList.toggle('on', x.dataset.tab === navTab));
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.id === 'tab-' + name));
-    window.scrollTo(0, 0);
+    if (App.screens[name]) App.screens[name](opts);
+    if (!opts.keepScroll) window.scrollTo(0, 0);
+  }
+  const go = (name, opts) => showTab(name, Object.assign({ push: true }, opts));
+  function goBack() {
+    const prev = stack.pop() || PARENT[current] || 'times';
+    showTab(prev, { back: true, keepScroll: false });
   }
   document.querySelectorAll('.dock button').forEach((b) => b.onclick = () => showTab(b.dataset.tab));
-  $('openAzkar').onclick = () => showTab('azkar');
-  $('azBack').onclick = () => showTab('tasbih');
+  document.querySelectorAll('.back').forEach((b) => b.onclick = goBack);
+  document.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => go(b.dataset.go));
+  $('openAzkar').onclick = () => go('azkar');
+  // فتح شاشة من إشعار: "azkar:morning" أو "stats" أو "calendar"
+  window.openTab = (spec) => {
+    const [tab, arg] = String(spec).split(':');
+    stack.length = 0;
+    if (tab === 'azkar' && arg && window.setAzkarMode) window.setAzkarMode(arg);
+    showTab(tab, { push: false });
+    if (PARENT[tab]) { stack.push(PARENT[tab]); }
+  };
+  Object.assign(App, { $, state, store, B, icon, toast, go, showTab, goBack, refresh: () => refresh(), isActive });
+  window.App = App;
 
   /* ---------- التحديث الإجباري ---------- */
   window.showUpdate = (info) => {
@@ -501,6 +543,7 @@
     syncSettingsText();
     scheduleNotifications();
   }
+  Tracker.syncNative();
   buildDial();
   renderTasbih();
   renderAzkar();
