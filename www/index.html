@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d2e">
+<title>مواقيت الصلاة</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div id="hijri"></div>
+  <div id="gregorian"></div>
+  <div id="place">جارٍ تحديد الموقع…</div>
+</header>
+
+<main>
+  <section id="tab-times" class="tab active">
+    <div class="next">
+      <div class="label">الصلاة القادمة</div>
+      <div id="nextName" class="big">—</div>
+      <div id="countdown" class="count">--:--:--</div>
+    </div>
+    <ul id="list"></ul>
+  </section>
+
+  <section id="tab-qibla" class="tab">
+    <div class="compass">
+      <div id="needle"><span>🕋</span></div>
+    </div>
+    <p id="qiblaInfo">—</p>
+    <p class="hint">أمسك الجوال بشكل مسطح، وسيشير رمز الكعبة إلى اتجاه القبلة.</p>
+  </section>
+
+  <section id="tab-tasbih" class="tab">
+    <div id="zikr">سبحان الله</div>
+    <button id="tasbihBtn">0</button>
+    <div class="row">
+      <button id="zikrNext" class="small">الذكر التالي</button>
+      <button id="tasbihReset" class="small">تصفير</button>
+    </div>
+  </section>
+
+  <section id="tab-settings" class="tab">
+    <label>طريقة الحساب
+      <select id="method">
+        <option value="UmmAlQura">أم القرى (السعودية)</option>
+        <option value="MuslimWorldLeague">رابطة العالم الإسلامي</option>
+        <option value="Egyptian">الهيئة المصرية العامة للمساحة</option>
+        <option value="Karachi">جامعة العلوم الإسلامية - كراتشي</option>
+        <option value="Dubai">دبي</option>
+        <option value="Kuwait">الكويت</option>
+        <option value="Qatar">قطر</option>
+        <option value="NorthAmerica">أمريكا الشمالية (ISNA)</option>
+        <option value="Turkey">تركيا</option>
+      </select>
+    </label>
+    <label>المذهب (العصر)
+      <select id="madhab">
+        <option value="Shafi">الجمهور (شافعي/مالكي/حنبلي)</option>
+        <option value="Hanafi">حنفي</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="notify"> تنبيه عند دخول وقت الصلاة</label>
+    <button id="relocate" class="small wide">تحديث الموقع</button>
+    <p class="hint">تُحسب المواقيت على الجهاز دون الحاجة إلى إنترنت.</p>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="times" class="on">🕌<span>المواقيت</span></button>
+  <button data-tab="qibla">🧭<span>القبلة</span></button>
+  <button data-tab="tasbih">📿<span>المسبحة</span></button>
+  <button data-tab="settings">⚙️<span>الإعدادات</span></button>
+</nav>
+
+<script src="lib/adhan.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
