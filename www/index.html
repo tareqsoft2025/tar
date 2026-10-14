@@ -3,105 +3,189 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b3d2e">
+<meta name="theme-color" content="#06231a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="مواقيت الصلاة والقبلة والأذكار لجميع المدن الفلسطينية">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>مواقيت الصلاة - فلسطين</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="update" hidden>
-  <div class="box">
-    <div class="ico">⬆️</div>
-    <h2>تحديث إجباري</h2>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4D58A"/><stop offset="1" stop-color="#B8923F"/></linearGradient>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6z"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="i-beads" viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2"/><circle cx="18.5" cy="8.5" r="2"/><circle cx="18.5" cy="15.5" r="2"/><circle cx="12" cy="19.5" r="2"/><circle cx="5.5" cy="15.5" r="2"/><circle cx="5.5" cy="8.5" r="2"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2.5"/><circle cx="9" cy="12" r="2.5"/><circle cx="17" cy="18" r="2.5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a2 2 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-sun-dim" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 4v1M12 19v1M5.6 5.6l.7.7M17.7 17.7l.7.7M4 12h1M19 12h1M5.6 18.4l.7-.7M17.7 6.3l.7-.7"/></symbol>
+    <symbol id="i-sunrise" viewBox="0 0 24 24"><path d="M12 2v6M4.9 10.9l1.4 1.4M2 18h2M20 18h2M17.7 12.3l1.4-1.4M22 22H2M8 6l4-4 4 4M16 18a4 4 0 0 0-8 0"/></symbol>
+    <symbol id="i-sunset" viewBox="0 0 24 24"><path d="M12 10V2M4.9 10.9l1.4 1.4M2 18h2M20 18h2M17.7 12.3l1.4-1.4M22 22H2M16 6l-4 4-4-4M16 18a4 4 0 0 0-8 0"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></symbol>
+  </defs>
+</svg>
+
+<div id="update" hidden role="dialog" aria-modal="true" aria-labelledby="updTitle">
+  <div class="sheet">
+    <div class="sheet-ico"><svg class="ic"><use href="#i-down"/></svg></div>
+    <h2 id="updTitle">تحديث جديد متاح</h2>
     <p id="updVer"></p>
-    <p id="updNotes"></p>
+    <p id="updNotes" class="muted"></p>
     <div id="updBar"><i></i></div>
-    <p id="updMsg"></p>
-    <button id="updBtn">تحديث الآن</button>
+    <p id="updMsg" class="accent"></p>
+    <button id="updBtn" class="btn btn-gold">تحديث الآن</button>
   </div>
 </div>
-<header>
-  <div id="hijri"></div>
-  <div id="gregorian"></div>
-  <div id="place" class="place">جارٍ تحديد الموقع…</div>
-</header>
+
+<div class="bg" aria-hidden="true"></div>
 
 <main>
+  <!-- المواقيت -->
   <section id="tab-times" class="tab active">
-    <div class="next">
-      <div class="label">الصلاة القادمة</div>
-      <div id="nextName" class="big">—</div>
-      <div id="countdown" class="count">--:--:--</div>
+    <header class="top">
+      <div class="top-date">
+        <div id="hijri" class="hijri"></div>
+        <div id="gregorian" class="greg"></div>
+      </div>
+      <button id="placeChip" class="chip" type="button"><svg class="ic"><use href="#i-pin"/></svg><span id="place"></span></button>
+    </header>
+
+    <div class="hero card">
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 220 220" aria-hidden="true">
+          <circle class="ring-bg" cx="110" cy="110" r="98"/>
+          <circle id="ringFg" class="ring-fg" cx="110" cy="110" r="98" transform="rotate(-90 110 110)"/>
+        </svg>
+        <div class="ring-center">
+          <div class="eyebrow">الصلاة القادمة</div>
+          <div id="nextName" class="next-name">—</div>
+          <div id="countdown" class="count">--:--:--</div>
+          <div id="nextAt" class="muted small"></div>
+        </div>
+      </div>
     </div>
-    <ul id="list"></ul>
+
+    <ul id="list" class="plist"></ul>
   </section>
 
-  <section id="tab-azkar" class="tab">
-    <div class="seg">
-      <button id="segMorning" class="on">☀️ أذكار الصباح</button>
-      <button id="segEvening">🌙 أذكار المساء</button>
-    </div>
-    <div id="azkarProgress" class="hint"></div>
-    <div id="azkarList"></div>
-    <button id="azkarReset" class="small wide">إعادة الأذكار من البداية</button>
-  </section>
-
+  <!-- القبلة -->
   <section id="tab-qibla" class="tab">
-    <div class="compass">
-      <div id="needle"><span>🕋</span></div>
+    <h1 class="page-title">اتجاه القبلة</h1>
+    <div class="compass-wrap">
+      <div class="compass-pointer"></div>
+      <svg id="dial" class="dial" viewBox="0 0 320 320" aria-hidden="true"></svg>
     </div>
-    <p id="qiblaInfo">—</p>
-    <p class="hint">أمسك الجوال بشكل مسطح، وسيشير رمز الكعبة إلى اتجاه القبلة.</p>
+    <div id="qiblaBadge" class="q-badge">اتجه نحو الكعبة</div>
+    <div class="card info-row">
+      <div><div class="muted small">زاوية القبلة</div><div id="qiblaDeg" class="num-lg">--°</div></div>
+      <div><div class="muted small">اتجاه جهازك</div><div id="headDeg" class="num-lg">--°</div></div>
+    </div>
+    <p class="hint">أمسك الجوال بشكل مسطّح وابتعد عن المعادن والمغناطيس. عندما يتوهّج الإطار الذهبي تكون في اتجاه القبلة.</p>
   </section>
 
+  <!-- الأذكار -->
+  <section id="tab-azkar" class="tab">
+    <h1 class="page-title">الأذكار</h1>
+    <div class="seg" role="tablist">
+      <button id="segMorning" class="on" role="tab"><svg class="ic"><use href="#i-sunrise"/></svg>أذكار الصباح</button>
+      <button id="segEvening" role="tab"><svg class="ic"><use href="#i-moon"/></svg>أذكار المساء</button>
+    </div>
+    <div class="progress"><i id="azBar"></i></div>
+    <div id="azkarProgress" class="hint start"></div>
+    <div id="azkarList"></div>
+    <button id="azkarReset" class="btn btn-ghost wide"><svg class="ic"><use href="#i-refresh"/></svg>إعادة الأذكار من البداية</button>
+  </section>
+
+  <!-- المسبحة -->
   <section id="tab-tasbih" class="tab">
-    <div id="zikr">سبحان الله</div>
-    <button id="tasbihBtn">0</button>
+    <h1 class="page-title">المسبحة</h1>
+    <div id="zikr" class="zikr">سبحان الله</div>
+    <div class="tasbih-wrap">
+      <svg class="ring big" viewBox="0 0 260 260" aria-hidden="true">
+        <circle class="ring-bg" cx="130" cy="130" r="116"/>
+        <circle id="tasbihRing" class="ring-fg" cx="130" cy="130" r="116" transform="rotate(-90 130 130)"/>
+      </svg>
+      <button id="tasbihBtn" class="tasbih-btn" aria-label="تسبيح">0</button>
+    </div>
+    <div id="tasbihTotal" class="muted center small"></div>
     <div class="row">
-      <button id="zikrNext" class="small">الذكر التالي</button>
-      <button id="tasbihReset" class="small">تصفير</button>
+      <button id="zikrNext" class="btn btn-ghost">الذكر التالي</button>
+      <button id="tasbihReset" class="btn btn-ghost">تصفير</button>
     </div>
   </section>
 
+  <!-- الإعدادات -->
   <section id="tab-settings" class="tab">
-    <label>المدينة / المنطقة
-      <select id="city"></select>
-    </label>
-    <label>طريقة الحساب
-      <select id="method">
-        <option value="Egyptian">الهيئة المصرية العامة للمساحة (الأكثر استخداماً في فلسطين)</option>
-        <option value="MuslimWorldLeague">رابطة العالم الإسلامي</option>
-        <option value="UmmAlQura">أم القرى</option>
-        <option value="Karachi">جامعة العلوم الإسلامية - كراتشي</option>
-        <option value="Turkey">تركيا</option>
-      </select>
-    </label>
-    <label>المذهب (العصر)
-      <select id="madhab">
-        <option value="Shafi">الجمهور (شافعي/مالكي/حنبلي)</option>
-        <option value="Hanafi">حنفي</option>
-      </select>
-    </label>
-    <label>تعديل دقيق للمواقيت (بالدقائق)
+    <h1 class="page-title">الإعدادات</h1>
+
+    <div class="group">
+      <div class="group-title">الموقع</div>
+      <label class="field">المدينة / المنطقة
+        <select id="city"></select>
+      </label>
+      <button id="relocate" class="btn btn-ghost wide"><svg class="ic"><use href="#i-pin"/></svg>تحديث الموقع بالـ GPS</button>
+    </div>
+
+    <div class="group">
+      <div class="group-title">طريقة الحساب</div>
+      <label class="field">طريقة الحساب
+        <select id="method">
+          <option value="Egyptian">الهيئة المصرية للمساحة (الأشهر في فلسطين)</option>
+          <option value="MuslimWorldLeague">رابطة العالم الإسلامي</option>
+          <option value="UmmAlQura">أم القرى</option>
+          <option value="Karachi">جامعة العلوم الإسلامية - كراتشي</option>
+          <option value="Turkey">تركيا</option>
+        </select>
+      </label>
+      <label class="field">المذهب (العصر)
+        <select id="madhab">
+          <option value="Shafi">الجمهور (شافعي/مالكي/حنبلي)</option>
+          <option value="Hanafi">حنفي</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="group">
+      <div class="group-title">تعديل دقيق (بالدقائق)</div>
       <div class="adj" id="adj"></div>
-    </label>
-    <label>تعديل التاريخ الهجري
-      <select id="hijriAdj">
-        <option value="-2">-2 يوم</option><option value="-1">-1 يوم</option><option value="0">بدون</option>
-        <option value="1">+1 يوم</option><option value="2">+2 يوم</option>
-      </select>
-    </label>
-    <label class="check"><input type="checkbox" id="notify"> تنبيه عند دخول وقت الصلاة</label>
-    <button id="relocate" class="small wide">تحديث الموقع</button>
-    <p class="hint">تُحسب المواقيت على الجهاز دون إنترنت بتوقيت فلسطين (القدس) مع التحويل التلقائي للتوقيت الصيفي. للمطابقة التامة مع تقويم دائرتك المحلية (وزارة الأوقاف) استخدم التعديل الدقيق بالدقائق.</p>
+      <p class="hint start">للمطابقة التامة مع تقويم دائرتك المحلية (وزارة الأوقاف).</p>
+      <label class="field">تعديل التاريخ الهجري
+        <select id="hijriAdj">
+          <option value="-2">-2 يوم</option><option value="-1">-1 يوم</option><option value="0">بدون</option>
+          <option value="1">+1 يوم</option><option value="2">+2 يوم</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="group">
+      <label class="switch-row">
+        <span><svg class="ic"><use href="#i-bell"/></svg>تنبيه عند دخول وقت الصلاة</span>
+        <input type="checkbox" id="notify" class="switch">
+      </label>
+    </div>
+
+    <p class="hint">تُحسب المواقيت على الجهاز دون إنترنت بتوقيت فلسطين (القدس) مع التحويل التلقائي للتوقيت الصيفي.</p>
+    <div id="appVer" class="muted center small"></div>
   </section>
 </main>
 
-<nav>
-  <button data-tab="times" class="on">🕌<span>المواقيت</span></button>
-  <button data-tab="qibla">🧭<span>القبلة</span></button>
-  <button data-tab="azkar">📖<span>الأذكار</span></button>
-  <button data-tab="tasbih">📿<span>المسبحة</span></button>
-  <button data-tab="settings">⚙️<span>الإعدادات</span></button>
+<nav class="dock" aria-label="التنقل">
+  <button data-tab="times" class="on"><svg class="ic"><use href="#i-clock"/></svg><span>المواقيت</span></button>
+  <button data-tab="qibla"><svg class="ic"><use href="#i-compass"/></svg><span>القبلة</span></button>
+  <button data-tab="azkar"><svg class="ic"><use href="#i-book"/></svg><span>الأذكار</span></button>
+  <button data-tab="tasbih"><svg class="ic"><use href="#i-beads"/></svg><span>المسبحة</span></button>
+  <button data-tab="settings"><svg class="ic"><use href="#i-sliders"/></svg><span>الإعدادات</span></button>
 </nav>
 
 <script src="lib/adhan.umd.min.js"></script>

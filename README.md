@@ -28,3 +28,6 @@ bash native/build.sh      # الناتج: native/build/prayer.apk (نسخة جا
 ./native/release.sh 1.3 "ملاحظات التحديث"
 git add -A && git commit -m "release 1.3" && git push   # ثم ادمج في main
 ```
+
+## تطبيق ويب قابل للإضافة (PWA)
+مجلد `docs/` نسخة ويب كاملة من التطبيق (تعمل دون إنترنت بعد أول فتح). فعّل **Settings → Pages → Deploy from a branch → main / docs**، ثم افتح الرابط في Chrome واختر "إضافة إلى الشاشة الرئيسية" لتثبيته كتطبيق مصغّر.

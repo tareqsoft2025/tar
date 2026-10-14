@@ -9,6 +9,8 @@ CODE=$(( $(grep -o 'versionCode="[0-9]*"' native/AndroidManifest.xml | grep -o '
 sed -i "s/android:versionCode=\"[0-9]*\" android:versionName=\"[^\"]*\"/android:versionCode=\"$CODE\" android:versionName=\"$NAME\"/" native/AndroidManifest.xml
 bash native/build.sh
 cp native/build/prayer.apk dist/prayer.apk
+# نسخة الويب (تطبيق PWA) لنشرها عبر GitHub Pages من مجلد docs
+rm -rf docs && mkdir docs && cp -r www/. docs/ && touch docs/.nojekyll
 python3 - "$CODE" "$NAME" "$NOTES" <<'PY'
 import json, sys
 json.dump({"versionCode": int(sys.argv[1]), "versionName": sys.argv[2], "notes": sys.argv[3],
