@@ -20,3 +20,11 @@ cd android && ./gradlew assembleDebug
 bash native/build.sh      # الناتج: native/build/prayer.apk (نسخة جاهزة في dist/prayer.apk)
 ```
 يستخدم WebView أصلي (Java) مع نفس واجهة `www/`. التوقيع بمفتاح تجريبي (`native/debug.p12`) ويتطلب أندرويد 7.0 فأعلى.
+
+## التحديث الإجباري التلقائي
+عند كل فتح للتطبيق يقرأ `dist/version.json` من فرع `main`؛ إذا كان `versionCode` فيه أحدث من المثبّت تظهر شاشة تحديث لا يمكن تجاوزها، تنزّل `dist/prayer.apk` وتفتح نافذة التثبيت.
+لإصدار نسخة جديدة بعد أي تعديل:
+```
+./native/release.sh 1.3 "ملاحظات التحديث"
+git add -A && git commit -m "release 1.3" && git push   # ثم ادمج في main
+```

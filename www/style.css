@@ -40,3 +40,14 @@ nav button.on{color:var(--accent)}
 .adj{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
 .adj div{text-align:center;font-size:.8rem}
 .adj input{width:100%;margin-top:4px;padding:8px 2px;border-radius:10px;border:none;background:var(--card);color:var(--text);text-align:center;font-size:1rem}
+#update{position:fixed;inset:0;z-index:99;background:rgba(5,25,19,.97);display:flex;align-items:center;justify-content:center;padding:24px}
+#update[hidden]{display:none}
+#update .box{background:var(--card);border:2px solid var(--accent);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center}
+#update .ico{font-size:2.6rem}
+#update h2{color:var(--accent);margin:6px 0 10px}
+#update p{margin:6px 0;color:var(--text)}
+#updBar{height:10px;background:#0b3d2e;border-radius:6px;overflow:hidden;margin:14px 0;display:none}
+#updBar i{display:block;height:100%;width:0;background:var(--accent)}
+#updMsg{color:var(--accent);font-size:.9rem}
+#updBtn{width:100%;margin-top:10px;padding:14px;border:none;border-radius:14px;background:var(--accent);color:#0b3d2e;font-size:1.1rem;font-weight:bold}
+#updBtn:disabled{opacity:.5}

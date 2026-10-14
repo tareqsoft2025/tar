@@ -234,6 +234,25 @@
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.id === 'tab-' + b.dataset.tab));
   });
 
+  // التحديث الإجباري (تستدعيه النسخة الأصلية عند وجود إصدار أحدث)
+  window.showUpdate = (info) => {
+    $('update').hidden = false;
+    $('updVer').textContent = `الإصدار الجديد ${info.versionName} متاح، ولا يمكن متابعة الاستخدام قبل التحديث.`;
+    $('updNotes').textContent = info.notes || '';
+    $('updBtn').onclick = () => {
+      $('updBtn').disabled = true;
+      $('updBar').style.display = 'block';
+      $('updMsg').textContent = 'جارٍ تنزيل التحديث…';
+      window.AndroidBridge.startUpdate(info.apk);
+    };
+  };
+  window.updateProgress = (pct) => {
+    $('updBar').firstElementChild.style.width = pct + '%';
+    $('updMsg').textContent = pct >= 100 ? 'اضغط "تثبيت" في النافذة التي ظهرت' : `جارٍ التنزيل ${pct}%`;
+    if (pct >= 100) $('updBtn').disabled = false;
+  };
+  window.updateError = (msg) => { $('updMsg').textContent = msg; $('updBtn').disabled = false; };
+
   renderTasbih();
   refresh();
 })();

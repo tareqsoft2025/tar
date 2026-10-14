@@ -1,10 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="2" android:versionName="1.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="3" android:versionName="1.2">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="33"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application android:label="مواقيت الصلاة" android:allowBackup="true" android:hardwareAccelerated="true">
         <activity android:name="com.tareqsoft.prayer.MainActivity" android:exported="true" android:launchMode="singleTask" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|layoutDirection">
             <intent-filter>
@@ -13,5 +14,6 @@
             </intent-filter>
         </activity>
         <receiver android:name="com.tareqsoft.prayer.AlarmReceiver" android:exported="false"/>
+        <provider android:name="com.tareqsoft.prayer.UpdateProvider" android:authorities="com.tareqsoft.prayer.update" android:exported="false" android:grantUriPermissions="true"/>
     </application>
 </manifest>

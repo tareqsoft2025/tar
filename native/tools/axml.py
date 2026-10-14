@@ -7,9 +7,10 @@ ANDROID = 'http://schemas.android.com/apk/res/android'
 RES = {'versionCode': 0x0101021b, 'versionName': 0x0101021c, 'name': 0x01010003, 'label': 0x01010001,
        'minSdkVersion': 0x0101020c, 'targetSdkVersion': 0x01010270, 'exported': 0x01010010,
        'allowBackup': 0x01010280, 'configChanges': 0x0101001f, 'usesCleartextTraffic': 0x010104ec,
-       'launchMode': 0x0101001d, 'screenOrientation': 0x0101001e, 'hardwareAccelerated': 0x010102d3}
+       'launchMode': 0x0101001d, 'screenOrientation': 0x0101001e, 'hardwareAccelerated': 0x010102d3,
+       'authorities': 0x01010018, 'grantUriPermissions': 0x0101001b}
 INT = {'versionCode', 'minSdkVersion', 'targetSdkVersion'}
-BOOL = {'exported', 'allowBackup', 'usesCleartextTraffic', 'hardwareAccelerated'}
+BOOL = {'grantUriPermissions', 'exported', 'allowBackup', 'usesCleartextTraffic', 'hardwareAccelerated'}
 FLAGS = {'configChanges': {'orientation': 0x80, 'keyboardHidden': 0x20, 'screenSize': 0x400, 'smallestScreenSize': 0x800,
                            'screenLayout': 0x100, 'keyboard': 0x10, 'uiMode': 0x200, 'locale': 0x4, 'layoutDirection': 0x2000,
                            'density': 0x1000, 'fontScale': 0x40000000}}
