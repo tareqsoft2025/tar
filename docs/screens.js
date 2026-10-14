@@ -278,7 +278,7 @@
     if (!n) box.appendChild(el('div', 'empty-msg', 'لا نتائج'));
   }
   $('qSearch').oninput = renderSurahList;
-  App.screens.quran = renderQuranHome;
+  App.screens.quran = () => { renderQuranHome(); renderReciter(); };
 
   function chooseWird() {
     const items = WIRD_OPTS.map(([t, n]) => [`${t} (${n} آية)`, () => {
@@ -371,6 +371,8 @@
     } else if (act === 'here') {
       store.set('qlast', { s: sel.s, a: sel.a });
       toast('سُجّل موضع وصولك للورد اليومي');
+    } else if (act === 'reciter') {
+      chooseReciter();
     } else if (act === 'play') {
       play(sel.s, sel.a);
     } else if (act === 'copy') {
@@ -383,7 +385,39 @@
   /* ----- التلاوة الصوتية (تحتاج إنترنت) ----- */
   const audio = $('qaudio');
   let playing = null;
-  const RECITER = 'Alafasy_128kbps';
+  // القرّاء المتاحون من خدمة everyayah.com (مجلد الصوت، الاسم)
+  const RECITERS = [
+    ['Alafasy_128kbps', 'مشاري العفاسي'],
+    ['Abdul_Basit_Murattal_192kbps', 'عبد الباسط عبد الصمد (مرتّل)'],
+    ['Husary_128kbps', 'محمود خليل الحصري'],
+    ['Minshawy_Murattal_128kbps', 'محمد صديق المنشاوي (مرتّل)'],
+    ['Abdurrahmaan_As-Sudais_192kbps', 'عبد الرحمن السديس'],
+    ['Saood_ash-Shuraym_128kbps', 'سعود الشريم'],
+    ['Maher_AlMuaiqly_64kbps', 'ماهر المعيقلي'],
+    ['Ghamadi_40kbps', 'سعد الغامدي'],
+    ['Hudhaify_128kbps', 'علي الحذيفي'],
+    ['Abu_Bakr_Ash-Shaatree_128kbps', 'أبو بكر الشاطري'],
+    ['Muhammad_Ayyoub_128kbps', 'محمد أيوب'],
+    ['Yasser_Ad-Dussary_128kbps', 'ياسر الدوسري'],
+    ['Nasser_Alqatami_128kbps', 'ناصر القطامي'],
+    ['Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net', 'أحمد العجمي']
+  ];
+  const reciterId = () => { const r = store.get('qreciter', RECITERS[0][0]); return RECITERS.some((x) => x[0] === r) ? r : RECITERS[0][0]; };
+  const reciterName = () => RECITERS.find((x) => x[0] === reciterId())[1];
+  function chooseReciter() {
+    choose('اختر القارئ', RECITERS.map(([id, name]) => [(id === reciterId() ? '● ' : '') + name, () => {
+      store.set('qreciter', id);
+      renderReciter();
+      toast('القارئ: ' + name);
+      if (playing) play(playing.s, playing.a); // يعيد الآية الحالية بصوت القارئ الجديد
+    }]));
+  }
+  function renderReciter() {
+    $('qReciter').innerHTML = `${icon('quran', 'ic gold')}<span>القارئ: ${reciterName()}</span>${icon('chev', 'chev')}`;
+    $('mpReciter').textContent = reciterName();
+  }
+  $('qReciter').onclick = chooseReciter;
+  $('mpReciter').onclick = chooseReciter;
   function markPlaying() {
     document.querySelectorAll('.ay.playing').forEach((n) => n.classList.remove('playing'));
     if (!playing || playing.s !== rs) return;
@@ -399,8 +433,8 @@
   }
   function play(s, a) {
     playing = { s, a };
-    audio.src = `https://everyayah.com/data/${RECITER}/${pad3(s)}${pad3(a)}.mp3`;
-    audio.play().then(updateMini, () => { toast('تعذر تشغيل التلاوة — تحتاج إلى اتصال بالإنترنت'); stop(); });
+    audio.src = `https://everyayah.com/data/${reciterId()}/${pad3(s)}${pad3(a)}.mp3`;
+    audio.play().then(updateMini, () => { toast('تعذر تشغيل التلاوة — تحقق من الإنترنت أو جرّب قارئاً آخر'); stop(); });
     markPlaying(); updateMini();
   }
   function stop() { audio.pause(); playing = null; document.querySelectorAll('.ay.playing').forEach((n) => n.classList.remove('playing')); updateMini(); }
@@ -409,8 +443,9 @@
     const total = Q[playing.s - 1][2].length;
     if (playing.a < total) play(playing.s, playing.a + 1); else stop();
   };
-  audio.onerror = () => { if (playing) { toast('تعذر تشغيل التلاوة — تحتاج إلى اتصال بالإنترنت'); stop(); } };
+  audio.onerror = () => { if (playing) { toast('تعذر تشغيل التلاوة — تحقق من الإنترنت أو جرّب قارئاً آخر'); stop(); } };
   audio.onplay = audio.onpause = updateMini;
   $('mpToggle').onclick = () => { if (audio.paused) audio.play(); else audio.pause(); };
   $('mpClose').onclick = stop;
+  renderReciter();
 })();

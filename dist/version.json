@@ -1,6 +1,6 @@
 {
-  "versionCode": 15,
-  "versionName": "3.0",
-  "notes": "متابعة الصلوات والقضاء والقرآن الكريم والتقويم الهجري والأذكار التلقائية وأقرب المساجد",
+  "versionCode": 16,
+  "versionName": "3.1",
+  "notes": "اختيار القارئ للتلاوة (14 قارئاً)",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
