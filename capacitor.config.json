@@ -1,0 +1,6 @@
+{
+  "appId": "com.tareqsoft.prayer",
+  "appName": "مواقيت الصلاة",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

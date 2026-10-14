@@ -1,0 +1,53 @@
+:root{--bg:#0b3d2e;--card:#14543f;--accent:#e8c872;--text:#f4f1e6;--muted:#a9c9bb}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,"Noto Naskh Arabic","Segoe UI",sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+header{text-align:center;padding:18px 12px 8px}
+#hijri{font-size:1.3rem;color:var(--accent);font-weight:bold}
+#gregorian,#place{color:var(--muted);font-size:.9rem;margin-top:2px}
+main{flex:1;padding:8px 14px 90px;overflow-y:auto}
+.tab{display:none}.tab.active{display:block}
+.next{background:var(--card);border-radius:18px;padding:16px;text-align:center;margin-bottom:12px}
+.label{color:var(--muted);font-size:.9rem}
+.big{font-size:2rem;color:var(--accent);font-weight:bold;margin:4px 0}
+.count{font-size:2.2rem;font-variant-numeric:tabular-nums;direction:ltr}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;justify-content:space-between;background:var(--card);margin-bottom:8px;padding:14px 16px;border-radius:14px;font-size:1.1rem}
+li.current{outline:2px solid var(--accent);background:#1c6a4f}
+li .t{direction:ltr;font-variant-numeric:tabular-nums}
+.compass{width:260px;height:260px;margin:20px auto;border-radius:50%;border:4px solid var(--accent);
+  background:radial-gradient(circle,#14543f,#0b3d2e);position:relative}
+#needle{position:absolute;inset:0;transition:transform .15s linear}
+#needle span{position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:2.4rem}
+#needle::after{content:"";position:absolute;left:50%;top:40px;bottom:50%;width:3px;background:var(--accent);transform:translateX(-50%)}
+#qiblaInfo{text-align:center;font-size:1.2rem}
+.hint{color:var(--muted);text-align:center;font-size:.85rem}
+#zikr{text-align:center;font-size:2rem;color:var(--accent);margin:24px 0}
+#tasbihBtn{display:block;margin:0 auto;width:210px;height:210px;border-radius:50%;border:6px solid var(--accent);
+  background:var(--card);color:var(--text);font-size:3.5rem;font-weight:bold}
+#tasbihBtn:active{background:#1c6a4f}
+.row{display:flex;gap:10px;justify-content:center;margin-top:24px}
+button.small{background:var(--card);color:var(--text);border:1px solid var(--accent);border-radius:12px;padding:10px 18px;font-size:1rem}
+button.wide{width:100%;margin-top:14px}
+label{display:block;margin-bottom:16px;color:var(--muted)}
+select{display:block;width:100%;margin-top:6px;padding:12px;border-radius:12px;border:none;background:var(--card);color:var(--text);font-size:1rem}
+label.check{display:flex;align-items:center;gap:10px;color:var(--text)}
+label.check input{width:22px;height:22px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#082b20;border-top:1px solid #1c6a4f;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:none;color:var(--muted);padding:10px 0;font-size:1.4rem;display:flex;flex-direction:column;align-items:center}
+nav button span{font-size:.7rem;margin-top:2px}
+nav button.on{color:var(--accent)}
+.adj{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.adj div{text-align:center;font-size:.8rem}
+.adj input{width:100%;margin-top:4px;padding:8px 2px;border-radius:10px;border:none;background:var(--card);color:var(--text);text-align:center;font-size:1rem}
+#update{position:fixed;inset:0;z-index:99;background:rgba(5,25,19,.97);display:flex;align-items:center;justify-content:center;padding:24px}
+#update[hidden]{display:none}
+#update .box{background:var(--card);border:2px solid var(--accent);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center}
+#update .ico{font-size:2.6rem}
+#update h2{color:var(--accent);margin:6px 0 10px}
+#update p{margin:6px 0;color:var(--text)}
+#updBar{height:10px;background:#0b3d2e;border-radius:6px;overflow:hidden;margin:14px 0;display:none}
+#updBar i{display:block;height:100%;width:0;background:var(--accent)}
+#updMsg{color:var(--accent);font-size:.9rem}
+#updBtn{width:100%;margin-top:10px;padding:14px;border:none;border-radius:14px;background:var(--accent);color:#0b3d2e;font-size:1.1rem;font-weight:bold}
+#updBtn:disabled{opacity:.5}

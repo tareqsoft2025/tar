@@ -1,0 +1,19 @@
+{
+  "name": "prayer-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "تطبيق مواقيت الصلاة",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/geolocation": "^6.0.1",
+    "@capacitor/local-notifications": "^6.1.0",
+    "adhan": "^4.4.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}
