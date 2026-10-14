@@ -514,7 +514,7 @@
 
   /* ---------- التنقل ---------- */
   const App = { screens: {} };
-  const PARENT = { stats: 'more', qada: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', reader: 'quran' };
+  const PARENT = { stats: 'more', qada: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
   const stack = [];
   let current = 'times';
   const isActive = (n) => current === n;

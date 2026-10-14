@@ -322,3 +322,52 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 .qs-box{max-height:82vh;overflow-y:auto}
 .time-in{min-height:44px;padding:0 12px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:1.0625rem;font-weight:700;direction:ltr}
 #adhkarCfg .srow{border-top:1px solid var(--line)}
+
+/* ===== أحاديث وسيرة ومواقف ===== */
+.hcard{display:block;width:100%;margin-top:14px;padding:16px;border-radius:var(--r-md);background:var(--card);border:1px solid var(--line);text-align:start}
+.hcard small{color:var(--gold);font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.hcard small .ic{width:16px;height:16px}
+.hcard .ht{font-family:"Amiri","Plex",serif;font-size:1.25rem;line-height:2;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.hcard .hs{color:var(--muted);font-size:.8125rem;margin-top:4px}
+.hd{padding:18px;margin-bottom:10px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.hd .ht{font-family:"Amiri","Plex",serif;font-size:1.375rem;line-height:2.1}
+.hd .hr{color:var(--gold);font-size:.875rem;font-weight:700;margin-top:8px}
+.hd .hb{color:var(--muted);font-size:.9375rem;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.hd .hact{display:flex;gap:8px;margin-top:10px}
+.hd .hact button{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:var(--r-full);background:var(--bg);border:1px solid var(--line);font-size:.875rem}
+.hd .hact .ic{width:16px;height:16px}
+.hd .fav.on{color:var(--gold);border-color:var(--gold)}
+.hd .fav.on .ic{fill:var(--gold)}
+.sira-hero{margin-bottom:16px}
+.sira-prog{font-size:1.125rem;font-weight:700;margin:4px 0 10px}
+.timeline{position:relative;padding-inline-start:0}
+.era{margin:18px 4px 10px;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:10px}
+.era::after{content:"";flex:1;height:1px;background:var(--line)}
+.tl{position:relative;display:flex;gap:14px;padding-bottom:14px}
+.tl::before{content:"";position:absolute;inset-block:26px 0;inset-inline-start:15px;width:2px;background:var(--line)}
+.tl:last-child::before{display:none}
+.tl .dot{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--bg);border:2px solid var(--line);font-size:.75rem;font-weight:700;color:var(--muted);z-index:1}
+.tl.read .dot{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}
+.tl.read .dot .ic{width:16px;height:16px;stroke-width:3}
+.tl .tc{flex:1;text-align:start;padding:12px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.tl .tc small{color:var(--gold);font-size:.75rem;font-weight:700}
+.tl .tc b{display:block;font-size:1.0625rem;margin:2px 0}
+.tl .tc span{color:var(--muted);font-size:.875rem}
+.les{display:flex;gap:12px;align-items:center;width:100%;padding:14px 16px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin-bottom:8px;text-align:start}
+.les .lt{flex:1}
+.les .lt small{color:var(--gold);font-weight:700;font-size:.75rem}
+.les .lt b{display:block;font-size:1.0625rem;line-height:1.5}
+.les .chev{color:var(--muted)}
+.story{padding:4px 2px}
+.story-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0}
+.chipx{padding:4px 12px;border-radius:var(--r-full);background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold);font-weight:700;font-size:.8125rem}
+.story-title{font-size:1.75rem;font-weight:700;line-height:1.4;margin:6px 0 14px}
+.story-body p{font-size:1.1875rem;line-height:2.1;margin:0 0 14px}
+.lesson{margin:20px 0 12px;padding:16px;border-radius:var(--r-md);background:linear-gradient(135deg,color-mix(in srgb,var(--gold) 20%,var(--card)),var(--card));border:1px solid color-mix(in srgb,var(--gold) 45%,var(--line));font-size:1.0625rem;line-height:1.9}
+.lesson-h{display:flex;align-items:center;gap:8px;color:var(--gold);font-weight:700;margin-bottom:6px}
+.lesson-h .ic{width:18px;height:18px}
+.lg.hist{background:#7CB7FF}
+.cd.hist::before{content:"";position:absolute;top:5px;inset-inline-end:6px;width:6px;height:6px;border-radius:50%;background:#7CB7FF}
+.cd.today.hist::before{background:var(--on-gold)}
+.hdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7CB7FF;margin-inline-end:6px}
+.edesc{color:var(--muted);font-size:.875rem;margin-top:2px;line-height:1.6}

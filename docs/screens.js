@@ -116,11 +116,13 @@
       if (h.m !== m) break;
       last = dt;
       const evs = Core.hijriEvents(h);
+      const hs = (window.HIST && window.HIST[h.m + '-' + h.d]) || [];
       const kinds = evs.map((e) => e.kind);
       const isToday = h.y === h0.y && h.m === h0.m && h.d === h0.d;
-      const cls = ['cd', isToday ? 'today' : '', kinds.includes('white') ? 'white' : '', kinds.includes('eid') ? 'eid' : kinds.includes('fast') ? 'fast' : kinds.includes('night') ? 'fast' : ''].join(' ');
+      const cls = ['cd', isToday ? 'today' : '', kinds.includes('white') ? 'white' : '', kinds.includes('eid') ? 'eid' : kinds.includes('fast') ? 'fast' : kinds.includes('night') ? 'fast' : '', hs.length ? 'hist' : ''].join(' ');
       grid.appendChild(el('div', cls, `<b>${h.d}</b><small>${gDay(dt)}</small>`));
       evs.filter((e) => e.kind !== 'white').forEach((e) => events.push({ h, dt, label: e.label }));
+      hs.forEach((x) => events.push({ h, dt, label: x.t, desc: x.d, hist: true }));
       if (kinds.includes('white') && h.d === 13) events.push({ h, dt, label: 'الأيام البيض (13 و14 و15)' });
     }
     const f = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { month: 'long', timeZone: TZ });
@@ -131,7 +133,7 @@
     const seen = {};
     const rows = events.filter((e) => { if (/العشر الأواخر|التشريق/.test(e.label)) { if (seen[e.label]) return false; seen[e.label] = 1; } return true; });
     if (!rows.length) box.appendChild(el('div', 'empty-msg', 'لا مناسبات خاصة في هذا الشهر'));
-    rows.forEach((e) => box.appendChild(el('div', 'ev', `<div class="ed">${e.h.d}<small>${Core.HIJRI_MONTHS[e.h.m - 1]}</small></div><div class="et">${e.label}<br><small class="muted">${new Intl.DateTimeFormat('ar-PS-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(e.dt)}</small></div>`)));
+    rows.forEach((e) => box.appendChild(el('div', 'ev', `<div class="ed">${e.h.d}<small>${Core.HIJRI_MONTHS[e.h.m - 1]}</small></div><div class="et">${e.hist ? '<span class="hdot"></span>' : ''}${e.label}${e.desc ? `<div class="edesc">${e.desc}</div>` : ''}<br><small class="muted">${new Intl.DateTimeFormat('ar-PS-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(e.dt)}</small></div>`)));
   }
   $('calPrev').onclick = () => { calOff--; renderCalendar(); };
   $('calNext').onclick = () => { calOff++; renderCalendar(); };
@@ -377,8 +379,7 @@
       play(sel.s, sel.a);
     } else if (act === 'copy') {
       const t = Q[sel.s - 1][2][sel.a - 1] + ` ﴿${arNum(sel.a)}﴾ — سورة ${surahName(sel.s)}`;
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toast('نُسخت الآية'), () => toast('تعذر النسخ'));
-      else toast('النسخ غير متاح');
+      if (App.copyText) App.copyText(t, 'نُسخت الآية'); else toast('النسخ غير متاح');
     }
   };
 

@@ -252,6 +252,24 @@ public class MainActivity extends Activity {
         public boolean overlayEnabled() { return OverlayService.enabled(MainActivity.this); }
 
         @JavascriptInterface
+        public void copy(final String text) {
+            runOnUiThread(new Runnable() { public void run() {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("text", text));
+            } });
+        }
+
+        @JavascriptInterface
+        public void share(final String text) {
+            runOnUiThread(new Runnable() { public void run() {
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType("text/plain");
+                i.putExtra(Intent.EXTRA_TEXT, text);
+                startActivity(Intent.createChooser(i, "مشاركة"));
+            } });
+        }
+
+        @JavascriptInterface
         public void setLogged(String json) { Scheduler.saveLogged(MainActivity.this, json); }
 
         /** Opens the maps app on a place (mosque directions). */
