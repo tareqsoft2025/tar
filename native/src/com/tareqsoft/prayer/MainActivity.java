@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
         web = new WebView(this);
         setContentView(web);
         SharedPreferences tp = getSharedPreferences("prayer", MODE_PRIVATE);
-        applyBars(tp.getString("bar_bg", "#06231a"), tp.getString("bar_nav", "#0a2a1f"), tp.getBoolean("bar_light", false));
+        applyBars(tp.getString("bar_bg", "#0b1620"), tp.getString("bar_nav", "#101e2b"), tp.getBoolean("bar_light", false));
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
