@@ -21,7 +21,8 @@
       method: store.get('method', 'Egyptian'),
       madhab: store.get('madhab', 'Shafi'),
       notify: store.get('notify', true),
-      remind: store.get('remind', 5)
+      remind: store.get('remind', 5),
+      mute: store.get('mute', {})
     };
   }
 
@@ -70,6 +71,7 @@
     for (let d = 0; d < 7; d++) {
       const t = calc(state, new Date(now.getTime() + d * 864e5));
       PRAYERS.forEach((k) => {
+        if (state.mute && state.mute[k]) return;
         const at = t[k].getTime();
         if (remind > 0 && at - remind * 60000 > now.getTime())
           list.push({ at: at - remind * 60000, title: `اقتربت صلاة ${NAMES[k]}`, body: `تبقّى ${remind} دقائق على أذان ${NAMES[k]}` });
