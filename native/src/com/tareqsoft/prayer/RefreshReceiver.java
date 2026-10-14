@@ -47,6 +47,7 @@ public class RefreshReceiver extends BroadcastReceiver {
                 s.setAllowFileAccess(true);
                 w.addJavascriptInterface(new Object() {
                     @JavascriptInterface public void schedule(String json) { Scheduler.schedule(app, json); }
+                    @JavascriptInterface public void saveTimes(String json) { Scheduler.saveTimes(app, json); }
                     @JavascriptInterface public void done() { h.post(finish); }
                 }, "AndroidBridge");
                 w.loadUrl(url);

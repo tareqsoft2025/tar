@@ -66,6 +66,12 @@ final class Scheduler {
         } catch (Exception e) { /* ignore */ }
     }
 
+    /** All prayer times (next days) for the home-screen widget: [{"k":"fajr","n":"الفجر","at":ms,"d":"yyyy-mm-dd"}, ...] */
+    static void saveTimes(Context c, String json) {
+        c.getSharedPreferences("prayer", Context.MODE_PRIVATE).edit().putString("times", json).apply();
+        PrayerWidget.updateAll(c);
+    }
+
     /** Re-run the background refresh (location + reschedule) after delayMs. */
     static void armRefresh(Context c, long delayMs) {
         Intent in = new Intent(c, RefreshReceiver.class);

@@ -4,7 +4,12 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
+import android.graphics.drawable.Icon;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -211,6 +216,33 @@ public class MainActivity extends Activity {
     public void onBackPressed() { moveTaskToBack(true); }
 
     class Bridge {
+        @JavascriptInterface
+        public void saveTimes(String json) { Scheduler.saveTimes(MainActivity.this, json); }
+
+        /** Asks the launcher to pin the prayer widget (Android 8+). Returns false if unsupported. */
+        @JavascriptInterface
+        public boolean pinWidget() {
+            if (Build.VERSION.SDK_INT < 26) return false;
+            AppWidgetManager m = AppWidgetManager.getInstance(MainActivity.this);
+            if (!m.isRequestPinAppWidgetSupported()) return false;
+            return m.requestPinAppWidget(new ComponentName(MainActivity.this, PrayerWidget.class), null, null);
+        }
+
+        /** Asks the launcher to pin an app shortcut to the home screen (Android 8+). */
+        @JavascriptInterface
+        public boolean pinShortcut() {
+            if (Build.VERSION.SDK_INT < 26) return false;
+            ShortcutManager sm = (ShortcutManager) getSystemService(Context.SHORTCUT_SERVICE);
+            if (sm == null || !sm.isRequestPinShortcutSupported()) return false;
+            Intent open = new Intent(MainActivity.this, MainActivity.class);
+            open.setAction(Intent.ACTION_MAIN);
+            ShortcutInfo info = new ShortcutInfo.Builder(MainActivity.this, "prayer_home")
+                .setShortLabel("مواقيت الصلاة")
+                .setIcon(Icon.createWithResource(MainActivity.this, R.mipmap.ic_launcher))
+                .setIntent(open).build();
+            return sm.requestPinShortcut(info, null);
+        }
+
         @JavascriptInterface
         public void setTheme(final String bg, final String nav, final boolean light) {
             getSharedPreferences("prayer", MODE_PRIVATE).edit()

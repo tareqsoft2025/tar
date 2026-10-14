@@ -184,3 +184,4 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 .toast.show{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:360px){.next-name{font-size:2rem}.count{font-size:1.625rem}.themes{grid-template-columns:repeat(3,1fr)}}
+.srow.link small{font-weight:400}
