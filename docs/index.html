@@ -71,6 +71,7 @@
     <button class="qs-btn" data-act="book"><svg class="ic gold"><use href="#i-bookmark"/></svg>علامة مرجعية هنا</button>
     <button class="qs-btn" data-act="here"><svg class="ic gold"><use href="#i-check"/></svg>وصلت إلى هنا (للورد اليومي)</button>
     <button class="qs-btn" data-act="play"><svg class="ic gold"><use href="#i-play"/></svg>استماع من هنا</button>
+    <button class="qs-btn" data-act="reciter"><svg class="ic gold"><use href="#i-quran"/></svg>تغيير القارئ</button>
     <button class="qs-btn" data-act="copy"><svg class="ic gold"><use href="#i-copy"/></svg>نسخ الآية</button>
   </div>
 </div>
@@ -80,7 +81,7 @@
 </div>
 <div id="miniPlayer" class="mini" hidden>
   <button id="mpToggle" class="icon-btn" aria-label="تشغيل/إيقاف"><svg class="ic"><use href="#i-pause"/></svg></button>
-  <div class="mp-info"><b id="mpTitle"></b><small class="muted">مشاري العفاسي</small></div>
+  <div class="mp-info"><b id="mpTitle"></b><small id="mpReciter" class="muted"></small></div>
   <button id="mpClose" class="icon-btn" aria-label="إغلاق"><svg class="ic"><use href="#i-x"/></svg></button>
 </div>
 <audio id="qaudio" preload="none"></audio>
@@ -241,6 +242,7 @@
     <div id="qContinue"></div>
     <div id="qWird"></div>
     <div id="qBooks"></div>
+    <button id="qReciter" class="link-card" type="button" style="margin-top:0;margin-bottom:12px"></button>
     <div class="search"><svg class="ic"><use href="#i-search"/></svg><input id="qSearch" type="search" placeholder="ابحث باسم السورة أو رقمها" aria-label="بحث"></div>
     <div id="qList" class="group"></div>
     <p class="note c"><span>نص المصحف: رواية حفص عن عاصم (الرسم العثماني) — المصدر: موسوعة القرآن الكريم quranenc.com عبر مشروع quran-json (CC BY-SA 4.0). التلاوة الصوتية تحتاج إنترنت.</span></p>
