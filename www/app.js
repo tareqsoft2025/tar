@@ -11,28 +11,53 @@
   };
 
   const state = {
-    coords: store.get('coords', null),
-    method: store.get('method', 'UmmAlQura'),
+    city: store.get('city', 'القدس (المسجد الأقصى)'),
+    gps: store.get('gps', null),
+    adj: store.get('adj', { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }),
+    hijriAdj: store.get('hijriAdj', 0),
+    coords: null,
+    method: store.get('method', 'Egyptian'),
     madhab: store.get('madhab', 'Shafi'),
     notify: store.get('notify', false),
     place: store.get('place', '')
   };
 
-  const fmt = new Intl.DateTimeFormat('ar', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const TZ = 'Asia/Hebron';
+  const fmt = new Intl.DateTimeFormat('ar', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: TZ });
+  const GPS = 'الموقع الحالي (GPS)';
+
+  function cityCoords(name) {
+    for (const g of window.PLACES) for (const it of g.items) if (it[0] === name) return { lat: it[1], lon: it[2] };
+    return null;
+  }
+  function resolveCoords() {
+    if (state.city === GPS && state.gps) { state.coords = state.gps; state.place = 'موقعك الحالي'; }
+    else {
+      if (state.city === GPS) state.city = 'القدس (المسجد الأقصى)';
+      state.coords = cityCoords(state.city);
+      state.place = state.city + ' - فلسطين';
+    }
+  }
+  // تاريخ اليوم بتقويم فلسطين (حتى لو كان توقيت الجهاز مختلفاً)
+  function psDay(date) {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).split('-');
+    return new Date(+p[0], +p[1] - 1, +p[2], 12, 0, 0);
+  }
   const pad = (n) => String(n).padStart(2, '0');
 
   function calc(date) {
     const c = new adhan.Coordinates(state.coords.lat, state.coords.lon);
     const p = adhan.CalculationMethod[state.method]();
     p.madhab = adhan.Madhab[state.madhab];
-    return new adhan.PrayerTimes(c, date, p);
+    ORDER.forEach((k) => { p.adjustments[k] = (p.adjustments[k] || 0) + (+state.adj[k] || 0); });
+    return new adhan.PrayerTimes(c, psDay(date), p);
   }
 
   function renderDates() {
     const now = new Date();
-    try { $('hijri').textContent = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { dateStyle: 'full' }).format(now); } catch (e) {}
-    $('gregorian').textContent = new Intl.DateTimeFormat('ar', { dateStyle: 'full' }).format(now);
-    $('place').textContent = state.place || (state.coords ? `${state.coords.lat.toFixed(2)}, ${state.coords.lon.toFixed(2)}` : 'الموقع غير محدد');
+    try { $('hijri').textContent = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { dateStyle: 'full', timeZone: TZ }).format(new Date(now.getTime() + state.hijriAdj * 864e5)); } catch (e) {}
+    $('gregorian').textContent = new Intl.DateTimeFormat('ar', { dateStyle: 'full', timeZone: TZ }).format(now);
+    $('place').textContent = state.place;
   }
 
   function nextPrayer(now) {
@@ -112,26 +137,25 @@
       let lat, lon;
       if (P.Geolocation) {
         await P.Geolocation.requestPermissions();
-        const pos = await P.Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 20000 });
+        const pos = await P.Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 20000 });
         lat = pos.coords.latitude; lon = pos.coords.longitude;
       } else {
-        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 20000 }));
+        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 20000 }));
         lat = pos.coords.latitude; lon = pos.coords.longitude;
       }
-      state.coords = { lat, lon };
-      state.place = '';
-      store.set('coords', state.coords);
-      store.set('place', '');
+      state.gps = { lat, lon };
+      store.set('gps', state.gps);
+      state.city = GPS;
+      store.set('city', GPS);
+      $('city').value = GPS;
     } catch (e) {
-      if (!state.coords) {
-        $('place').textContent = 'تعذر تحديد الموقع. فعّل GPS ثم اضغط "تحديث الموقع" في الإعدادات.';
-        return;
-      }
+      alert('تعذر تحديد الموقع. فعّل GPS أو اختر مدينتك من القائمة.');
     }
     refresh();
   }
 
   function refresh() {
+    resolveCoords();
     renderDates();
     renderTimes();
     renderQibla();
@@ -175,6 +199,35 @@
   $('notify').onchange = (e) => { state.notify = e.target.checked; store.set('notify', state.notify); scheduleNotifications(); };
   $('relocate').onclick = locate;
 
+  const citySel = $('city');
+  const og0 = document.createElement('optgroup'); og0.label = 'تلقائي';
+  og0.innerHTML = `<option value="${GPS}">${GPS}</option>`;
+  citySel.appendChild(og0);
+  window.PLACES.forEach((g) => {
+    const og = document.createElement('optgroup'); og.label = g.group;
+    g.items.forEach((it) => { const o = document.createElement('option'); o.value = it[0]; o.textContent = it[0]; og.appendChild(o); });
+    citySel.appendChild(og);
+  });
+  if (state.city === GPS && !state.gps) state.city = 'القدس (المسجد الأقصى)';
+  citySel.value = state.city;
+  citySel.onchange = (e) => {
+    state.city = e.target.value; store.set('city', state.city);
+    if (state.city === GPS && !state.gps) locate(); else refresh();
+  };
+
+  const adjBox = $('adj');
+  ORDER.forEach((k) => {
+    const d = document.createElement('div');
+    d.innerHTML = `${NAMES[k]}<input type="number" inputmode="numeric" step="1" min="-30" max="30" value="${state.adj[k] || 0}">`;
+    d.querySelector('input').onchange = (e) => {
+      state.adj[k] = Math.max(-30, Math.min(30, parseInt(e.target.value, 10) || 0));
+      e.target.value = state.adj[k]; store.set('adj', state.adj); refresh();
+    };
+    adjBox.appendChild(d);
+  });
+  $('hijriAdj').value = String(state.hijriAdj);
+  $('hijriAdj').onchange = (e) => { state.hijriAdj = +e.target.value; store.set('hijriAdj', state.hijriAdj); renderDates(); };
+
   // Tabs
   document.querySelectorAll('nav button').forEach((b) => b.onclick = () => {
     document.querySelectorAll('nav button').forEach((x) => x.classList.toggle('on', x === b));
@@ -182,6 +235,5 @@
   });
 
   renderTasbih();
-  if (state.coords) refresh();
-  locate();
+  refresh();
 })();

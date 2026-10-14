@@ -37,3 +37,6 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#082b20;borde
 nav button{flex:1;background:none;border:none;color:var(--muted);padding:10px 0;font-size:1.4rem;display:flex;flex-direction:column;align-items:center}
 nav button span{font-size:.7rem;margin-top:2px}
 nav button.on{color:var(--accent)}
+.adj{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.adj div{text-align:center;font-size:.8rem}
+.adj input{width:100%;margin-top:4px;padding:8px 2px;border-radius:10px;border:none;background:var(--card);color:var(--text);text-align:center;font-size:1rem}
