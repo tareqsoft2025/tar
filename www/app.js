@@ -70,7 +70,21 @@
     if (state.nextTime <= new Date()) renderTimes(); else tick(state.nextTime);
   }, 1000);
 
+  function scheduleNative() {
+    const B = window.AndroidBridge;
+    if (!state.notify || !state.coords) { B.cancel(); return; }
+    const list = [];
+    for (let d = 0; d < 7; d++) {
+      const t = calc(new Date(Date.now() + d * 864e5));
+      PRAYERS.forEach((k) => {
+        if (t[k] > new Date()) list.push({ at: t[k].getTime(), title: 'حان وقت الصلاة', body: `حان الآن موعد صلاة ${NAMES[k]}` });
+      });
+    }
+    B.schedule(JSON.stringify(list));
+  }
+
   async function scheduleNotifications() {
+    if (window.AndroidBridge) return scheduleNative();
     const LN = P.LocalNotifications;
     if (!LN) return;
     try {

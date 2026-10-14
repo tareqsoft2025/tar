@@ -14,3 +14,9 @@ npx cap add android && npx cap sync android
 cd android && ./gradlew assembleDebug
 ```
 الملف الناتج: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+## بناء APK بدون Android SDK
+```
+bash native/build.sh      # الناتج: native/build/prayer.apk (نسخة جاهزة في dist/prayer.apk)
+```
+يستخدم WebView أصلي (Java) مع نفس واجهة `www/`. التوقيع بمفتاح تجريبي (`native/debug.p12`) ويتطلب أندرويد 7.0 فأعلى.
