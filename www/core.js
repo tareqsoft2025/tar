@@ -12,6 +12,20 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   };
 
+  // when: 'a:N' بعد الصلاة بـN دقيقة، 's:N' قبل الشروق بـN، 'm:N' قبل المغرب بـN، 'f' وقت ثابت
+  const ADHKAR_DEFAULT = {
+    morning: { on: true, when: 'a:25', fixed: '06:00' },
+    evening: { on: true, when: 'a:20', fixed: '17:00' },
+    sleep: { on: true, when: 'a:60', fixed: '22:00' }
+  };
+  function loadAdhkarCfg() {
+    const saved = store.get('adhkarCfg', null);
+    const cfg = JSON.parse(JSON.stringify(ADHKAR_DEFAULT));
+    if (saved) Object.keys(cfg).forEach((k) => { if (saved[k]) Object.assign(cfg[k], saved[k]); });
+    else if (store.get('adhkarRemind', true) === false) Object.keys(cfg).forEach((k) => { cfg[k].on = false; });
+    return cfg;
+  }
+
   function loadState() {
     return {
       city: store.get('city', GPS), // الوضع الافتراضي: تحديد تلقائي بالموقع
@@ -24,7 +38,7 @@
       remind: store.get('remind', 5),
       mute: store.get('mute', {}),
       nudge: store.get('nudge', true),               // تذكير لطيف إذا لم تُسجَّل الصلاة
-      adhkarRemind: store.get('adhkarRemind', true),  // أذكار الصباح والمساء والنوم
+      adhkarCfg: loadAdhkarCfg(),                       // تذكير الأذكار: لكل نوع تشغيل + وقت
       afterRemind: store.get('afterRemind', false),   // أذكار بعد الصلاة
       fastRemind: store.get('fastRemind', false),     // صيام الاثنين والخميس
       eventsRemind: store.get('eventsRemind', false)  // الأيام البيض والمناسبات
@@ -95,6 +109,32 @@
     return out;
   }
 
+  // وقت جداري بتوقيت فلسطين -> لحظة زمنية
+  function tzOffsetMs(ms) {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(ms));
+    const g = (t) => +p.find((x) => x.type === t).value;
+    return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) - ms;
+  }
+  function clockToEpoch(ds, hhmm) {
+    const [y, m, d] = ds.split('-').map(Number);
+    const [h, mi] = String(hhmm || '06:00').split(':').map(Number);
+    const wall = Date.UTC(y, m - 1, d, h || 0, mi || 0);
+    let t = wall - tzOffsetMs(wall);
+    t = wall - tzOffsetMs(t);
+    return t;
+  }
+  // وقت تذكير الأذكار لنوع معيّن في يوم معيّن
+  function adhkarTime(type, cfg, t, ds) {
+    const anchor = { morning: 'fajr', evening: 'asr', sleep: 'isha' }[type];
+    const w = cfg.when || 'a:0';
+    if (w === 'f') return clockToEpoch(ds, cfg.fixed);
+    const [kind, n] = w.split(':');
+    const mins = (+n || 0) * 60000;
+    if (kind === 's') return t.sunrise.getTime() - mins;
+    if (kind === 'm') return t.maghrib.getTime() - mins;
+    return t[anchor].getTime() + mins;
+  }
+
   // قائمة الإشعارات للأيام السبعة القادمة
   function notifications(state, now) {
     now = now || new Date();
@@ -123,11 +163,10 @@
         });
       }
       // 3) تذكير الأذكار
-      if (state.adhkarRemind) {
-        if (ms('fajr') + 25 * 60000 < ms('sunrise')) push(ms('fajr') + 25 * 60000, 'أذكار الصباح', 'ابدأ يومك بذكر الله', { tab: 'azkar:morning' });
-        push(ms('asr') + 20 * 60000, 'أذكار المساء', 'حافظ على أذكار المساء', { tab: 'azkar:evening' });
-        push(ms('isha') + 60 * 60000, 'أذكار النوم', 'ختام يومك بذكر الله', { tab: 'azkar:sleep' });
-      }
+      const cfg = state.adhkarCfg || ADHKAR_DEFAULT;
+      if (cfg.morning.on) push(adhkarTime('morning', cfg.morning, t, ds), 'أذكار الصباح', 'ابدأ يومك بذكر الله', { tab: 'azkar:morning' });
+      if (cfg.evening.on) push(adhkarTime('evening', cfg.evening, t, ds), 'أذكار المساء', 'حافظ على أذكار المساء', { tab: 'azkar:evening' });
+      if (cfg.sleep.on) push(adhkarTime('sleep', cfg.sleep, t, ds), 'أذكار النوم', 'ختام يومك بذكر الله', { tab: 'azkar:sleep' });
       if (state.afterRemind) PRAYERS.forEach((k) => push(ms(k) + 10 * 60000, 'أذكار بعد الصلاة', `بعد صلاة ${NAMES[k]}`, { tab: 'azkar:after' }));
       // 4) صيام الاثنين والخميس + الأيام البيض والمناسبات: تنبيه مساء اليوم السابق
       const at = ms('isha') + 30 * 60000;

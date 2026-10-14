@@ -1,6 +1,6 @@
 {
-  "versionCode": 16,
-  "versionName": "3.1",
-  "notes": "اختيار القارئ للتلاوة (14 قارئاً)",
+  "versionCode": 17,
+  "versionName": "3.2",
+  "notes": "إعدادات تذكير أذكار الصباح والمساء والنوم: تشغيل ووقت مخصص لكل منها",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

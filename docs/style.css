@@ -320,3 +320,5 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 @media (max-width:360px){.dock button span{font-size:.625rem}}
 #mqRadius{grid-template-columns:repeat(3,1fr)}
 .qs-box{max-height:82vh;overflow-y:auto}
+.time-in{min-height:44px;padding:0 12px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:1.0625rem;font-weight:700;direction:ltr}
+#adhkarCfg .srow{border-top:1px solid var(--line)}

@@ -433,10 +433,44 @@
     if (B && B.setCountdown) B.setCountdown(state.cd);
     toast(state.cd ? 'سيظهر الوقت المتبقي في الإشعارات وعلى شاشة القفل' : 'تم إيقاف عرض الوقت المتبقي');
   };
-  [['nudge', 'nudge'], ['adhkarRemind', 'adhkarRemind'], ['afterRemind', 'afterRemind'], ['fastRemind', 'fastRemind'], ['eventsRemind', 'eventsRemind']].forEach(([id, key]) => {
+  [['nudge', 'nudge'], ['afterRemind', 'afterRemind'], ['fastRemind', 'fastRemind'], ['eventsRemind', 'eventsRemind']].forEach(([id, key]) => {
     $(id).checked = !!state[key];
     $(id).onchange = (e) => { state[key] = e.target.checked; store.set(key, state[key]); scheduleNotifications(); };
   });
+  // إعدادات تذكير الأذكار: تشغيل + وقت لكل من الصباح والمساء والنوم
+  const ADHKAR_UI = {
+    morning: { title: 'أذكار الصباح', opts: [['a:0', 'عند أذان الفجر'], ['a:10', 'بعد الفجر بـ10 دقائق'], ['a:25', 'بعد الفجر بـ25 دقيقة'], ['a:45', 'بعد الفجر بـ45 دقيقة'], ['s:15', 'قبل الشروق بـ15 دقيقة'], ['f', 'وقت أحدده بنفسي']] },
+    evening: { title: 'أذكار المساء', opts: [['a:0', 'عند أذان العصر'], ['a:10', 'بعد العصر بـ10 دقائق'], ['a:20', 'بعد العصر بـ20 دقيقة'], ['a:45', 'بعد العصر بـ45 دقيقة'], ['m:15', 'قبل المغرب بـ15 دقيقة'], ['f', 'وقت أحدده بنفسي']] },
+    sleep: { title: 'أذكار النوم', opts: [['a:30', 'بعد العشاء بـ30 دقيقة'], ['a:60', 'بعد العشاء بساعة'], ['a:90', 'بعد العشاء بساعة ونصف'], ['a:120', 'بعد العشاء بساعتين'], ['f', 'وقت أحدده بنفسي']] }
+  };
+  function renderAdhkarCfg() {
+    const box = $('adhkarCfg');
+    box.innerHTML = '';
+    Object.keys(ADHKAR_UI).forEach((type) => {
+      const ui = ADHKAR_UI[type], cfg = state.adhkarCfg[type];
+      const label = (ui.opts.find((o) => o[0] === cfg.when) || ui.opts[0])[1];
+      const save = () => { store.set('adhkarCfg', state.adhkarCfg); scheduleNotifications(); renderAdhkarCfg(); };
+      const row = document.createElement('label');
+      row.className = 'srow';
+      row.innerHTML = `<span class="st"><b>تذكير ${ui.title}</b><small>${cfg.on ? (cfg.when === 'f' ? 'يومياً الساعة ' + cfg.fixed : label) : 'متوقف'}</small></span><input type="checkbox" class="switch" ${cfg.on ? 'checked' : ''}>`;
+      row.querySelector('input').onchange = (e) => { cfg.on = e.target.checked; save(); };
+      box.appendChild(row);
+      if (!cfg.on) return;
+      const sel = document.createElement('div');
+      sel.className = 'srow sel';
+      sel.innerHTML = `<span class="st"><b>وقت ${ui.title}</b><small>${label}</small></span><svg class="ic chev"><use href="#i-chev"/></svg><select aria-label="وقت ${ui.title}">${ui.opts.map((o) => `<option value="${o[0]}" ${o[0] === cfg.when ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`;
+      sel.querySelector('select').onchange = (e) => { cfg.when = e.target.value; save(); };
+      box.appendChild(sel);
+      if (cfg.when === 'f') {
+        const t = document.createElement('label');
+        t.className = 'srow';
+        t.innerHTML = `<span class="st"><b>الساعة</b><small>بتوقيت فلسطين</small></span><input type="time" class="time-in" value="${cfg.fixed}">`;
+        t.querySelector('input').onchange = (e) => { if (e.target.value) { cfg.fixed = e.target.value; save(); } };
+        box.appendChild(t);
+      }
+    });
+  }
+  renderAdhkarCfg();
   $('remind').value = String(state.remind);
   $('remind').onchange = (e) => { state.remind = +e.target.value; store.set('remind', state.remind); scheduleNotifications(); syncSettingsText(); };
   $('testNotif').onclick = () => {
