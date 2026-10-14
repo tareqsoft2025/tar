@@ -22,8 +22,7 @@
       madhab: store.get('madhab', 'Shafi'),
       notify: store.get('notify', true),
       remind: store.get('remind', 5),
-      mute: store.get('mute', {}),
-      methodTouched: store.get('methodTouched', false)
+      mute: store.get('mute', {})
     };
   }
 
@@ -56,54 +55,7 @@
     const p = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).split('-');
     return new Date(+p[0], +p[1] - 1, +p[2], 12, 0, 0);
   }
-  /* ---- تقويم قطاع غزة (وزارة الأوقاف) ---- */
-  // حدود القطاع تقريباً
-  function inGaza(c) { return c.lat >= 31.2 && c.lat <= 31.62 && c.lon >= 34.2 && c.lon <= 34.6; }
-  function effectiveMethod(state) {
-    if (state.method === 'Gaza') return 'Gaza';
-    if (!state.methodTouched && inGaza(coordsOf(state))) return 'Gaza';
-    return state.method;
-  }
-  function tzOffsetMs(ms) {
-    const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(ms));
-    const g = (t) => +p.find((x) => x.type === t).value;
-    return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) - ms;
-  }
-  // وقت جداري بتوقيت فلسطين -> لحظة زمنية
-  function clockToEpoch(ds, minutes) {
-    const [y, m, d] = ds.split('-').map(Number);
-    const wall = Date.UTC(y, m - 1, d, 0, minutes);
-    let t = wall - tzOffsetMs(wall);
-    t = wall - tzOffsetMs(t);
-    return t;
-  }
-  const psDateStr = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-  // الحساب المعايَر على تقويم غزة: الطريقة المصرية + التقريب للأعلى (والظهر للأسفل) + 2 د للمغرب
-  const GAZA_ROUND = { fajr: ['c', 0], sunrise: ['c', 0], dhuhr: ['f', 0], asr: ['c', 0], maghrib: ['c', 2], isha: ['c', 0] };
-  function calcGaza(state, date) {
-    const c = coordsOf(state);
-    const ds = psDateStr(date);
-    const row = inGaza(c) && window.OFFICIAL && window.OFFICIAL.gaza && window.OFFICIAL.gaza[ds];
-    const out = { official: !!row };
-    const idx = { fajr: 1, sunrise: 2, dhuhr: 3, asr: 4, maghrib: 5, isha: 6 };
-    if (row) {
-      ORDER.forEach((k) => { out[k] = new Date(clockToEpoch(ds, row[idx[k]]) + (+state.adj[k] || 0) * 60000); });
-    } else {
-      const p = adhan.CalculationMethod.Egyptian();
-      p.madhab = adhan.Madhab.Shafi;
-      p.rounding = adhan.Rounding.None;
-      const t = new adhan.PrayerTimes(new adhan.Coordinates(c.lat, c.lon), psDay(date), p);
-      ORDER.forEach((k) => {
-        const [mode, off] = GAZA_ROUND[k];
-        const v = t[k].getTime() / 60000 + off;
-        out[k] = new Date((mode === 'c' ? Math.ceil(v - 1e-9) : Math.floor(v)) * 60000 + (+state.adj[k] || 0) * 60000);
-      });
-    }
-    out.firstAdhan = new Date(out.fajr.getTime() - 30 * 60000); // الأذان الأول للفجر قبل الثاني بـ30 دقيقة
-    return out;
-  }
   function calc(state, date) {
-    if (effectiveMethod(state) === 'Gaza') return calcGaza(state, date);
     const c = coordsOf(state);
     const p = adhan.CalculationMethod[state.method]();
     p.madhab = adhan.Madhab[state.madhab];
@@ -145,5 +97,5 @@
     return out;
   }
 
-  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications, times, inGaza, effectiveMethod };
+  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications, times };
 })();

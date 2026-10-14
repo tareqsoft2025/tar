@@ -185,5 +185,3 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:360px){.next-name{font-size:2rem}.count{font-size:1.625rem}.themes{grid-template-columns:repeat(3,1fr)}}
 .srow.link small{font-weight:400}
-.plist .pn{display:flex;flex-direction:column;line-height:1.35}
-.pn-sub{font-size:.75rem;font-weight:400;opacity:.75}
