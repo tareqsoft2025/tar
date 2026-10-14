@@ -49,6 +49,7 @@
 </div>
 
 <div class="bg" aria-hidden="true"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <main>
   <!-- المواقيت -->
@@ -134,7 +135,7 @@
       <label class="field">المدينة / المنطقة
         <select id="city"></select>
       </label>
-      <button id="relocate" class="btn btn-ghost wide"><svg class="ic"><use href="#i-pin"/></svg>تحديث الموقع بالـ GPS</button>
+      <button id="relocate" class="btn btn-ghost wide"><svg class="ic"><use href="#i-pin"/></svg>تحديد موقعي الآن (GPS)</button>
     </div>
 
     <div class="group">
@@ -169,10 +170,20 @@
     </div>
 
     <div class="group">
+      <div class="group-title">التنبيهات</div>
       <label class="switch-row">
-        <span><svg class="ic"><use href="#i-bell"/></svg>تنبيه عند دخول وقت الصلاة</span>
+        <span><svg class="ic"><use href="#i-bell"/></svg>تفعيل تنبيهات الصلاة</span>
         <input type="checkbox" id="notify" class="switch">
       </label>
+      <label class="field" style="margin-top:16px">تذكير قبل موعد الصلاة
+        <select id="remind">
+          <option value="5">قبل 5 دقائق</option>
+          <option value="10">قبل 10 دقائق</option>
+          <option value="15">قبل 15 دقيقة</option>
+          <option value="0">بدون تذكير (عند الأذان فقط)</option>
+        </select>
+      </label>
+      <button id="testNotif" class="btn btn-ghost wide"><svg class="ic"><use href="#i-bell"/></svg>إرسال إشعار تجريبي</button>
     </div>
 
     <p class="hint">تُحسب المواقيت على الجهاز دون إنترنت بتوقيت فلسطين (القدس) مع التحويل التلقائي للتوقيت الصيفي.</p>
@@ -190,6 +201,7 @@
 
 <script src="lib/adhan.umd.min.js"></script>
 <script src="places.js"></script>
+<script src="core.js"></script>
 <script src="azkar.js"></script>
 <script src="app.js"></script>
 </body>

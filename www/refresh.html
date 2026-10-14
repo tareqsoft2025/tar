@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>refresh</title></head>
+<body>
+<script src="lib/adhan.umd.min.js"></script>
+<script src="places.js"></script>
+<script src="core.js"></script>
+<script>
+// يُشغَّل في الخلفية من النسخة الأصلية: يحدّث الموقع ويعيد جدولة الإشعارات دون فتح التطبيق
+(function () {
+  try {
+    const q = new URLSearchParams(location.search);
+    const lat = parseFloat(q.get('lat')), lon = parseFloat(q.get('lon'));
+    const s = Core.loadState();
+    if (s.city === Core.GPS && isFinite(lat) && isFinite(lon)) {
+      s.gps = { lat, lon };
+      Core.store.set('gps', s.gps);
+    }
+    if (window.AndroidBridge) {
+      AndroidBridge.schedule(JSON.stringify(Core.notifications(s)));
+      AndroidBridge.done();
+    }
+  } catch (e) { if (window.AndroidBridge) AndroidBridge.done(); }
+})();
+</script>
+</body></html>
