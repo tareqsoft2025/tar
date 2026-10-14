@@ -205,11 +205,22 @@
           <option value="0">بدون تذكير (عند الأذان فقط)</option>
         </select>
       </div>
+      <button id="testNotif" class="srow link" type="button"><svg class="ic gold"><use href="#i-bell"/></svg><span class="st"><b>إرسال إشعار تجريبي</b></span></button>
+    </div>
+
+    <div class="sec" id="showSec">عرض المواقيت على الشاشات</div>
+    <div class="group" id="showGroup">
       <label class="srow" id="cdRow">
-        <span class="st"><b>الوقت المتبقي على شاشة القفل</b><small>عدّاد تنازلي للصلاة القادمة في الإشعارات وشاشة القفل</small></span>
+        <span class="st"><b>على شاشة القفل وفي الإشعارات</b><small>الصلاة القادمة بعدّ تنازلي مباشر مع كل أوقات اليوم</small></span>
         <input type="checkbox" id="cdNotif" class="switch">
       </label>
-      <button id="testNotif" class="srow link" type="button"><svg class="ic gold"><use href="#i-bell"/></svg><span class="st"><b>إرسال إشعار تجريبي</b></span></button>
+      <label class="srow" id="ovRow">
+        <span class="st"><b>فوق كل الشاشات</b><small>شريط صغير قابل للسحب يعرض الوقت المتبقي فوق جميع التطبيقات</small></span>
+        <input type="checkbox" id="ovNotif" class="switch">
+      </label>
+      <div class="srow">
+        <span class="st"><small>الشاشة الدائمة (AOD): يعرضها النظام وحده مع أيقونة إشعار العدّ التنازلي عند تفعيل شاشة القفل، ولا يسمح أندرويد للتطبيقات بتصميمها.</small></span>
+      </div>
     </div>
 
     <div class="sec">الشاشة الرئيسية</div>

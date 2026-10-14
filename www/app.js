@@ -394,7 +394,27 @@
   };
   state.cd = store.get('cdNotif', true);
   $('cdNotif').checked = state.cd;
-  $('cdRow').hidden = !B;
+  $('showSec').hidden = !B;
+  $('showGroup').hidden = !B;
+  // العرض فوق كل الشاشات
+  const ovOn = () => !!(B && B.overlayEnabled && B.overlayEnabled());
+  function syncOverlayUI() {
+    if (!B || !B.canOverlay) return;
+    if (ovOn() && !B.canOverlay()) { B.setOverlay(false); }
+    else if (ovOn()) { B.setOverlay(true); } // يبدأ الخدمة بعد منح الإذن
+    $('ovNotif').checked = ovOn();
+  }
+  if (B && B.canOverlay) {
+    syncOverlayUI();
+    $('ovNotif').onchange = (e) => {
+      if (e.target.checked) {
+        B.setOverlay(true);
+        if (!B.canOverlay()) { B.requestOverlay(); toast('اسمح بالعرض فوق التطبيقات ثم ارجع إلى هنا'); }
+        else toast('سيظهر الوقت المتبقي فوق كل الشاشات');
+      } else { B.setOverlay(false); }
+    };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) syncOverlayUI(); });
+  }
   if (B && B.setCountdown) B.setCountdown(state.cd);
   $('cdNotif').onchange = (e) => {
     state.cd = e.target.checked; store.set('cdNotif', state.cd);
