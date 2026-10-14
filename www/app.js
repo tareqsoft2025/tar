@@ -10,6 +10,7 @@
   const state = Object.assign(Core.loadState(), { coords: null, place: '', next: null });
   if (state.city !== GPS && !Core.cityCoords(state.city)) state.city = GPS;
 
+  window.toast = toast;
   function toast(msg) {
     const t = $('toast');
     t.textContent = msg;
@@ -100,12 +101,6 @@
     if (!B) return;
     B.schedule(JSON.stringify(Core.notifications(state)));
   }
-  // إشعار تجريبي مرة واحدة عند أول تثبيت (بعد منح الإذن)
-  function maybeTestNotification() {
-    if (!B || store.get('testSent', false)) return;
-    if (B.notificationsAllowed()) { B.testNotification(); store.set('testSent', true); }
-  }
-
   /* ---------- الموقع ---------- */
   const MOVE_KM = 1.5;
   let locating = false;
@@ -140,7 +135,7 @@
     } finally { locating = false; }
   }
   // تستدعيها النسخة الأصلية بعد منح/رفض الأذونات
-  window.nativePermsChanged = () => { autoLocate(false); scheduleNotifications(); maybeTestNotification(); };
+  window.nativePermsChanged = () => { autoLocate(false); scheduleNotifications(); };
 
   /* ---------- القبلة ---------- */
   let heading = null;
@@ -359,7 +354,6 @@
   renderAzkar();
   refresh();
   autoLocate(false);
-  maybeTestNotification();
   setInterval(() => { if (!document.hidden) autoLocate(false); }, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderDates(); renderTimes(); renderAzkar(); autoLocate(false); } });
   if (window.AndroidBridge) $('appVer').textContent = 'رقم الإصدار ' + window.AndroidBridge.versionCode();

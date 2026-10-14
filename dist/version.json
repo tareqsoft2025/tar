@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "1.5",
-  "notes": "تنبيهات قبل الصلاة بـ5 دقائق، إشعار تجريبي، تحديث الموقع تلقائياً",
+  "versionCode": 7,
+  "versionName": "1.6",
+  "notes": "إشعار تجريبي فوري عند أول تثبيت",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
