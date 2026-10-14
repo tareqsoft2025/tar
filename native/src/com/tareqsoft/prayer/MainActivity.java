@@ -36,10 +36,10 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setStatusBarColor(Color.parseColor("#0b3d2e"));
-        getWindow().setNavigationBarColor(Color.parseColor("#082b20"));
+        getWindow().setStatusBarColor(Color.parseColor("#06231a"));
+        getWindow().setNavigationBarColor(Color.parseColor("#0a2a1f"));
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#0b3d2e"));
+        web.setBackgroundColor(Color.parseColor("#06231a"));
         setContentView(web);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
