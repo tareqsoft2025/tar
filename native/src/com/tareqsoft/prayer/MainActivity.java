@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new Bridge(), "AndroidBridge");
         requestPerms();
+        maybeSendTest();
         web.loadUrl("file:///android_asset/www/index.html");
     }
 
@@ -85,6 +86,7 @@ public class MainActivity extends Activity {
             sp.edit().putBoolean("bg_asked", true).apply();
             requestPermissions(new String[] { "android.permission.ACCESS_BACKGROUND_LOCATION" }, 2);
         }
+        maybeSendTest();
         js("window.nativePermsChanged && window.nativePermsChanged()");
     }
 
@@ -92,6 +94,16 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (web != null) checkUpdate();
+        maybeSendTest();
+    }
+
+    /** One test notification per install, sent natively as soon as notifications are allowed. */
+    private void maybeSendTest() {
+        SharedPreferences sp = getSharedPreferences("prayer", MODE_PRIVATE);
+        if (sp.getBoolean("test_sent", false) || !Scheduler.notificationsAllowed(this)) return;
+        sp.edit().putBoolean("test_sent", true).apply();
+        Scheduler.notifyNow(this, 900, "تم تثبيت التطبيق بنجاح", "هذا إشعار تجريبي: ستصلك تنبيهات الصلاة قبل موعدها وعند دخول الوقت. بارك الله فيك.");
+        js("window.toast && window.toast('تم إرسال إشعار تجريبي')");
     }
 
     private static final String VERSION_URL = "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/version.json";
