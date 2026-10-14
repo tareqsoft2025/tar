@@ -51,3 +51,11 @@ nav button.on{color:var(--accent)}
 #updMsg{color:var(--accent);font-size:.9rem}
 #updBtn{width:100%;margin-top:10px;padding:14px;border:none;border-radius:14px;background:var(--accent);color:#0b3d2e;font-size:1.1rem;font-weight:bold}
 #updBtn:disabled{opacity:.5}
+.seg{display:flex;gap:8px;margin-bottom:10px}
+.seg button{flex:1;padding:12px 4px;border-radius:12px;border:1px solid var(--accent);background:var(--card);color:var(--text);font-size:1rem}
+.seg button.on{background:var(--accent);color:#0b3d2e;font-weight:bold}
+.zk{background:var(--card);border-radius:16px;padding:16px;margin-bottom:10px;line-height:2;font-size:1.15rem;cursor:pointer;user-select:none}
+.zk .n{display:inline-block;margin-top:6px;padding:4px 14px;border-radius:20px;background:var(--bg);color:var(--accent);font-size:1rem}
+.zk.done{opacity:.4}
+.zk.done .n{color:var(--text)}
+nav button{font-size:1.25rem}

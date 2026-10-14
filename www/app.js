@@ -228,6 +228,44 @@
   $('hijriAdj').value = String(state.hijriAdj);
   $('hijriAdj').onchange = (e) => { state.hijriAdj = +e.target.value; store.set('hijriAdj', state.hijriAdj); renderDates(); };
 
+  // أذكار الصباح والمساء
+  const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
+  let mode = (new Date(new Date().toLocaleString('en-US', { timeZone: TZ })).getHours() < 14) ? 'morning' : 'evening';
+  function azState() {
+    const s = store.get('azkar', null);
+    return s && s.day === today() ? s : { day: today(), morning: {}, evening: {} };
+  }
+  function renderAzkar() {
+    const st = azState();
+    const list = window.AZKAR[mode];
+    $('segMorning').classList.toggle('on', mode === 'morning');
+    $('segEvening').classList.toggle('on', mode === 'evening');
+    const box = $('azkarList');
+    box.innerHTML = '';
+    let done = 0;
+    list.forEach((z, i) => {
+      const left = st[mode][i] === undefined ? z.c : st[mode][i];
+      if (left === 0) done++;
+      const d = document.createElement('div');
+      d.className = 'zk' + (left === 0 ? ' done' : '');
+      const txt = document.createElement('div'); txt.textContent = z.t;
+      const n = document.createElement('span'); n.className = 'n';
+      n.textContent = left === 0 ? '✓ تم' : `المتبقي ${left} من ${z.c}`;
+      d.appendChild(txt); d.appendChild(n);
+      d.onclick = () => {
+        const cur = azState();
+        const l = cur[mode][i] === undefined ? z.c : cur[mode][i];
+        if (l > 0) { cur[mode][i] = l - 1; store.set('azkar', cur); if (navigator.vibrate) navigator.vibrate(15); renderAzkar(); }
+      };
+      box.appendChild(d);
+    });
+    $('azkarProgress').textContent = `أنجزت ${done} من ${list.length} — اضغط على الذكر لإنقاص العدّاد`;
+  }
+  $('segMorning').onclick = () => { mode = 'morning'; renderAzkar(); };
+  $('segEvening').onclick = () => { mode = 'evening'; renderAzkar(); };
+  $('azkarReset').onclick = () => { const cur = azState(); cur[mode] = {}; store.set('azkar', cur); renderAzkar(); };
+  renderAzkar();
+
   // Tabs
   document.querySelectorAll('nav button').forEach((b) => b.onclick = () => {
     document.querySelectorAll('nav button').forEach((x) => x.classList.toggle('on', x === b));

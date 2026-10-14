@@ -35,6 +35,16 @@
     <ul id="list"></ul>
   </section>
 
+  <section id="tab-azkar" class="tab">
+    <div class="seg">
+      <button id="segMorning" class="on">☀️ أذكار الصباح</button>
+      <button id="segEvening">🌙 أذكار المساء</button>
+    </div>
+    <div id="azkarProgress" class="hint"></div>
+    <div id="azkarList"></div>
+    <button id="azkarReset" class="small wide">إعادة الأذكار من البداية</button>
+  </section>
+
   <section id="tab-qibla" class="tab">
     <div class="compass">
       <div id="needle"><span>🕋</span></div>
@@ -89,12 +99,14 @@
 <nav>
   <button data-tab="times" class="on">🕌<span>المواقيت</span></button>
   <button data-tab="qibla">🧭<span>القبلة</span></button>
+  <button data-tab="azkar">📖<span>الأذكار</span></button>
   <button data-tab="tasbih">📿<span>المسبحة</span></button>
   <button data-tab="settings">⚙️<span>الإعدادات</span></button>
 </nav>
 
 <script src="lib/adhan.umd.min.js"></script>
 <script src="places.js"></script>
+<script src="azkar.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
