@@ -19,6 +19,7 @@ import java.net.URL;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 import android.view.Window;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
@@ -36,11 +37,10 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setStatusBarColor(Color.parseColor("#06231a"));
-        getWindow().setNavigationBarColor(Color.parseColor("#0a2a1f"));
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#06231a"));
         setContentView(web);
+        SharedPreferences tp = getSharedPreferences("prayer", MODE_PRIVATE);
+        applyBars(tp.getString("bar_bg", "#06231a"), tp.getString("bar_nav", "#0a2a1f"), tp.getBoolean("bar_light", false));
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -95,6 +95,22 @@ public class MainActivity extends Activity {
         super.onResume();
         if (web != null) checkUpdate();
         maybeSendTest();
+    }
+
+    /** Matches the system bars and WebView background to the chosen theme. */
+    private void applyBars(String bg, String nav, boolean light) {
+        try {
+            int b = Color.parseColor(bg), n = Color.parseColor(nav);
+            getWindow().setStatusBarColor(b);
+            getWindow().setNavigationBarColor(n);
+            web.setBackgroundColor(b);
+            if (Build.VERSION.SDK_INT >= 23) {
+                View d = getWindow().getDecorView();
+                int f = d.getSystemUiVisibility();
+                int lightFlags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | (Build.VERSION.SDK_INT >= 26 ? View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR : 0);
+                d.setSystemUiVisibility(light ? (f | lightFlags) : (f & ~lightFlags));
+            }
+        } catch (Exception e) { /* ignore bad colour */ }
     }
 
     /** One test notification per install, sent natively as soon as notifications are allowed. */
@@ -195,6 +211,13 @@ public class MainActivity extends Activity {
     public void onBackPressed() { moveTaskToBack(true); }
 
     class Bridge {
+        @JavascriptInterface
+        public void setTheme(final String bg, final String nav, final boolean light) {
+            getSharedPreferences("prayer", MODE_PRIVATE).edit()
+                .putString("bar_bg", bg).putString("bar_nav", nav).putBoolean("bar_light", light).apply();
+            runOnUiThread(new Runnable() { public void run() { applyBars(bg, nav, light); } });
+        }
+
         @JavascriptInterface
         public void startUpdate(String url) { downloadAndInstall(url); }
 

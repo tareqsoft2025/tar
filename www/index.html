@@ -11,6 +11,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>مواقيت الصلاة - فلسطين</title>
+<script>try{var t=JSON.parse(localStorage.getItem('theme'));if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -92,7 +93,7 @@
       <div><div class="muted small">زاوية القبلة</div><div id="qiblaDeg" class="num-lg">--°</div></div>
       <div><div class="muted small">اتجاه جهازك</div><div id="headDeg" class="num-lg">--°</div></div>
     </div>
-    <p class="hint">أمسك الجوال بشكل مسطّح وابتعد عن المعادن والمغناطيس. عندما يتوهّج الإطار الذهبي تكون في اتجاه القبلة.</p>
+    <p class="hint">أمسك الجوال بشكل مسطّح وابتعد عن المعادن والمغناطيس. عندما يتوهّج إطار البوصلة تكون في اتجاه القبلة.</p>
   </section>
 
   <!-- الأذكار -->
@@ -129,6 +130,11 @@
   <!-- الإعدادات -->
   <section id="tab-settings" class="tab">
     <h1 class="page-title">الإعدادات</h1>
+
+    <div class="group">
+      <div class="group-title">المظهر</div>
+      <div id="themes" class="themes"></div>
+    </div>
 
     <div class="group">
       <div class="group-title">الموقع</div>
