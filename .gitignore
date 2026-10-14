@@ -1,5 +1,6 @@
 node_modules/
 android/
 *.apk
+!dist/prayer.apk
 native/build/
 native/.tools/
