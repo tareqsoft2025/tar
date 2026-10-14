@@ -30,18 +30,7 @@ public class PrayerWidget extends AppWidgetProvider {
     @Override
     public void onReceive(Context c, Intent i) {
         super.onReceive(c, i);
-        if (TICK.equals(i.getAction())) updateAll(c);
-    }
-
-    @Override
-    public void onDisabled(Context c) {
-        ((AlarmManager) c.getSystemService(Context.ALARM_SERVICE)).cancel(tickIntent(c));
-    }
-
-    private static PendingIntent tickIntent(Context c) {
-        Intent in = new Intent(c, PrayerWidget.class);
-        in.setAction(TICK);
-        return PendingIntent.getBroadcast(c, 77, in, Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE : PendingIntent.FLAG_UPDATE_CURRENT);
+        if (TICK.equals(i.getAction())) Scheduler.refreshAll(c);
     }
 
     private static String clock(long at) {
@@ -95,16 +84,6 @@ public class PrayerWidget extends AppWidgetProvider {
                             rv.setTextColor(timeIds[k], isNext ? GOLD : TEXT);
                         }
                     }
-                }
-                // refresh right when this prayer starts
-                AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-                long when = at + 1500;
-                boolean exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms();
-                if (Build.VERSION.SDK_INT >= 23) {
-                    if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, when, tickIntent(c));
-                    else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, when, tickIntent(c));
-                } else {
-                    am.set(AlarmManager.RTC_WAKEUP, when, tickIntent(c));
                 }
             }
             m.updateAppWidget(ids, rv);

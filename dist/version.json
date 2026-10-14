@@ -1,6 +1,6 @@
 {
-  "versionCode": 10,
-  "versionName": "1.9",
-  "notes": "ودجت للشاشة الرئيسية، اختصار التطبيق، وأيقونة جديدة للتطبيق",
+  "versionCode": 11,
+  "versionName": "2.0",
+  "notes": "عرض الوقت المتبقي للصلاة على شاشة القفل وفي الإشعارات",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

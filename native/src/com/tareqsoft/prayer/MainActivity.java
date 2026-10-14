@@ -217,6 +217,9 @@ public class MainActivity extends Activity {
 
     class Bridge {
         @JavascriptInterface
+        public void setCountdown(boolean on) { Scheduler.setCountdownEnabled(MainActivity.this, on); }
+
+        @JavascriptInterface
         public void saveTimes(String json) { Scheduler.saveTimes(MainActivity.this, json); }
 
         /** Asks the launcher to pin the prayer widget (Android 8+). Returns false if unsupported. */

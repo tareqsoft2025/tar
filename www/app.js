@@ -392,6 +392,15 @@
     scheduleNotifications(); syncSettingsText(); renderTimes();
     toast(state.notify ? 'تم تفعيل تنبيهات الصلاة' : 'تم إيقاف تنبيهات الصلاة');
   };
+  state.cd = store.get('cdNotif', true);
+  $('cdNotif').checked = state.cd;
+  $('cdRow').hidden = !B;
+  if (B && B.setCountdown) B.setCountdown(state.cd);
+  $('cdNotif').onchange = (e) => {
+    state.cd = e.target.checked; store.set('cdNotif', state.cd);
+    if (B && B.setCountdown) B.setCountdown(state.cd);
+    toast(state.cd ? 'سيظهر الوقت المتبقي في الإشعارات وعلى شاشة القفل' : 'تم إيقاف عرض الوقت المتبقي');
+  };
   $('remind').value = String(state.remind);
   $('remind').onchange = (e) => { state.remind = +e.target.value; store.set('remind', state.remind); scheduleNotifications(); syncSettingsText(); };
   $('testNotif').onclick = () => {
