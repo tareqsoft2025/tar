@@ -106,6 +106,7 @@
   function scheduleNotifications() {
     if (!B) return;
     B.schedule(JSON.stringify(Core.notifications(state)));
+    if (B.saveTimes) B.saveTimes(JSON.stringify(Core.times(state)));
   }
 
   /* ---------- تحديد الموقع تلقائياً ---------- */
@@ -398,6 +399,39 @@
     else toast(B ? 'التنبيهات غير مفعّلة. فعّلها من إعدادات النظام للتطبيق.' : 'التنبيهات متاحة في تطبيق أندرويد فقط.');
   };
   ['method', 'hijriAdj', 'remind'].forEach((id) => $(id).addEventListener('change', syncSettingsText));
+
+  /* ---------- الشاشة الرئيسية: ودجت / اختصار / تثبيت PWA ---------- */
+  const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  let deferredPrompt = null;
+  if (B && B.pinWidget) {
+    $('pinWidget').hidden = false;
+    $('pinShortcut').hidden = false;
+    $('pinWidget').onclick = () => {
+      let ok = false;
+      try { ok = B.pinWidget(); } catch (e) { /* ignore */ }
+      toast(ok ? 'اتبع نافذة النظام لإضافة الودجت إلى شاشتك' : 'أضفه يدوياً: اضغط مطوّلاً على الشاشة الرئيسية ← الودجات ← مواقيت الصلاة');
+    };
+    $('pinShortcut').onclick = () => {
+      let ok = false;
+      try { ok = B.pinShortcut(); } catch (e) { /* ignore */ }
+      toast(ok ? 'اتبع نافذة النظام لإضافة الاختصار' : 'أضفه يدوياً: اضغط مطوّلاً على أيقونة التطبيق ← إضافة إلى الشاشة الرئيسية');
+    };
+  } else if (!standalone) {
+    $('installPwa').hidden = false;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
+    $('installPwa').onclick = async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        try { await deferredPrompt.userChoice; } catch (e) { /* ignore */ }
+        deferredPrompt = null;
+      } else {
+        toast('من قائمة المتصفح اختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية"');
+      }
+    };
+  } else {
+    $('homeGroup').previousElementSibling.hidden = true;
+    $('homeGroup').hidden = true;
+  }
 
   /* ---------- التنقل ---------- */
   function showTab(name) {

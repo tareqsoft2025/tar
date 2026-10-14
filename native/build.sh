@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds a signed APK without the Android SDK (javac + dx + hand-made AXML manifest + apksig).
-# Needs: JDK 11+, python3, curl. Output: native/build/prayer.apk
+# Builds a signed APK without the Android SDK (aapt + javac + dx + apksig).
+# Needs: JDK 11+, aapt + zipalign (apt-get install aapt zipalign), curl. Output: native/build/prayer.apk
 set -euo pipefail
 cd "$(dirname "$0")"
 TOOLS="${TOOLS_DIR:-$PWD/.tools}"
@@ -19,24 +19,23 @@ fetch dx.jar $MVN/com/jakewharton/android/repackaged/dalvik-dx/9.0.0_r3/dalvik-d
 fetch apksig.jar $MVN/com/android/tools/build/apksig/2.3.0/apksig-2.3.0.jar
 
 rm -rf build/classes build/apk && mkdir -p build/classes build/apk/assets
-javac -source 8 -target 8 -Xlint:-options -cp "$TOOLS/android.jar" -d build/classes $(find src -name '*.java')
-java -cp "$TOOLS/dx.jar" com.android.dx.command.Main --dex --output=build/apk/classes.dex build/classes
-python3 tools/axml.py AndroidManifest.xml build/apk/AndroidManifest.xml
+command -v aapt >/dev/null && command -v zipalign >/dev/null || { echo "aapt and zipalign are required: apt-get install -y aapt zipalign" >&2; exit 1; }
+rm -rf build/gen && mkdir -p build/gen
 cp -r ../www build/apk/assets/www
+# resources (icon, widget layout), binary manifest and R.java
+aapt package -f -m -0 arsc -J build/gen -M AndroidManifest.xml -S res -A build/apk/assets -I "$TOOLS/android.jar" -F build/res.apk
+javac -source 8 -target 8 -Xlint:-options -cp "$TOOLS/android.jar" -d build/classes $(find src build/gen -name '*.java')
+java -cp "$TOOLS/dx.jar" com.android.dx.command.Main --dex --output=build/apk/classes.dex build/classes
+cp build/res.apk build/unsigned.apk
+(cd build/apk && aapt add ../unsigned.apk classes.dex >/dev/null)
+# targetSdk 30+ needs resources.arsc stored uncompressed and 4-byte aligned
+zipalign -f 4 build/unsigned.apk build/aligned.apk
 
 if [ ! -f debug.p12 ]; then
   keytool -genkeypair -keystore debug.p12 -storetype PKCS12 -storepass android -keypass android \
     -alias prayer -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Prayer Debug" >/dev/null 2>&1
 fi
-(cd build/apk && python3 - <<'PY'
-import os, zipfile
-with zipfile.ZipFile('../unsigned.apk', 'w', zipfile.ZIP_DEFLATED) as z:
-    for f in ['AndroidManifest.xml', 'classes.dex']: z.write(f)
-    for d, _, fs in os.walk('assets'):
-        for f in fs: z.write(os.path.join(d, f))
-PY
-)
 mkdir -p build/sign
 javac -cp "$TOOLS/apksig.jar" -d build/sign tools/Sign.java
-java --add-exports java.base/sun.security.x509=ALL-UNNAMED --add-exports java.base/sun.security.pkcs=ALL-UNNAMED -cp "$TOOLS/apksig.jar:build/sign" Sign debug.p12 build/unsigned.apk build/prayer.apk
+java --add-exports java.base/sun.security.x509=ALL-UNNAMED --add-exports java.base/sun.security.pkcs=ALL-UNNAMED -cp "$TOOLS/apksig.jar:build/sign" Sign debug.p12 build/aligned.apk build/prayer.apk
 echo "built: $PWD/build/prayer.apk"

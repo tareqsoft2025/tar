@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="9" android:versionName="1.8">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="10" android:versionName="1.9">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="33"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    <application android:label="مواقيت الصلاة" android:allowBackup="true" android:hardwareAccelerated="true">
+    <application android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:allowBackup="true" android:hardwareAccelerated="true">
         <activity android:name="com.tareqsoft.prayer.MainActivity" android:exported="true" android:launchMode="singleTask" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|layoutDirection">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -24,6 +24,13 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
                 <action android:name="com.tareqsoft.prayer.REFRESH"/>
             </intent-filter>
+        </receiver>
+        <receiver android:name="com.tareqsoft.prayer.PrayerWidget" android:exported="true" android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="com.tareqsoft.prayer.WIDGET_TICK"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info"/>
         </receiver>
         <provider android:name="com.tareqsoft.prayer.UpdateProvider" android:authorities="com.tareqsoft.prayer.update" android:exported="false" android:grantUriPermissions="true"/>
     </application>

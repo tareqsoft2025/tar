@@ -17,6 +17,7 @@
     }
     if (window.AndroidBridge) {
       AndroidBridge.schedule(JSON.stringify(Core.notifications(s)));
+      AndroidBridge.saveTimes(JSON.stringify(Core.times(s)));
       AndroidBridge.done();
     }
   } catch (e) { if (window.AndroidBridge) AndroidBridge.done(); }

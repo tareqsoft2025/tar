@@ -83,5 +83,19 @@
     return list;
   }
 
-  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications };
+  // كل المواقيت للأيام القادمة (للودجت على الشاشة الرئيسية)
+  function times(state, now) {
+    now = now || new Date();
+    const df = new Intl.DateTimeFormat('en-CA', { timeZone: TZ });
+    const out = [];
+    for (let d = -1; d <= 3; d++) {
+      const dt = new Date(now.getTime() + d * 864e5);
+      const t = calc(state, dt);
+      const ds = df.format(dt);
+      ORDER.forEach((k) => out.push({ k, n: NAMES[k], at: t[k].getTime(), d: ds }));
+    }
+    return out;
+  }
+
+  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications, times };
 })();
