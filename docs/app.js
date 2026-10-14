@@ -149,30 +149,29 @@
   function buildDial() {
     dial.innerHTML = '';
     const g = el('g', { id: 'dialG' }, dial);
-    el('circle', { cx: 160, cy: 160, r: 150, fill: 'none', stroke: 'rgba(255,255,255,.12)', 'stroke-width': 1 }, g);
-    for (let a = 0; a < 360; a += 5) {
-      const major = a % 90 === 0, mid = a % 30 === 0;
+    el('circle', { cx: 160, cy: 160, r: 150, fill: 'none', class: 'rim', 'stroke-width': 1 }, g);
+    for (let t = 0; t < 360; t += 5) {
+      const major = t % 90 === 0, mid = t % 30 === 0;
       const r1 = 150, r2 = major ? 130 : mid ? 138 : 144;
-      const rad = (a - 90) * Math.PI / 180;
+      const rad = (t - 90) * Math.PI / 180;
       el('line', { x1: 160 + r1 * Math.cos(rad), y1: 160 + r1 * Math.sin(rad), x2: 160 + r2 * Math.cos(rad), y2: 160 + r2 * Math.sin(rad),
-        stroke: major ? '#E2BC6A' : 'rgba(255,255,255,.35)', 'stroke-width': major ? 2.5 : 1 }, g);
+        class: major ? 'tick major' : 'tick', 'stroke-width': major ? 2.5 : 1 }, g);
     }
-    [['ش', 0], ['شرق', 90], ['ج', 180], ['غرب', 270]].forEach(([t, a]) => {
-      const rad = (a - 90) * Math.PI / 180;
-      const x = 160 + 112 * Math.cos(rad), y = 160 + 112 * Math.sin(rad);
-      const label = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[a];
-      const tx = el('text', { x, y: y + 5, 'text-anchor': 'middle', fill: a === 0 ? '#F4D58A' : 'rgba(243,239,227,.7)', 'font-size': 16, 'font-weight': 700, 'font-family': 'Tajawal' }, g);
+    [['N', 0], ['E', 90], ['S', 180], ['W', 270]].forEach(([label, t]) => {
+      const rad = (t - 90) * Math.PI / 180;
+      const tx = el('text', { x: 160 + 112 * Math.cos(rad), y: 160 + 112 * Math.sin(rad) + 5, 'text-anchor': 'middle', class: t === 0 ? 'lbl n' : 'lbl',
+        'font-size': 16, 'font-weight': 700, 'font-family': 'Tajawal' }, g);
       tx.textContent = label;
     });
     // علامة الكعبة
     const k = el('g', { id: 'kaaba' }, g);
-    el('line', { x1: 160, y1: 160, x2: 160, y2: 58, stroke: 'rgba(226,188,106,.55)', 'stroke-width': 2, 'stroke-dasharray': '3 5' }, k);
+    el('line', { x1: 160, y1: 160, x2: 160, y2: 58, class: 'guide', 'stroke-width': 2, 'stroke-dasharray': '3 5' }, k);
     const ki = el('g', { id: 'kaabaIcon' }, k);
-    el('rect', { x: 142, y: 34, width: 36, height: 36, rx: 6, fill: '#E2BC6A' }, ki);
-    el('rect', { x: 146, y: 38, width: 28, height: 28, rx: 4, fill: '#1b1405' }, ki);
-    el('rect', { x: 146, y: 46, width: 28, height: 4, fill: '#E2BC6A' }, ki);
-    el('rect', { x: 156, y: 54, width: 8, height: 12, rx: 2, fill: '#E2BC6A' }, ki);
-    el('circle', { cx: 160, cy: 160, r: 6, fill: '#E2BC6A' }, g);
+    el('rect', { x: 142, y: 34, width: 36, height: 36, rx: 6, class: 'kfill' }, ki);
+    el('rect', { x: 146, y: 38, width: 28, height: 28, rx: 4, class: 'kdark' }, ki);
+    el('rect', { x: 146, y: 46, width: 28, height: 4, class: 'kfill' }, ki);
+    el('rect', { x: 156, y: 54, width: 8, height: 12, rx: 2, class: 'kfill' }, ki);
+    el('circle', { cx: 160, cy: 160, r: 6, class: 'kfill' }, g);
   }
   function renderQibla() {
     if (!state.coords) return;
@@ -313,6 +312,33 @@
   });
   $('hijriAdj').value = String(state.hijriAdj);
   $('hijriAdj').onchange = (e) => { state.hijriAdj = +e.target.value; store.set('hijriAdj', state.hijriAdj); renderDates(); };
+
+  /* ---------- الثيمات ---------- */
+  const THEMES = [
+    { id: 'emerald', name: 'زمرد وذهب', bg: '#06231a', nav: '#0a2a1f', light: false, sw: 'linear-gradient(135deg,#0b3a2a 50%,#E2BC6A 50%)' },
+    { id: 'midnight', name: 'ليل أزرق', bg: '#07122B', nav: '#0b1a3a', light: false, sw: 'linear-gradient(135deg,#0F2350 50%,#7CB7FF 50%)' },
+    { id: 'sand', name: 'رمل القدس', bg: '#1E1409', nav: '#26180c', light: false, sw: 'linear-gradient(135deg,#3A2512 50%,#F0A64B 50%)' },
+    { id: 'royal', name: 'بنفسجي ملكي', bg: '#170D2B', nav: '#1d1136', light: false, sw: 'linear-gradient(135deg,#2A1850 50%,#C9A7FF 50%)' },
+    { id: 'palestine', name: 'علم فلسطين', bg: '#080A09', nav: '#0c0f0d', light: false, sw: 'linear-gradient(135deg,#0b0b0b 34%,#fff 34% 50%,#2FBF71 50% 72%,#E4312B 72%)' },
+    { id: 'light', name: 'نهاري فاتح', bg: '#F6F2E8', nav: '#ffffff', light: true, sw: 'linear-gradient(135deg,#F6F2E8 50%,#0B6B3A 50%)' }
+  ];
+  function applyTheme(id, save) {
+    const t = THEMES.find((x) => x.id === id) || THEMES[0];
+    document.documentElement.setAttribute('data-theme', t.id);
+    const m = document.querySelector('meta[name=theme-color]');
+    if (m) m.setAttribute('content', t.bg);
+    if (save) store.set('theme', t.id);
+    document.querySelectorAll('.theme-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === t.id)));
+    if (B && B.setTheme) B.setTheme(t.bg, t.nav, t.light);
+  }
+  THEMES.forEach((t) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'theme-btn'; b.dataset.id = t.id;
+    b.innerHTML = `<span class="sw" style="background:${t.sw}"></span><span>${t.name}</span>`;
+    b.onclick = () => applyTheme(t.id, true);
+    $('themes').appendChild(b);
+  });
+  applyTheme(store.get('theme', 'emerald'), false);
 
   /* ---------- التنقل ---------- */
   function showTab(name) {

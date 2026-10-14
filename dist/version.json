@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
-  "notes": "إشعار تجريبي فوري عند أول تثبيت",
+  "versionCode": 8,
+  "versionName": "1.7",
+  "notes": "ثيمات متعددة للتطبيق: اختر مظهرك المفضل من الإعدادات",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
