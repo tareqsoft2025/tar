@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "2.0",
-  "notes": "عرض الوقت المتبقي للصلاة على شاشة القفل وفي الإشعارات",
+  "versionCode": 12,
+  "versionName": "2.1",
+  "notes": "مواقيت قطاع غزة حسب التقويم الرسمي (جمادى الأولى 1448) مع الأذان الأول للفجر",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

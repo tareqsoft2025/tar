@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="11" android:versionName="2.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="12" android:versionName="2.1">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="33"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>

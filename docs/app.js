@@ -51,7 +51,7 @@
     const out = [];
     [-1, 0, 1].forEach((d) => {
       const t = calc(new Date(now.getTime() + d * 864e5));
-      ORDER.forEach((k) => out.push({ key: k, time: t[k], day: d }));
+      ORDER.forEach((k) => out.push({ key: k, time: t[k], day: d, first: k === 'fajr' ? t.firstAdhan : null }));
     });
     return out;
   }
@@ -75,7 +75,8 @@
       const t = timeParts(e.time);
       const noBell = e.key === 'sunrise';
       const muted = noBell || state.mute[e.key] || !state.notify;
-      li.innerHTML = `<span class="pn">${NAMES[e.key]}</span><span class="pt">${t.hm} ${t.ap}</span>` +
+      const fa = e.first ? timeParts(e.first) : null;
+      li.innerHTML = `<span class="pn">${NAMES[e.key]}${fa ? `<small class="pn-sub">الأذان الأول ${fa.hm} ${fa.ap}</small>` : ''}</span><span class="pt">${t.hm} ${t.ap}</span>` +
         `<button class="bell ${muted ? 'off' : ''}" ${noBell ? 'disabled' : ''} aria-label="تنبيه ${NAMES[e.key]}">${icon(muted ? 'bell-off' : 'bell')}</button>`;
       if (!noBell) li.querySelector('.bell').onclick = () => {
         if (!state.notify) { toast('فعّل تنبيهات الصلاة أولاً'); return; }
@@ -331,7 +332,8 @@
   /* ---------- الإعدادات ---------- */
   const optText = (sel) => { const o = sel.options[sel.selectedIndex]; return o ? o.textContent : ''; };
   function syncSettingsText() {
-    $('methodSub').textContent = optText($('method'));
+    const eff = Core.effectiveMethod(state);
+    $('methodSub').textContent = eff === 'Gaza' && state.method !== 'Gaza' ? 'أوقاف قطاع غزة (تلقائي)' : optText($('method'));
     $('hijriSub').textContent = optText($('hijriAdj'));
     $('remindSub').textContent = optText($('remind'));
     const auto = state.city === GPS;
@@ -371,7 +373,7 @@
   $('placeChip').onclick = () => showTab('settings');
 
   $('method').value = state.method;
-  $('method').onchange = (e) => { state.method = e.target.value; store.set('method', state.method); refresh(); };
+  $('method').onchange = (e) => { state.method = e.target.value; state.methodTouched = true; store.set('method', state.method); store.set('methodTouched', true); refresh(); };
   document.querySelectorAll('#madhabSeg button').forEach((b) => b.onclick = () => {
     state.madhab = b.dataset.v; store.set('madhab', state.madhab); refresh();
   });
