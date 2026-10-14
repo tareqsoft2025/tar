@@ -80,6 +80,7 @@ final class Scheduler {
     /** Updates the widget and the lock-screen countdown, then re-arms the tick for the next prayer. */
     static void refreshAll(Context c) {
         PrayerWidget.updateAll(c);
+        OverlayService.sync(c);
         long next = updateCountdown(c);
         if (next > 0) {
             Intent in = new Intent(c, TickReceiver.class);
@@ -96,6 +97,27 @@ final class Scheduler {
         ap.setTimeZone(tz);
         Date d = new Date(at);
         return hm.format(d) + " " + (ap.format(d).startsWith("A") ? "ص" : "م");
+    }
+
+    /** The next prayer entry from the saved times, or null. */
+    static JSONObject nextEntry(Context c) {
+        try {
+            JSONArray all = new JSONArray(c.getSharedPreferences("prayer", Context.MODE_PRIVATE).getString("times", "[]"));
+            long now = System.currentTimeMillis();
+            JSONObject next = null;
+            for (int i = 0; i < all.length(); i++) {
+                JSONObject o = all.getJSONObject(i);
+                if (o.getLong("at") > now && (next == null || o.getLong("at") < next.getLong("at"))) next = o;
+            }
+            return next;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    static void setOverlayEnabled(Context c, boolean on) {
+        c.getSharedPreferences("prayer", Context.MODE_PRIVATE).edit().putBoolean("overlay_on", on).apply();
+        OverlayService.sync(c);
     }
 
     static void setCountdownEnabled(Context c, boolean on) {
@@ -123,6 +145,7 @@ final class Scheduler {
             if (!sp.getBoolean("countdown", true) || !notificationsAllowed(c)) { nm.cancel(901); return at; }
 
             StringBuilder sb = new StringBuilder();
+            StringBuilder line = new StringBuilder();
             String day = next.getString("d");
             String[] keys = { "fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha" };
             for (String k : keys) {
@@ -132,6 +155,10 @@ final class Scheduler {
                         boolean isNext = k.equals(next.getString("k"));
                         if (sb.length() > 0) sb.append('\n');
                         sb.append(isNext ? "◂ " : "   ").append(o.getString("n")).append(":  ").append(clock(o.getLong("at")));
+                        if (!k.equals("sunrise")) {
+                            if (line.length() > 0) line.append("  ·  ");
+                            line.append(o.getString("n")).append(' ').append(clock(o.getLong("at")).replace(" ص", "").replace(" م", ""));
+                        }
                     }
                 }
             }
@@ -147,7 +174,7 @@ final class Scheduler {
             }
             int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
             nb.setContentTitle(next.getString("n") + " · " + clock(at))
-              .setContentText("متبقٍ على الأذان")
+              .setContentText(line.toString())
               .setStyle(new Notification.BigTextStyle().bigText(sb.toString()))
               .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
               .setContentIntent(PendingIntent.getActivity(c, 1, new Intent(c, MainActivity.class), f))

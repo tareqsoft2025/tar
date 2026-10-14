@@ -217,6 +217,23 @@ public class MainActivity extends Activity {
 
     class Bridge {
         @JavascriptInterface
+        public boolean canOverlay() { return OverlayService.canDraw(MainActivity.this); }
+
+        /** Opens the system screen to allow "display over other apps" for this app. */
+        @JavascriptInterface
+        public void requestOverlay() {
+            runOnUiThread(new Runnable() { public void run() {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+            } });
+        }
+
+        @JavascriptInterface
+        public void setOverlay(boolean on) { Scheduler.setOverlayEnabled(MainActivity.this, on); }
+
+        @JavascriptInterface
+        public boolean overlayEnabled() { return OverlayService.enabled(MainActivity.this); }
+
+        @JavascriptInterface
         public void setCountdown(boolean on) { Scheduler.setCountdownEnabled(MainActivity.this, on); }
 
         @JavascriptInterface

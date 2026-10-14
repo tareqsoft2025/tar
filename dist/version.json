@@ -1,6 +1,6 @@
 {
-  "versionCode": 13,
-  "versionName": "2.2",
-  "notes": "إلغاء تعديل مواقيت غزة والعودة إلى حساب الإصدار 2.0",
+  "versionCode": 14,
+  "versionName": "2.3",
+  "notes": "عرض المواقيت على شاشة القفل وفوق كل الشاشات من الإعدادات",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
