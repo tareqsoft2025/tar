@@ -6,6 +6,7 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.provider.Settings;
@@ -29,7 +30,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class MainActivity extends Activity {
-    private static final int MAX_ALARMS = 60;
     private WebView web;
 
     @Override
@@ -61,8 +61,12 @@ public class MainActivity extends Activity {
         web.loadUrl("file:///android_asset/www/index.html");
     }
 
+    /** Asks once (first launch only): location + notifications, then background location. Never nags again. */
     private void requestPerms() {
         if (Build.VERSION.SDK_INT < 23) return;
+        SharedPreferences sp = getSharedPreferences("prayer", MODE_PRIVATE);
+        if (sp.getBoolean("perms_asked", false)) return;
+        sp.edit().putBoolean("perms_asked", true).apply();
         java.util.ArrayList<String> need = new java.util.ArrayList<String>();
         need.add(Manifest.permission.ACCESS_FINE_LOCATION);
         need.add(Manifest.permission.ACCESS_COARSE_LOCATION);
@@ -75,7 +79,13 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
         super.onRequestPermissionsResult(code, perms, res);
-        web.post(new Runnable() { public void run() { web.reload(); } });
+        SharedPreferences sp = getSharedPreferences("prayer", MODE_PRIVATE);
+        if (code == 1 && Build.VERSION.SDK_INT >= 29 && !sp.getBoolean("bg_asked", false)
+            && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            sp.edit().putBoolean("bg_asked", true).apply();
+            requestPermissions(new String[] { "android.permission.ACCESS_BACKGROUND_LOCATION" }, 2);
+        }
+        js("window.nativePermsChanged && window.nativePermsChanged()");
     }
 
     @Override
@@ -182,45 +192,26 @@ public class MainActivity extends Activity {
         /** json: [{"at":epochMillis,"title":"..","body":".."}, ...] */
         @JavascriptInterface
         public void schedule(String json) {
-            try {
-                AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-                cancelAll(am);
-                JSONArray arr = new JSONArray(json);
-                long now = System.currentTimeMillis();
-                int n = 0;
-                for (int i = 0; i < arr.length() && n < MAX_ALARMS; i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    long at = o.getLong("at");
-                    if (at <= now) continue;
-                    Intent in = new Intent(MainActivity.this, AlarmReceiver.class);
-                    in.putExtra("title", o.optString("title"));
-                    in.putExtra("body", o.optString("body"));
-                    in.putExtra("id", n);
-                    PendingIntent pi = PendingIntent.getBroadcast(MainActivity.this, n, in, flags());
-                    if (Build.VERSION.SDK_INT >= 23) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
-                    else am.set(AlarmManager.RTC_WAKEUP, at, pi);
-                    n++;
-                }
-            } catch (Exception e) { /* ignore */ }
+            Scheduler.schedule(MainActivity.this, json);
+            Scheduler.armRefresh(MainActivity.this, 6L * 60 * 60 * 1000);
         }
 
         @JavascriptInterface
-        public void cancel() {
-            cancelAll((AlarmManager) getSystemService(Context.ALARM_SERVICE));
+        public void cancel() { Scheduler.cancelAll(MainActivity.this); }
+
+        @JavascriptInterface
+        public boolean notificationsAllowed() { return Scheduler.notificationsAllowed(MainActivity.this); }
+
+        @JavascriptInterface
+        public void testNotification() {
+            Scheduler.notifyNow(MainActivity.this, 900, "تم تفعيل التنبيهات بنجاح",
+                "ستصلك تنبيهات الصلاة قبل موعدها وعند دخول الوقت. بارك الله فيك.");
         }
 
-        private void cancelAll(AlarmManager am) {
-            for (int i = 0; i < MAX_ALARMS; i++) {
-                Intent in = new Intent(MainActivity.this, AlarmReceiver.class);
-                PendingIntent pi = PendingIntent.getBroadcast(MainActivity.this, i, in, flags());
-                am.cancel(pi);
-            }
-        }
-
-        private int flags() {
-            return Build.VERSION.SDK_INT >= 23
-                ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-                : PendingIntent.FLAG_UPDATE_CURRENT;
+        @JavascriptInterface
+        public boolean exactAlarmsAllowed() {
+            if (Build.VERSION.SDK_INT < 31) return true;
+            return ((AlarmManager) getSystemService(Context.ALARM_SERVICE)).canScheduleExactAlarms();
         }
     }
 }

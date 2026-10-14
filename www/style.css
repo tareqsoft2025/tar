@@ -166,3 +166,5 @@ select option,select optgroup{background:#0b3a2a;color:var(--text)}
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:360px){.next-name{font-size:2rem}.count{font-size:1.5rem}.chip{max-width:44%}}
+.toast{position:fixed;inset-inline:16px;bottom:calc(var(--dock-h) + 32px + env(safe-area-inset-bottom));z-index:30;max-width:520px;margin-inline:auto;padding:12px 20px;border-radius:var(--r-md);background:rgba(10,42,31,.96);border:1px solid rgba(226,188,106,.5);color:var(--text);font-weight:500;font-size:.9375rem;text-align:center;box-shadow:var(--sh-lg);opacity:0;transform:translateY(12px);pointer-events:none;transition:all .3s var(--ease)}
+.toast.show{opacity:1;transform:none}

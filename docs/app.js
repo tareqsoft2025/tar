@@ -1,31 +1,22 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const P = (window.Capacitor && window.Capacitor.Plugins) || {};
-  const NAMES = { fajr: 'الفجر', sunrise: 'الشروق', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء' };
+  const { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store } = Core;
   const ICONS = { fajr: 'sunrise', sunrise: 'sun-dim', dhuhr: 'sun', asr: 'sun-dim', maghrib: 'sunset', isha: 'moon' };
-  const ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
-  const PRAYERS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-  const TZ = 'Asia/Hebron';
-  const GPS = 'الموقع الحالي (GPS)';
-  const DEFAULT_CITY = 'القدس (المسجد الأقصى)';
   const SVGNS = 'http://www.w3.org/2000/svg';
-
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  };
+  const B = window.AndroidBridge || null;
   const icon = (name, cls) => `<svg class="ic ${cls || ''}"><use href="#i-${name}"/></svg>`;
 
-  const state = {
-    city: store.get('city', DEFAULT_CITY),
-    gps: store.get('gps', null),
-    adj: store.get('adj', { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }),
-    hijriAdj: store.get('hijriAdj', 0),
-    method: store.get('method', 'Egyptian'),
-    madhab: store.get('madhab', 'Shafi'),
-    notify: store.get('notify', false),
-    coords: null, place: '', next: null
-  };
+  const state = Object.assign(Core.loadState(), { coords: null, place: '', next: null });
+  if (state.city !== GPS && !Core.cityCoords(state.city)) state.city = GPS;
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast.h);
+    toast.h = setTimeout(() => t.classList.remove('show'), 4500);
+  }
 
   const tf = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: TZ });
   const timeParts = (d) => {
@@ -36,28 +27,15 @@
   const pad = (n) => String(n).padStart(2, '0');
 
   /* ---------- الحساب ---------- */
-  function cityCoords(name) {
-    for (const g of window.PLACES) for (const it of g.items) if (it[0] === name) return { lat: it[1], lon: it[2] };
-    return null;
-  }
   function resolveCoords() {
-    if (state.city === GPS && state.gps) { state.coords = state.gps; state.place = 'موقعك الحالي'; return; }
-    if (state.city === GPS) state.city = DEFAULT_CITY;
-    state.coords = cityCoords(state.city) || cityCoords(DEFAULT_CITY);
-    state.place = state.city.replace(/ \(.*\)/, '');
+    state.coords = Core.coordsOf(state);
+    if (state.city === GPS) {
+      state.place = state.gps ? (Core.nearestPlace(state.gps) || 'موقعك الحالي') : 'جارٍ تحديد الموقع…';
+    } else {
+      state.place = state.city.replace(/ \(.*\)/, '');
+    }
   }
-  // تاريخ اليوم بتقويم فلسطين حتى لو كان توقيت الجهاز مختلفاً
-  function psDay(date) {
-    const p = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).split('-');
-    return new Date(+p[0], +p[1] - 1, +p[2], 12, 0, 0);
-  }
-  function calc(date) {
-    const c = new adhan.Coordinates(state.coords.lat, state.coords.lon);
-    const p = adhan.CalculationMethod[state.method]();
-    p.madhab = adhan.Madhab[state.madhab];
-    ORDER.forEach((k) => { p.adjustments[k] = (p.adjustments[k] || 0) + (+state.adj[k] || 0); });
-    return new adhan.PrayerTimes(c, psDay(date), p);
-  }
+  const calc = (date) => Core.calc(state, date);
   function timeline(now) {
     const out = [];
     [-1, 0, 1].forEach((d) => {
@@ -118,62 +96,51 @@
   setInterval(tick, 1000);
 
   /* ---------- الإشعارات ---------- */
-  function scheduleNative() {
-    const B = window.AndroidBridge;
-    if (!state.notify || !state.coords) { B.cancel(); return; }
-    const list = [];
-    for (let d = 0; d < 7; d++) {
-      const t = calc(new Date(Date.now() + d * 864e5));
-      PRAYERS.forEach((k) => {
-        if (t[k] > new Date()) list.push({ at: t[k].getTime(), title: 'حان وقت الصلاة', body: `حان الآن موعد صلاة ${NAMES[k]}` });
-      });
-    }
-    B.schedule(JSON.stringify(list));
+  function scheduleNotifications() {
+    if (!B) return;
+    B.schedule(JSON.stringify(Core.notifications(state)));
   }
-  async function scheduleNotifications() {
-    if (window.AndroidBridge) return scheduleNative();
-    const LN = P.LocalNotifications;
-    if (!LN) return;
-    try {
-      const pending = await LN.getPending();
-      if (pending.notifications.length) await LN.cancel({ notifications: pending.notifications });
-      if (!state.notify || !state.coords) return;
-      const perm = await LN.requestPermissions();
-      if (perm.display !== 'granted') { state.notify = false; store.set('notify', false); $('notify').checked = false; return; }
-      const list = [];
-      let id = 1;
-      for (let d = 0; d < 7; d++) {
-        const t = calc(new Date(Date.now() + d * 864e5));
-        PRAYERS.forEach((k) => {
-          if (t[k] > new Date()) list.push({ id: id++, title: 'حان وقت الصلاة', body: `حان الآن موعد صلاة ${NAMES[k]}`, schedule: { at: t[k], allowWhileIdle: true } });
-        });
-      }
-      if (list.length) await LN.schedule({ notifications: list });
-    } catch (e) { console.warn(e); }
+  // إشعار تجريبي مرة واحدة عند أول تثبيت (بعد منح الإذن)
+  function maybeTestNotification() {
+    if (!B || store.get('testSent', false)) return;
+    if (B.notificationsAllowed()) { B.testNotification(); store.set('testSent', true); }
   }
 
   /* ---------- الموقع ---------- */
-  async function locate() {
-    $('place').textContent = 'جارٍ تحديد الموقع…';
-    try {
-      let lat, lon;
-      if (P.Geolocation) {
-        await P.Geolocation.requestPermissions();
-        const pos = await P.Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 20000 });
-        lat = pos.coords.latitude; lon = pos.coords.longitude;
-      } else {
-        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 20000 }));
-        lat = pos.coords.latitude; lon = pos.coords.longitude;
-      }
-      state.gps = { lat, lon };
-      store.set('gps', state.gps);
-      state.city = GPS; store.set('city', GPS);
-      $('city').value = GPS;
-    } catch (e) {
-      alert('تعذر تحديد الموقع. فعّل GPS أو اختر مدينتك من القائمة.');
-    }
-    refresh();
+  const MOVE_KM = 1.5;
+  let locating = false;
+  function getPosition() {
+    return new Promise((res, rej) => {
+      if (!navigator.geolocation) return rej(new Error('no geolocation'));
+      navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000 });
+    });
   }
+  // يحدّث الموقع تلقائياً: أول مرة يحفظه، وبعدها عند أي انتقال يغيّر الشاشة والمواقيت
+  async function autoLocate(manual) {
+    if (locating) return;
+    if (state.city !== GPS && !manual) return;
+    locating = true;
+    try {
+      const pos = await getPosition();
+      const here = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      const first = !state.gps;
+      const moved = !state.gps || Core.distKm(state.gps, here) >= MOVE_KM;
+      if (moved || state.city !== GPS) {
+        state.gps = here;
+        store.set('gps', here);
+        state.city = GPS; store.set('city', GPS);
+        $('city').value = GPS;
+        refresh();
+        if (!first) toast('تم تحديث موقعك وأوقات الصلاة: ' + state.place);
+      }
+      if (manual && !moved) toast('موقعك لم يتغيّر: ' + state.place);
+    } catch (e) {
+      if (manual) toast('تعذر تحديد الموقع. فعّل GPS أو اختر مدينتك من القائمة.');
+      else if (!state.gps && !store.get('locHint', false)) { store.set('locHint', true); toast('تعذر تحديد الموقع، نعرض أوقات القدس. فعّل GPS ليتحدّث تلقائياً.'); }
+    } finally { locating = false; }
+  }
+  // تستدعيها النسخة الأصلية بعد منح/رفض الأذونات
+  window.nativePermsChanged = () => { autoLocate(false); scheduleNotifications(); maybeTestNotification(); };
 
   /* ---------- القبلة ---------- */
   let heading = null;
@@ -316,7 +283,13 @@
   $('method').onchange = (e) => { state.method = e.target.value; store.set('method', state.method); refresh(); };
   $('madhab').onchange = (e) => { state.madhab = e.target.value; store.set('madhab', state.madhab); refresh(); };
   $('notify').onchange = (e) => { state.notify = e.target.checked; store.set('notify', state.notify); scheduleNotifications(); };
-  $('relocate').onclick = locate;
+  $('remind').value = String(state.remind);
+  $('remind').onchange = (e) => { state.remind = +e.target.value; store.set('remind', state.remind); scheduleNotifications(); };
+  $('testNotif').onclick = () => {
+    if (B && B.notificationsAllowed()) B.testNotification();
+    else toast(B ? 'التنبيهات غير مفعّلة. فعّلها من إعدادات النظام للتطبيق.' : 'التنبيهات متاحة في تطبيق أندرويد فقط.');
+  };
+  $('relocate').onclick = () => autoLocate(true);
   $('placeChip').onclick = () => showTab('settings');
 
   const citySel = $('city');
@@ -328,11 +301,11 @@
     g.items.forEach((it) => { const o = document.createElement('option'); o.value = it[0]; o.textContent = it[0]; og.appendChild(o); });
     citySel.appendChild(og);
   });
-  if (state.city === GPS && !state.gps) state.city = DEFAULT_CITY;
   citySel.value = state.city;
   citySel.onchange = (e) => {
     state.city = e.target.value; store.set('city', state.city);
-    if (state.city === GPS && !state.gps) locate(); else refresh();
+    refresh();
+    if (state.city === GPS) autoLocate(true);
   };
   ORDER.forEach((k) => {
     const d = document.createElement('div');
@@ -385,7 +358,10 @@
   renderTasbih();
   renderAzkar();
   refresh();
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderDates(); renderTimes(); renderAzkar(); } });
+  autoLocate(false);
+  maybeTestNotification();
+  setInterval(() => { if (!document.hidden) autoLocate(false); }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderDates(); renderTimes(); renderAzkar(); autoLocate(false); } });
   if (window.AndroidBridge) $('appVer').textContent = 'رقم الإصدار ' + window.AndroidBridge.versionCode();
 
   // تطبيق ويب قابل للتثبيت (PWA)
