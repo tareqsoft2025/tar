@@ -117,9 +117,10 @@
       last = dt;
       const evs = Core.hijriEvents(h);
       const hs = (window.HIST && window.HIST[h.m + '-' + h.d]) || [];
+      const isFri = Core.weekday(dt) === 5;
       const kinds = evs.map((e) => e.kind);
       const isToday = h.y === h0.y && h.m === h0.m && h.d === h0.d;
-      const cls = ['cd', isToday ? 'today' : '', kinds.includes('white') ? 'white' : '', kinds.includes('eid') ? 'eid' : kinds.includes('fast') ? 'fast' : kinds.includes('night') ? 'fast' : '', hs.length ? 'hist' : ''].join(' ');
+      const cls = ['cd', isToday ? 'today' : '', kinds.includes('white') ? 'white' : '', kinds.includes('eid') ? 'eid' : kinds.includes('fast') ? 'fast' : kinds.includes('night') ? 'fast' : '', hs.length ? 'hist' : '', isFri ? 'fri' : ''].join(' ');
       grid.appendChild(el('div', cls, `<b>${h.d}</b><small>${gDay(dt)}</small>`));
       evs.filter((e) => e.kind !== 'white').forEach((e) => events.push({ h, dt, label: e.label }));
       hs.forEach((x) => events.push({ h, dt, label: x.t, desc: x.d, hist: true }));
@@ -303,6 +304,7 @@
   function openReader(s, a) {
     go('reader', { push: true, surah: s, ayah: a });
   }
+  App.openSurah = (n) => openReader(n, 1);
   function renderReader(opts) {
     opts = opts || {};
     if (opts.back && !opts.surah) return;

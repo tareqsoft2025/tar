@@ -371,3 +371,35 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 .cd.today.hist::before{background:var(--on-gold)}
 .hdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7CB7FF;margin-inline-end:6px}
 .edesc{color:var(--muted);font-size:.875rem;margin-top:2px;line-height:1.6}
+
+/* ===== يوم الجمعة ===== */
+.jbanner{display:block;width:100%;margin-top:14px;padding:14px 16px;border-radius:var(--r-md);background:linear-gradient(135deg,color-mix(in srgb,var(--gold) 24%,var(--card)),var(--card));border:1px solid color-mix(in srgb,var(--gold) 50%,var(--line));text-align:start}
+.jbanner[hidden]{display:none}
+.jb-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.jb-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--gold);color:var(--on-gold);flex:none}
+.jb-t{flex:1;display:flex;flex-direction:column;line-height:1.4}
+.jb-t b{font-size:1.1875rem}
+.jb-t small{color:var(--muted);font-size:.875rem}
+.jbanner .chev{color:var(--muted)}
+.jbanner .progress{margin:0}
+.jb-s{color:var(--muted);font-size:.8125rem;margin-top:6px}
+.jm-hero{text-align:center;padding:20px 16px;background:linear-gradient(160deg,color-mix(in srgb,var(--gold) 18%,var(--card)),var(--card))}
+.jm-status{font-size:1.5rem;font-weight:700;line-height:1.4;margin:6px 0 14px;color:var(--gold)}
+.jm-status[data-kind=hour]{color:var(--ok)}
+.jm-times{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.jm-times>div{padding:10px;border-radius:14px;background:var(--bg)}
+.jm-times small{display:block;color:var(--muted);font-size:.75rem}
+.jm-times b{font-size:1.0625rem;font-variant-numeric:tabular-nums}
+.jrow{display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;text-align:start}
+.jrow+.jrow{border-top:1px solid var(--line)}
+.jrow .st{flex:1;display:flex;flex-direction:column}
+.jrow .st b{font-size:1.0625rem}
+.jrow .st small{color:var(--muted);font-size:.8125rem}
+.jrow .chev{color:var(--muted)}
+.jck{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;color:transparent;flex:none;transition:all .2s var(--ease)}
+.jck .ic{width:16px;height:16px;stroke-width:3}
+.jrow.on .jck{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}
+.sal .chips{margin-bottom:6px}
+.sal-text{font-family:"Amiri","Plex",serif;font-size:1.25rem;line-height:2;text-align:center;margin:4px 0}
+.cd.fri{border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
+#calDow span:first-child{}

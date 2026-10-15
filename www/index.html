@@ -52,6 +52,7 @@
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.6-9 9-9 9z"/></symbol>
     <symbol id="i-quote" viewBox="0 0 24 24"><path d="M9 7H5v6h4v4l3-3V7zM19 7h-4v6h4v4l3-3V7z"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
   </defs>
 </svg>
@@ -117,6 +118,7 @@
     </div>
 
     <ul id="list" class="plist"></ul>
+    <button id="jumahBanner" class="jbanner" type="button" hidden></button>
     <button id="dailyHadith" class="hcard" type="button"></button>
   </section>
 
@@ -180,6 +182,7 @@
     <h1 class="page-title">المزيد</h1>
     <div class="sub">أدوات تعينك على المحافظة على صلاتك وعبادتك</div>
     <div class="hub">
+      <button class="hub-card" data-go="jumah"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>يوم الجمعة</b><small>سنن وساعة الإجابة والصلاة على النبي</small></button>
       <button class="hub-card" data-go="stats"><span class="hub-ic"><svg class="ic"><use href="#i-chart"/></svg></span><b>متابعة صلاتي</b><small>سجّل صلواتك وسلسلة أيامك</small></button>
       <button class="hub-card" data-go="qada"><span class="hub-ic"><svg class="ic"><use href="#i-refresh"/></svg></span><b>قضاء الصلوات</b><small>عدّاد للفوائت</small></button>
       <button class="hub-card" data-go="calendar"><span class="hub-ic"><svg class="ic"><use href="#i-cal"/></svg></span><b>التقويم الهجري</b><small>الأيام البيض والمناسبات</small></button>
@@ -264,6 +267,43 @@
     </div>
     <div id="rBody" class="reader"></div>
     <div class="rnav"><button id="rPrev" class="btn-outline">السورة السابقة</button><button id="rNext" class="btn-outline">السورة التالية</button></div>
+  </section>
+
+  <!-- يوم الجمعة -->
+  <section id="tab-jumah" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">يوم الجمعة</h1></div>
+    <div class="card-flat jm-hero">
+      <div id="jmWhen" class="eyebrow"></div>
+      <div id="jmStatus" class="jm-status"></div>
+      <div class="jm-times">
+        <div><small>صلاة الجمعة</small><b id="jmPrayer">--</b></div>
+        <div><small>ساعة الإجابة</small><b id="jmHour">--</b></div>
+      </div>
+    </div>
+
+    <div class="sec">سنن يوم الجمعة</div>
+    <div class="progress" style="margin:0 0 10px"><i id="jmBar"></i></div>
+    <div class="group" id="jmChecks"></div>
+
+    <div class="sec">الصلاة على النبي ﷺ</div>
+    <div class="card-flat sal">
+      <div id="salChips" class="chips"></div>
+      <div id="salText" class="sal-text"></div>
+      <div class="tasbih-wrap" style="width:min(56vw,200px);margin:8px auto 8px">
+        <svg class="tring" viewBox="0 0 260 260" aria-hidden="true"><circle class="tring-bg" cx="130" cy="130" r="120"/><circle id="salRing" class="tring-fg" cx="130" cy="130" r="120" transform="rotate(-90 130 130)"/></svg>
+        <button id="salBtn" class="tasbih-btn" aria-label="صلّ على النبي"><span id="salNum">0</span><small id="salGoalTxt"></small></button>
+      </div>
+      <div class="stat-grid three">
+        <div class="stat"><div class="stat-l">اليوم</div><div id="salToday" class="stat-v">0</div></div>
+        <div class="stat"><div class="stat-l">هذا الأسبوع</div><div id="salWeek" class="stat-v">0</div></div>
+        <div class="stat"><div class="stat-l">المجموع</div><div id="salTotal" class="stat-v">0</div></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button id="salGoal" class="btn-outline">الهدف اليومي</button><button id="salReset" class="btn-outline">تصفير اليوم</button></div>
+    </div>
+
+    <div class="sec">اقرأ وتزوّد</div>
+    <button id="jmKahf" class="link-card" type="button" style="margin-top:0"><svg class="ic gold"><use href="#i-quran"/></svg><span>افتح سورة الكهف</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+    <button id="jmHadith" class="link-card" type="button"><svg class="ic gold"><use href="#i-quote"/></svg><span>أحاديث في فضل يوم الجمعة</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
   </section>
 
   <!-- أحاديث نبوية -->
@@ -388,6 +428,12 @@
       <button id="testNotif" class="srow link" type="button"><svg class="ic gold"><use href="#i-bell"/></svg><span class="st"><b>إرسال إشعار تجريبي</b></span></button>
     </div>
 
+    <div class="sec">يوم الجمعة</div>
+    <div class="group">
+      <label class="srow"><span class="st"><b>تسمية الظهر «الجمعة» يوم الجمعة</b><small>في قائمة المواقيت والإشعارات والودجت</small></span><input type="checkbox" id="fridayLabel" class="switch"></label>
+      <div id="jumahCfg"></div>
+    </div>
+
     <div class="sec" id="showSec">عرض المواقيت على الشاشات</div>
     <div class="group" id="showGroup">
       <label class="srow" id="cdRow">
@@ -433,5 +479,6 @@
 <script src="content.js"></script>
 <script src="screens.js"></script>
 <script src="content-ui.js"></script>
+<script src="jumah.js"></script>
 </body>
 </html>
