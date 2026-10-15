@@ -63,7 +63,7 @@
     if (ni < 1) ni = 1;
     const next = tl[ni];
     state.next = next;
-    $('nextName').textContent = NAMES[next.key];
+    $('nextName').textContent = Core.nameFor(state, next.key, next.time);
     const np = timeParts(next.time);
     $('nextAt').textContent = `${np.hm} ${np.ap}`;
     const ul = $('list');
@@ -78,13 +78,13 @@
       const ds = Tracker.dayStr(now);
       const started = e.time <= now;
       const logged = !noBell && Tracker.isLogged(ds, e.key);
-      li.innerHTML = `<span class="pn">${NAMES[e.key]}</span><span class="pt">${t.hm} ${t.ap}</span>` +
-        (noBell ? '<span class="logb off" style="visibility:hidden"></span>' : `<button class="logb ${logged ? 'on' : ''} ${started ? '' : 'off'}" aria-label="تسجيل صلاة ${NAMES[e.key]}">${icon('check')}</button>`) +
-        `<button class="bell ${muted ? 'off' : ''}" ${noBell ? 'disabled' : ''} aria-label="تنبيه ${NAMES[e.key]}">${icon(muted ? 'bell-off' : 'bell')}</button>`;
+      li.innerHTML = `<span class="pn">${Core.nameFor(state, e.key, e.time)}</span><span class="pt">${t.hm} ${t.ap}</span>` +
+        (noBell ? '<span class="logb off" style="visibility:hidden"></span>' : `<button class="logb ${logged ? 'on' : ''} ${started ? '' : 'off'}" aria-label="تسجيل صلاة ${Core.nameFor(state, e.key, e.time)}">${icon('check')}</button>`) +
+        `<button class="bell ${muted ? 'off' : ''}" ${noBell ? 'disabled' : ''} aria-label="تنبيه ${Core.nameFor(state, e.key, e.time)}">${icon(muted ? 'bell-off' : 'bell')}</button>`;
       if (!noBell) li.querySelector('.logb').onclick = () => {
-        if (!started) { toast(`لم يحن وقت صلاة ${NAMES[e.key]} بعد`); return; }
+        if (!started) { toast(`لم يحن وقت صلاة ${Core.nameFor(state, e.key, e.time)} بعد`); return; }
         const on = Tracker.toggle(ds, e.key);
-        toast(on ? `تقبّل الله منك · سُجّلت صلاة ${NAMES[e.key]}` : `أُلغي تسجيل صلاة ${NAMES[e.key]}`);
+        toast(on ? `تقبّل الله منك · سُجّلت صلاة ${Core.nameFor(state, e.key, e.time)}` : `أُلغي تسجيل صلاة ${Core.nameFor(state, e.key, e.time)}`);
         if (navigator.vibrate) navigator.vibrate(on ? 30 : 10);
         renderTimes(); if (App.screens.stats && isActive('stats')) App.screens.stats();
       };
@@ -92,7 +92,7 @@
         if (!state.notify) { toast('فعّل تنبيهات الصلاة أولاً'); return; }
         state.mute[e.key] = !state.mute[e.key];
         store.set('mute', state.mute);
-        toast(state.mute[e.key] ? `تم إيقاف تنبيه صلاة ${NAMES[e.key]}` : `تم تفعيل تنبيه صلاة ${NAMES[e.key]}`);
+        toast(state.mute[e.key] ? `تم إيقاف تنبيه صلاة ${Core.nameFor(state, e.key, e.time)}` : `تم تفعيل تنبيه صلاة ${Core.nameFor(state, e.key, e.time)}`);
         renderTimes(); scheduleNotifications();
       };
       ul.appendChild(li);
@@ -443,13 +443,14 @@
     evening: { title: 'أذكار المساء', opts: [['a:0', 'عند أذان العصر'], ['a:10', 'بعد العصر بـ10 دقائق'], ['a:20', 'بعد العصر بـ20 دقيقة'], ['a:45', 'بعد العصر بـ45 دقيقة'], ['m:15', 'قبل المغرب بـ15 دقيقة'], ['f', 'وقت أحدده بنفسي']] },
     sleep: { title: 'أذكار النوم', opts: [['a:30', 'بعد العشاء بـ30 دقيقة'], ['a:60', 'بعد العشاء بساعة'], ['a:90', 'بعد العشاء بساعة ونصف'], ['a:120', 'بعد العشاء بساعتين'], ['f', 'وقت أحدده بنفسي']] }
   };
-  function renderAdhkarCfg() {
-    const box = $('adhkarCfg');
+  // يبني صفوف الإعداد (تشغيل + وقت) لمجموعة تذكيرات
+  function renderCfg(boxId, key, UI) {
+    const box = $(boxId);
     box.innerHTML = '';
-    Object.keys(ADHKAR_UI).forEach((type) => {
-      const ui = ADHKAR_UI[type], cfg = state.adhkarCfg[type];
+    Object.keys(UI).forEach((type) => {
+      const ui = UI[type], cfg = state[key][type];
       const label = (ui.opts.find((o) => o[0] === cfg.when) || ui.opts[0])[1];
-      const save = () => { store.set('adhkarCfg', state.adhkarCfg); scheduleNotifications(); renderAdhkarCfg(); };
+      const save = () => { store.set(key, state[key]); scheduleNotifications(); renderCfg(boxId, key, UI); };
       const row = document.createElement('label');
       row.className = 'srow';
       row.innerHTML = `<span class="st"><b>تذكير ${ui.title}</b><small>${cfg.on ? (cfg.when === 'f' ? 'يومياً الساعة ' + cfg.fixed : label) : 'متوقف'}</small></span><input type="checkbox" class="switch" ${cfg.on ? 'checked' : ''}>`;
@@ -470,6 +471,17 @@
       }
     });
   }
+  const JUMAH_UI = {
+    prep: { title: 'الاستعداد للجمعة', opts: [['b:120', 'قبل الجمعة بساعتين'], ['b:90', 'قبل الجمعة بساعة ونصف'], ['b:60', 'قبل الجمعة بساعة'], ['b:45', 'قبل الجمعة بـ45 دقيقة'], ['f', 'وقت أحدده بنفسي']] },
+    kahf: { title: 'سورة الكهف', opts: [['a:0', 'عند أذان الفجر'], ['a:30', 'بعد الفجر بنصف ساعة'], ['a:60', 'بعد الفجر بساعة'], ['s:15', 'قبل الشروق بـ15 دقيقة'], ['f', 'وقت أحدده بنفسي']] },
+    salawat: { title: 'الصلاة على النبي ﷺ', opts: [['f', 'وقت أحدده بنفسي'], ['b:180', 'قبل الجمعة بـ3 ساعات'], ['b:60', 'قبل الجمعة بساعة'], ['a:30', 'بعد الجمعة بنصف ساعة'], ['a:120', 'بعد الجمعة بساعتين']] },
+    hour: { title: 'ساعة الإجابة', opts: [['a:0', 'عند أذان العصر'], ['a:5', 'بعد العصر بـ5 دقائق'], ['a:15', 'بعد العصر بـ15 دقيقة'], ['m:60', 'قبل المغرب بساعة'], ['m:30', 'قبل المغرب بنصف ساعة'], ['f', 'وقت أحدده بنفسي']] }
+  };
+  const renderAdhkarCfg = () => renderCfg('adhkarCfg', 'adhkarCfg', ADHKAR_UI);
+  const renderJumahCfg = () => renderCfg('jumahCfg', 'jumahCfg', JUMAH_UI);
+  $('fridayLabel').checked = state.fridayLabel !== false;
+  $('fridayLabel').onchange = (e) => { state.fridayLabel = e.target.checked; store.set('fridayLabel', state.fridayLabel); refresh(); };
+  renderJumahCfg();
   renderAdhkarCfg();
   $('remind').value = String(state.remind);
   $('remind').onchange = (e) => { state.remind = +e.target.value; store.set('remind', state.remind); scheduleNotifications(); syncSettingsText(); };
@@ -514,7 +526,7 @@
 
   /* ---------- التنقل ---------- */
   const App = { screens: {} };
-  const PARENT = { stats: 'more', qada: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
+  const PARENT = { stats: 'more', qada: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', jumah: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
   const stack = [];
   let current = 'times';
   const isActive = (n) => current === n;
@@ -573,6 +585,7 @@
     resolveCoords();
     renderDates();
     renderTimes();
+    if (window.renderJumahBanner) window.renderJumahBanner();
     renderQibla();
     syncSettingsText();
     scheduleNotifications();

@@ -18,6 +18,19 @@
     evening: { on: true, when: 'a:20', fixed: '17:00' },
     sleep: { on: true, when: 'a:60', fixed: '22:00' }
   };
+  // تذكيرات الجمعة: when: 'a:N' بعد الصلاة المرتبطة، 'b:N' قبلها، 'f' وقت ثابت
+  const JUMAH_DEFAULT = {
+    kahf: { on: true, when: 'a:30', fixed: '07:00' },     // سورة الكهف: بعد الفجر
+    salawat: { on: true, when: 'f', fixed: '10:00' },      // الصلاة على النبي ﷺ
+    prep: { on: true, when: 'b:90', fixed: '10:30' },      // الاستعداد للجمعة: غسل وطيب وتبكير
+    hour: { on: true, when: 'a:5', fixed: '16:00' }        // ساعة الإجابة: آخر ساعة بعد العصر
+  };
+  function loadJumahCfg() {
+    const saved = store.get('jumahCfg', null);
+    const cfg = JSON.parse(JSON.stringify(JUMAH_DEFAULT));
+    if (saved) Object.keys(cfg).forEach((k) => { if (saved[k]) Object.assign(cfg[k], saved[k]); });
+    return cfg;
+  }
   function loadAdhkarCfg() {
     const saved = store.get('adhkarCfg', null);
     const cfg = JSON.parse(JSON.stringify(ADHKAR_DEFAULT));
@@ -38,7 +51,9 @@
       remind: store.get('remind', 5),
       mute: store.get('mute', {}),
       nudge: store.get('nudge', true),               // تذكير لطيف إذا لم تُسجَّل الصلاة
-      adhkarCfg: loadAdhkarCfg(),                       // تذكير الأذكار: لكل نوع تشغيل + وقت
+      adhkarCfg: loadAdhkarCfg(),
+      jumahCfg: loadJumahCfg(),                         // تذكيرات يوم الجمعة
+      fridayLabel: store.get('fridayLabel', true),        // تسمية الظهر "الجمعة" يوم الجمعة                       // تذكير الأذكار: لكل نوع تشغيل + وقت
       afterRemind: store.get('afterRemind', false),   // أذكار بعد الصلاة
       fastRemind: store.get('fastRemind', false),     // صيام الاثنين والخميس
       eventsRemind: store.get('eventsRemind', false)  // الأيام البيض والمناسبات
@@ -125,14 +140,21 @@
   }
   // وقت تذكير الأذكار لنوع معيّن في يوم معيّن
   function adhkarTime(type, cfg, t, ds) {
-    const anchor = { morning: 'fajr', evening: 'asr', sleep: 'isha' }[type];
+    const anchor = { morning: 'fajr', evening: 'asr', sleep: 'isha', kahf: 'fajr', salawat: 'dhuhr', prep: 'dhuhr', hour: 'asr' }[type];
     const w = cfg.when || 'a:0';
     if (w === 'f') return clockToEpoch(ds, cfg.fixed);
     const [kind, n] = w.split(':');
     const mins = (+n || 0) * 60000;
+    if (kind === 'b') return t[anchor].getTime() - mins;
     if (kind === 's') return t.sunrise.getTime() - mins;
     if (kind === 'm') return t.maghrib.getTime() - mins;
     return t[anchor].getTime() + mins;
+  }
+
+  // اسم الصلاة: يوم الجمعة يصير الظهر «الجمعة»
+  function nameFor(state, key, date) {
+    if (key === 'dhuhr' && state.fridayLabel !== false && date && weekday(date) === 5) return 'الجمعة';
+    return NAMES[key];
   }
 
   // قائمة الإشعارات للأيام السبعة القادمة
@@ -151,15 +173,17 @@
       // 1) الصلاة: تذكير قبلها + عند دخول الوقت
       if (state.notify) PRAYERS.forEach((k) => {
         if (state.mute && state.mute[k]) return;
-        if (remind > 0) push(ms(k) - remind * 60000, `اقتربت صلاة ${NAMES[k]}`, `تبقّى ${remind} دقائق على أذان ${NAMES[k]}`);
-        push(ms(k), 'حان وقت الصلاة', `حان الآن موعد صلاة ${NAMES[k]}`);
+        const nm = nameFor(state, k, t[k]);
+        const jum = nm === 'الجمعة';
+        if (remind > 0) push(ms(k) - remind * 60000, jum ? 'اقتربت صلاة الجمعة' : `اقتربت صلاة ${nm}`, jum ? `تبقّى ${remind} دقائق على أذان الجمعة، بادر إلى المسجد` : `تبقّى ${remind} دقائق على أذان ${nm}`, jum ? { tab: 'jumah' } : null);
+        push(ms(k), jum ? 'حان وقت صلاة الجمعة' : 'حان وقت الصلاة', jum ? 'حان الآن موعد صلاة الجمعة، لا تنسَ الإنصات للخطبة' : `حان الآن موعد صلاة ${nm}`, jum ? { tab: 'jumah' } : null);
       });
       // 2) تذكير لطيف إن لم تُسجَّل الصلاة قبل خروج وقتها
       if (state.nudge) {
         const end = { fajr: ms('sunrise'), dhuhr: ms('asr'), asr: ms('maghrib'), maghrib: ms('isha'), isha: ms('isha') + 120 * 60000 };
         PRAYERS.forEach((k) => {
           const at = end[k] - (k === 'isha' ? 0 : 15 * 60000);
-          if (at > ms(k) + 20 * 60000) push(at, `هل صليت ${NAMES[k]}؟`, k === 'isha' ? 'سجّل صلاتك إن أدّيتها' : 'سجّل صلاتك قبل خروج الوقت', { tab: 'stats', chk: ds + '|' + k });
+          if (at > ms(k) + 20 * 60000) push(at, `هل صليت ${nameFor(state, k, t[k])}؟`, k === 'isha' ? 'سجّل صلاتك إن أدّيتها' : 'سجّل صلاتك قبل خروج الوقت', { tab: 'stats', chk: ds + '|' + k });
         });
       }
       // 3) تذكير الأذكار
@@ -168,6 +192,14 @@
       if (cfg.evening.on) push(adhkarTime('evening', cfg.evening, t, ds), 'أذكار المساء', 'حافظ على أذكار المساء', { tab: 'azkar:evening' });
       if (cfg.sleep.on) push(adhkarTime('sleep', cfg.sleep, t, ds), 'أذكار النوم', 'ختام يومك بذكر الله', { tab: 'azkar:sleep' });
       if (state.afterRemind) PRAYERS.forEach((k) => push(ms(k) + 10 * 60000, 'أذكار بعد الصلاة', `بعد صلاة ${NAMES[k]}`, { tab: 'azkar:after' }));
+      // 3ب) يوم الجمعة: الكهف والصلاة على النبي والاستعداد وساعة الإجابة
+      if (weekday(day) === 5 && state.jumahCfg) {
+        const jc = state.jumahCfg;
+        if (jc.prep.on) push(adhkarTime('prep', jc.prep, t, ds), 'استعد للجمعة', 'الغسل والطيب ولبس أحسن الثياب والتبكير إلى المسجد', { tab: 'jumah' });
+        if (jc.kahf.on) push(adhkarTime('kahf', jc.kahf, t, ds), 'سورة الكهف', 'من قرأها يوم الجمعة أضاء له من النور ما بين الجمعتين', { tab: 'jumah' });
+        if (jc.salawat.on) push(adhkarTime('salawat', jc.salawat, t, ds), 'أكثروا من الصلاة على النبي ﷺ', 'اللهم صل وسلم على نبينا محمد', { tab: 'jumah' });
+        if (jc.hour.on) push(adhkarTime('hour', jc.hour, t, ds), 'ساعة الإجابة', 'آخر ساعة من يوم الجمعة: أكثر من الدعاء حتى المغرب', { tab: 'jumah' });
+      }
       // 4) صيام الاثنين والخميس + الأيام البيض والمناسبات: تنبيه مساء اليوم السابق
       const at = ms('isha') + 30 * 60000;
       const tomorrow = new Date(nowMs + (d + 1) * 864e5);
@@ -194,10 +226,10 @@
       const dt = new Date(now.getTime() + d * 864e5);
       const t = calc(state, dt);
       const ds = df.format(dt);
-      ORDER.forEach((k) => out.push({ k, n: NAMES[k], at: t[k].getTime(), d: ds }));
+      ORDER.forEach((k) => out.push({ k, n: nameFor(state, k, t[k]), at: t[k].getTime(), d: ds }));
     }
     return out;
   }
 
-  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications, times, hijri, hijriEvents, weekday, HIJRI_MONTHS, WEEKDAYS };
+  window.Core = { NAMES, ORDER, PRAYERS, TZ, GPS, DEFAULT_CITY, store, loadState, cityCoords, coordsOf, distKm, nearestPlace, psDay, calc, notifications, times, hijri, hijriEvents, weekday, HIJRI_MONTHS, WEEKDAYS, nameFor };
 })();

@@ -4,7 +4,7 @@
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
   const H = window.HADITH, S = window.SEERAH, L = window.LESSONS;
   const dayIndex = () => { const d = new Date(); return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(d.getFullYear(), 0, 0)) / 864e5); };
-  const CAT = { نية: 'النية والإخلاص', أخلاق: 'الأخلاق', عبادة: 'العبادات', علم: 'العلم', صدقة: 'الصدقة', مجتمع: 'الأسرة والمجتمع', حياة: 'الحياة والدنيا', ذكر: 'الذكر', دين: 'الدين', أقصى: 'المسجد الأقصى' };
+  const CAT = { نية: 'النية والإخلاص', أخلاق: 'الأخلاق', عبادة: 'العبادات', علم: 'العلم', صدقة: 'الصدقة', مجتمع: 'الأسرة والمجتمع', حياة: 'الحياة والدنيا', ذكر: 'الذكر', دين: 'الدين', أقصى: 'المسجد الأقصى', جمعة: 'يوم الجمعة' };
 
   function copyText(t, okMsg) {
     if (B && B.copy) { B.copy(t); toast(okMsg || 'تم النسخ'); return; }
@@ -60,7 +60,7 @@
     if (focusEl) setTimeout(() => focusEl.scrollIntoView({ block: 'center' }), 60);
   }
   $('hSearch').oninput = () => renderHadith();
-  App.screens.hadith = (o) => { if (o && o.focus !== undefined) { cat = 'الكل'; $('hSearch').value = ''; } renderHadith(o); };
+  App.screens.hadith = (o) => { if (o && (o.focus !== undefined || o.cat)) { cat = o.cat || 'الكل'; $('hSearch').value = ''; } renderHadith(o); };
 
   // حديث اليوم في الشاشة الرئيسية
   function renderDaily() {
