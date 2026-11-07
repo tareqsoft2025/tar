@@ -3,7 +3,6 @@
   const { $, state, store, B, icon, toast, go } = App;
   const TZ = Core.TZ;
   const NAMES = Core.NAMES;
-  const KEYS = Tracker.KEYS;
   const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
   const arNum = (n) => String(n).replace(/\d/g, (d) => AR_DIGITS[d]);
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -20,40 +19,6 @@
     $('gsheet').hidden = false;
   }
   $('gsheet').onclick = (e) => { if (e.target.hasAttribute('data-close')) $('gsheet').hidden = true; };
-
-  /* =============== متابعة صلاتي =============== */
-  function renderStats() {
-    const today = Tracker.dayStr();
-    const n = Tracker.count(today);
-    $('todayNum').textContent = n + '/5';
-    $('todayRing').style.strokeDashoffset = String(276.5 * (1 - n / 5));
-    $('todayMsg').textContent = n === 5 ? 'أتممت صلوات اليوم، تقبّل الله منك' : n === 0 ? 'ابدأ بتسجيل صلاتك' : `بقي ${5 - n} من صلوات اليوم`;
-    $('todayDate').textContent = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(new Date());
-    const pills = $('todayPills');
-    pills.innerHTML = '';
-    KEYS.forEach((k) => {
-      const on = Tracker.isLogged(today, k);
-      const b = el('button', 'pill' + (on ? ' on' : ''), `${icon('check')}<span>${NAMES[k]}</span>`);
-      b.onclick = () => { Tracker.toggle(today, k); renderStats(); refreshTimes(); };
-      pills.appendChild(b);
-    });
-    const s = Tracker.streaks(today);
-    $('stCur').textContent = s.current;
-    $('stBest').textContent = s.best;
-    $('stAll').textContent = Tracker.totals().all;
-    const chart = $('weekChart');
-    chart.innerHTML = '';
-    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    Tracker.week(today).forEach((d) => {
-      const col = el('div', 'wk' + (d.ds === today ? ' today' : ''));
-      const bar = el('div', 'bar ' + (d.n === 5 ? 'full' : d.n > 0 ? 'part' : ''));
-      bar.style.height = Math.max(6, (d.n / 5) * 100) + 'px';
-      col.append(el('b', '', d.n), bar, el('small', '', days[d.dow].replace('ال', '')));
-      chart.appendChild(col);
-    });
-  }
-  function refreshTimes() { App.refresh(); }
-  App.screens.stats = renderStats;
 
   /* =============== قضاء الصلوات =============== */
   const QADA = [['fajr', 'الفجر'], ['dhuhr', 'الظهر'], ['asr', 'العصر'], ['maghrib', 'المغرب'], ['isha', 'العشاء'], ['witr', 'الوتر']];

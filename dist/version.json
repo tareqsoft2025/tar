@@ -1,6 +1,6 @@
 {
-  "versionCode": 19,
-  "versionName": "4.1",
-  "notes": "ميزات يوم الجمعة: الصلاة على النبي وساعة الإجابة والكهف والاستعداد",
+  "versionCode": 20,
+  "versionName": "4.2",
+  "notes": "إزالة ميزة متابعة الصلاة",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

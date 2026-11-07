@@ -50,7 +50,6 @@
       notify: store.get('notify', true),
       remind: store.get('remind', 5),
       mute: store.get('mute', {}),
-      nudge: store.get('nudge', true),               // تذكير لطيف إذا لم تُسجَّل الصلاة
       adhkarCfg: loadAdhkarCfg(),
       jumahCfg: loadJumahCfg(),                         // تذكيرات يوم الجمعة
       fridayLabel: store.get('fridayLabel', true),        // تسمية الظهر "الجمعة" يوم الجمعة                       // تذكير الأذكار: لكل نوع تشغيل + وقت
@@ -178,14 +177,6 @@
         if (remind > 0) push(ms(k) - remind * 60000, jum ? 'اقتربت صلاة الجمعة' : `اقتربت صلاة ${nm}`, jum ? `تبقّى ${remind} دقائق على أذان الجمعة، بادر إلى المسجد` : `تبقّى ${remind} دقائق على أذان ${nm}`, jum ? { tab: 'jumah' } : null);
         push(ms(k), jum ? 'حان وقت صلاة الجمعة' : 'حان وقت الصلاة', jum ? 'حان الآن موعد صلاة الجمعة، لا تنسَ الإنصات للخطبة' : `حان الآن موعد صلاة ${nm}`, jum ? { tab: 'jumah' } : null);
       });
-      // 2) تذكير لطيف إن لم تُسجَّل الصلاة قبل خروج وقتها
-      if (state.nudge) {
-        const end = { fajr: ms('sunrise'), dhuhr: ms('asr'), asr: ms('maghrib'), maghrib: ms('isha'), isha: ms('isha') + 120 * 60000 };
-        PRAYERS.forEach((k) => {
-          const at = end[k] - (k === 'isha' ? 0 : 15 * 60000);
-          if (at > ms(k) + 20 * 60000) push(at, `هل صليت ${nameFor(state, k, t[k])}؟`, k === 'isha' ? 'سجّل صلاتك إن أدّيتها' : 'سجّل صلاتك قبل خروج الوقت', { tab: 'stats', chk: ds + '|' + k });
-        });
-      }
       // 3) تذكير الأذكار
       const cfg = state.adhkarCfg || ADHKAR_DEFAULT;
       if (cfg.morning.on) push(adhkarTime('morning', cfg.morning, t, ds), 'أذكار الصباح', 'ابدأ يومك بذكر الله', { tab: 'azkar:morning' });
