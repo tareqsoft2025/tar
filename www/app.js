@@ -75,14 +75,22 @@
       const t = timeParts(e.time);
       const noBell = e.key === 'sunrise';
       const muted = noBell || state.mute[e.key] || !state.notify;
-      li.innerHTML = `<span class="pn">${Core.nameFor(state, e.key, e.time)}</span><span class="pt">${t.hm} ${t.ap}</span>` +
-        `<button class="bell ${muted ? 'off' : ''}" ${noBell ? 'disabled' : ''} aria-label="تنبيه ${Core.nameFor(state, e.key, e.time)}">${icon(muted ? 'bell-off' : 'bell')}</button>`;
-      if (!noBell) li.querySelector('.bell').onclick = () => {
-        if (!state.notify) { toast('فعّل تنبيهات الصلاة أولاً'); return; }
-        state.mute[e.key] = !state.mute[e.key];
-        store.set('mute', state.mute);
-        toast(state.mute[e.key] ? `تم إيقاف تنبيه صلاة ${Core.nameFor(state, e.key, e.time)}` : `تم تفعيل تنبيه صلاة ${Core.nameFor(state, e.key, e.time)}`);
-        renderTimes(); scheduleNotifications();
+      const nm = Core.nameFor(state, e.key, e.time);
+      const PI = { fajr: 'moon-star', sunrise: 'sunrise', dhuhr: 'sun', asr: 'sun', maghrib: 'sunrise', isha: 'moon' };
+      const ico = isNext ? 'mosque' : (state.mute[e.key] && !noBell ? 'bell-off' : PI[e.key]);
+      li.innerHTML = `<span class="pch">${icon('chev')}</span><span class="pn">${nm}</span><span class="pt">${t.hm} ${t.ap}</span><span class="pic ${muted && !noBell ? 'off' : ''}">${icon(ico)}</span>`;
+      li.tabIndex = 0;
+      li.setAttribute('role', 'button');
+      li.onclick = () => {
+        if (noBell) { toast('الشروق وقت انتهاء الفجر، ولا أذان له'); return; }
+        const isMuted = !!state.mute[e.key];
+        App.choose(`صلاة ${nm}`, [[isMuted ? 'تفعيل تنبيه هذه الصلاة' : 'إيقاف تنبيه هذه الصلاة', () => {
+          if (!state.notify) { toast('فعّل تنبيهات الصلاة أولاً'); return; }
+          state.mute[e.key] = !isMuted;
+          store.set('mute', state.mute);
+          toast(isMuted ? `تم تفعيل تنبيه صلاة ${nm}` : `تم إيقاف تنبيه صلاة ${nm}`);
+          renderTimes(); scheduleNotifications();
+        }]]);
       };
       ul.appendChild(li);
     });

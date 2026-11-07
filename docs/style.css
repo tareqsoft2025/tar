@@ -423,3 +423,51 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 .kh-row{display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--line)}
 .kh-row:last-child{border:0}
 .kh-row span{color:var(--muted)}
+
+/* ===== تصميم الشاشة الرئيسية الجديد (ليلي فاخر) ===== */
+#tab-times{position:relative}
+.sky{position:absolute;top:calc(-20px - env(safe-area-inset-top));inset-inline:-20px;width:calc(100% + 40px);height:290px;z-index:-1;pointer-events:none;
+  -webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)}
+.sky .sil{fill:color-mix(in srgb,var(--card-2) 92%,var(--text));stroke:color-mix(in srgb,var(--card-2) 92%,var(--text));opacity:.9;stroke-linecap:round}
+.sky .stars circle{fill:var(--gold);opacity:.7}
+.sky .win{fill:var(--gold);opacity:.9}
+.topbar{margin-bottom:18px}
+.date-h{font-size:1.75rem}
+.date-sub{font-size:1rem;margin-bottom:18px}
+.icon-btn{background:color-mix(in srgb,var(--card) 70%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:14px}
+.hero{position:relative;overflow:hidden;min-height:236px;padding:20px 22px;border-radius:26px;border:1.5px solid transparent;margin-bottom:16px;
+  background:var(--pattern) 0 0/72px 72px,linear-gradient(145deg,color-mix(in srgb,var(--card-2) 75%,transparent),color-mix(in srgb,var(--card) 92%,transparent)) padding-box,
+  linear-gradient(135deg,color-mix(in srgb,var(--gold) 80%,transparent),color-mix(in srgb,var(--gold) 8%,transparent) 42%,color-mix(in srgb,var(--gold) 45%,transparent)) border-box;
+  box-shadow:0 10px 36px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06)}
+.hero-art{position:absolute;left:5%;bottom:-2px;width:31%;height:80%;filter:drop-shadow(0 0 10px color-mix(in srgb,var(--gold) 40%,transparent))}
+.hero-body{position:relative;width:64%;margin-inline-start:0}
+.hero .next-name{font-size:2.25rem;line-height:1.3}
+.hero .next-time{font-size:1.5rem;white-space:nowrap}
+.hero .hrow{align-items:flex-end;gap:6px}
+.hero .hdiv{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold) 45%,transparent),transparent);margin:12px 0 14px}
+.cd-pill{padding:10px 14px 8px;border-radius:16px;background:color-mix(in srgb,var(--bg) 35%,transparent);border:1px solid color-mix(in srgb,var(--line) 80%,transparent)}
+.cd-pill .eyebrow{display:flex;align-items:center;gap:8px;font-size:.875rem}
+.cd-pill .eyebrow .ic{width:20px;height:20px}
+.cd-pill .count{font-size:1.875rem;text-align:start;line-height:1.3}
+.plist{gap:10px}
+.plist li,.plist li.upcoming,.plist li.past{position:relative;display:flex;align-items:center;gap:12px;min-height:64px;padding:0 14px;border-radius:18px;cursor:pointer;
+  background:color-mix(in srgb,var(--card) 72%,transparent);border:1px solid color-mix(in srgb,var(--line) 85%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--text)}
+.plist li.past{color:var(--muted)}
+.plist li.next{color:var(--gold);border:1.5px solid var(--gold);background:linear-gradient(135deg,color-mix(in srgb,var(--gold) 16%,var(--card)),color-mix(in srgb,var(--card) 80%,transparent));
+  box-shadow:0 0 22px color-mix(in srgb,var(--gold) 28%,transparent),inset 0 0 18px color-mix(in srgb,var(--gold) 10%,transparent)}
+.plist .pch{color:var(--muted);display:grid;place-items:center}
+.plist .pch .ic{width:18px;height:18px}
+.plist li.next .pch{color:var(--gold)}
+.plist .pn{flex:1;font-size:1.125rem}
+.plist .pt{min-width:0;font-weight:700;font-size:1.125rem}
+.plist .pic{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;flex:none;border:1.5px solid color-mix(in srgb,var(--line) 90%,var(--gold));background:color-mix(in srgb,var(--bg) 40%,transparent);color:var(--gold)}
+.plist .pic .ic{width:22px;height:22px}
+.plist .pic.off{color:var(--muted)}
+.plist li.next .pic{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent)}
+.dock{inset-inline:12px;bottom:calc(10px + env(safe-area-inset-bottom));height:var(--nav-h);padding:6px;padding-bottom:6px;border:1px solid var(--line);border-radius:28px;
+  background:color-mix(in srgb,var(--nav-bg) 82%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.dock button{position:relative;border-radius:22px}
+.dock button.on{background:color-mix(in srgb,var(--gold) 12%,var(--card))}
+.dock button.on::after{content:"";position:absolute;bottom:4px;width:34px;height:3px;border-radius:3px;background:var(--gold)}
+main{padding-bottom:calc(var(--nav-h) + 40px + env(safe-area-inset-bottom))}
+@media (max-width:360px){.hero .next-name{font-size:1.875rem}.hero .next-time{font-size:1.25rem}.cd-pill .count{font-size:1.5rem}}
