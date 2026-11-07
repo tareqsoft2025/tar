@@ -46,6 +46,9 @@
         .format(new Date(now.getTime() + state.hijriAdj * 864e5));
     } catch (e) { $('hijri').textContent = ''; }
     $('place').textContent = placeLabel();
+    const AY = [['وَأَقِمِ الصَّلَاةَ', 'إِنَّ الصَّلَاةَ تَنْهَىٰ عَنِ الْفَحْشَاءِ وَالْمُنكَرِ'], ['إِنَّنِي أَنَا اللَّهُ لَا إِلَٰهَ إِلَّا أَنَا فَاعْبُدْنِي', 'وَأَقِمِ الصَّلَاةَ لِذِكْرِي'], ['حَافِظُوا عَلَى الصَّلَوَاتِ وَالصَّلَاةِ الْوُسْطَىٰ', 'وَقُومُوا لِلَّهِ قَانِتِينَ'], ['إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ', 'كِتَابًا مَّوْقُوتًا'], ['وَاسْتَعِينُوا بِالصَّبْرِ وَالصَّلَاةِ', 'وَإِنَّهَا لَكَبِيرَةٌ إِلَّا عَلَى الْخَاشِعِينَ'], ['قَدْ أَفْلَحَ الْمُؤْمِنُونَ', 'الَّذِينَ هُمْ فِي صَلَاتِهِمْ خَاشِعُونَ']];
+    const ay = AY[Math.floor(now.getTime() / 864e5) % AY.length];
+    $('ayah1').textContent = ay[0]; $('ayah2').textContent = ay[1];
   }
   function timeline(now) {
     const out = [];
@@ -63,6 +66,7 @@
     if (ni < 1) ni = 1;
     const next = tl[ni];
     state.next = next;
+    state.prev = tl[ni - 1];
     $('nextName').textContent = Core.nameFor(state, next.key, next.time);
     const np = timeParts(next.time);
     $('nextAt').textContent = `${np.hm} ${np.ap}`;
@@ -76,9 +80,9 @@
       const noBell = e.key === 'sunrise';
       const muted = noBell || state.mute[e.key] || !state.notify;
       const nm = Core.nameFor(state, e.key, e.time);
-      const PI = { fajr: 'moon-star', sunrise: 'sunrise', dhuhr: 'sun', asr: 'sun', maghrib: 'sunrise', isha: 'moon' };
-      const ico = isNext ? 'mosque' : (state.mute[e.key] && !noBell ? 'bell-off' : PI[e.key]);
-      li.innerHTML = `<span class="pch">${icon('chev')}</span><span class="pn">${nm}</span><span class="pt">${t.hm} ${t.ap}</span><span class="pic ${muted && !noBell ? 'off' : ''}">${icon(ico)}</span>`;
+      const PI = { fajr: 'sunrise', sunrise: 'sun', dhuhr: 'sun', asr: 'sunset', maghrib: 'sunset', isha: 'moon' };
+      const ico = state.mute[e.key] && !noBell ? 'bell-off' : PI[e.key];
+      li.innerHTML = `<span class="pic ${muted && !noBell ? 'off' : ''}">${icon(ico)}</span><span class="pn">${nm}</span><span class="pt">${t.hm} ${t.ap}</span>`;
       li.tabIndex = 0;
       li.setAttribute('role', 'button');
       li.onclick = () => {
@@ -103,11 +107,18 @@
     if (state.next.time <= now) { renderTimes(); return; }
     const s = Math.floor((state.next.time - now) / 1000);
     $('countdown').textContent = `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+    if (state.prev) {
+      const span = state.next.time - state.prev.time;
+      const f = span > 0 ? Math.min(1, Math.max(0, (now - state.prev.time) / span)) : 0;
+      $('ringFg').style.strokeDashoffset = String(565.5 * (1 - f));
+      $('ringDot').setAttribute('transform', `rotate(${(f * 360).toFixed(1)} 100 100)`);
+    }
   }
   setInterval(tick, 1000);
   function updateBell() {
     $('bellBtn').innerHTML = icon(state.notify ? 'bell' : 'bell-off');
     $('bellBtn').style.color = state.notify ? 'var(--gold)' : 'var(--muted)';
+    $('bellBtn').classList.toggle('dot', !!state.notify);
   }
 
   /* ---------- الإشعارات ---------- */
@@ -189,6 +200,8 @@
     const q = state.qibla;
     $('qiblaSub').textContent = 'من موقعك الحالي: ' + state.place;
     $('qiblaDeg').textContent = Math.round(q) + '°';
+    $('qcDeg').textContent = Math.round(q) + '°';
+    $('qcArrow').style.transform = `rotate(${Math.round(q)}deg)`;
     $('qiblaDir').textContent = `${DIRS[Math.round(q / 45) % 8]} · من الشمال الحقيقي`;
     const km = Math.round(Core.distKm(state.coords, KAABA));
     $('qiblaDist').textContent = '≈ ' + km.toLocaleString('en-US') + ' كم';
@@ -583,10 +596,12 @@
     renderDates();
     renderTimes();
     if (window.renderJumahBanner) window.renderJumahBanner();
+    if (window.renderWeather) window.renderWeather();
     renderQibla();
     syncSettingsText();
     scheduleNotifications();
   }
+  $('qiblaCard').onclick = () => showTab('qibla');
   buildDial();
   renderTasbih();
   renderAzkar();

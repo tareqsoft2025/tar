@@ -1,6 +1,6 @@
 {
-  "versionCode": 23,
-  "versionName": "5.2",
-  "notes": "ودجت الصلاة بتصميم جديد: خلفية متدرجة وإطار ذهبي وخلايا للصلوات وعدّ تنازلي",
+  "versionCode": 24,
+  "versionName": "5.3",
+  "notes": "تصميم جديد للرئيسية: حلقة العدّ التنازلي والحالة الجوية وبطاقة القبلة وآية متجددة",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

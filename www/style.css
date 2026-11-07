@@ -471,3 +471,74 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 .dock button.on::after{content:"";position:absolute;bottom:4px;width:34px;height:3px;border-radius:3px;background:var(--gold)}
 main{padding-bottom:calc(var(--nav-h) + 40px + env(safe-area-inset-bottom))}
 @media (max-width:360px){.hero .next-name{font-size:1.875rem}.hero .next-time{font-size:1.25rem}.cd-pill .count{font-size:1.5rem}}
+
+/* ===== تصميم الشاشة الرئيسية v3 (مسطّح، حلقة العدّ، طقس وقبلة) ===== */
+:root{--bg:#0d1a21;--card:#112329;--card-2:#143036;--line:#1f3b40;--ok:#3DBE86;--nav-bg:#0d1a21}
+.topbar2{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}
+.tb-right{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.tb-right .place{margin-bottom:6px}
+.tb-right .place .ic{color:var(--ok);width:24px;height:24px}
+.tb-right .date-sub{margin:0;font-size:.9375rem}
+.tb-right .date-h{font-size:1.0625rem;font-weight:500;color:var(--muted);margin:0}
+.tb-left{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex:1;min-width:0}
+.bell-main{position:relative;border-radius:50%;width:48px;height:48px;background:transparent;border:1px solid var(--line)}
+.bell-main.dot::after{content:"";position:absolute;top:8px;inset-inline-end:10px;width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px var(--bg)}
+.ayah{align-self:stretch;font-family:"Amiri","Plex",serif;line-height:1.7;text-align:start}
+.ayah small{display:block;font-size:.9375rem;color:var(--muted)}
+.ayah b{display:block;font-size:1.125rem;font-weight:400;color:var(--text)}
+.ayah i{display:block;width:34px;height:3px;border-radius:3px;background:var(--gold);margin-top:6px}
+.hero{display:flex;flex-direction:row;align-items:center;gap:14px;min-height:0;padding:16px;border-radius:22px;border:1px solid color-mix(in srgb,var(--ok) 30%,var(--line));
+  background:color-mix(in srgb,var(--ok) 7%,var(--card));box-shadow:none;margin-bottom:12px;overflow:visible}
+.hero::before,.hero::after{display:none}
+.hero-info{flex:0 0 40%;position:relative}
+.hero-info .eyebrow{font-size:.9375rem}
+.hero-info .next-name{font-size:2.5rem;line-height:1.35;margin:2px 0}
+.hero-info .hdiv{margin:6px 0 8px;background:var(--line)}
+.hero-info .next-time{font-size:1.625rem;white-space:nowrap}
+.ring{position:relative;flex:1;aspect-ratio:1;max-width:190px;margin-inline-start:auto;border-inline-start:1px solid var(--line);padding-inline-start:0}
+.ring svg{width:100%;height:100%;display:block}
+.ring-bg{fill:none;stroke:color-mix(in srgb,var(--text) 10%,transparent);stroke-width:10}
+.ring-fg{fill:none;stroke:var(--ok);stroke-width:10;stroke-linecap:round;stroke-dasharray:565.5;stroke-dashoffset:565.5;transition:stroke-dashoffset 1s linear}
+.ring-dot{fill:var(--gold)}
+.ring-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.ring-in .eyebrow{font-size:.8125rem}
+.ring-in .count{font-size:1.5rem;line-height:1.2}
+.cd-units{display:flex;gap:14px;direction:ltr;font-size:.6875rem;color:var(--muted);margin-top:2px}
+.plist{gap:0;margin-bottom:12px}
+.plist li,.plist li.upcoming,.plist li.past{min-height:60px;padding:0 6px 0 10px;border-radius:0;background:transparent;border:0;border-bottom:1px solid var(--line);backdrop-filter:none;-webkit-backdrop-filter:none;gap:14px;box-shadow:none;color:var(--text)}
+.plist li.past{color:var(--muted)}
+.plist li:last-child{border-bottom:0}
+.plist .pic{width:44px;height:44px;border:1px solid var(--line);background:color-mix(in srgb,var(--card-2) 80%,transparent);color:var(--text)}
+.plist .pic .ic{width:22px;height:22px}
+.plist .pn{font-size:1.1875rem}
+.plist .pt{font-weight:400;font-size:1.1875rem}
+.plist li.next{border:1px solid color-mix(in srgb,var(--ok) 40%,var(--line));border-left:3px solid var(--gold);border-radius:14px;background:color-mix(in srgb,var(--ok) 16%,var(--card));color:var(--text);box-shadow:none}
+.plist li.next .pn,.plist li.next .pt{color:var(--text);font-weight:700}
+.plist li.next .pic{border-color:var(--gold);color:var(--gold);background:transparent}
+.duo{display:grid;grid-template-columns:1fr 1.15fr;gap:10px;margin-bottom:12px}
+.tile{display:flex;align-items:center;gap:10px;padding:12px;min-height:84px;border-radius:18px;background:var(--card);border:1px solid var(--line);text-align:start}
+.tile-ic{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--ok);flex:none}
+.tile-ic .ic{width:24px;height:24px;transition:transform .4s var(--ease);fill:currentColor;stroke:currentColor}
+.tile-tx{display:flex;flex-direction:column;flex:1;min-width:0}
+.tile-tx small{color:var(--muted);font-size:.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile-tx b{font-size:1.5rem;line-height:1.2}
+.tile .chev{color:var(--muted);width:18px;height:18px}
+.wx-ic{width:40px;color:var(--muted);flex:none;display:grid;place-items:center}
+.wx-ic .ic{width:36px;height:36px;stroke-width:1.5}
+.wx-hl{display:flex;flex-direction:column;gap:2px;border-inline-start:1px solid var(--line);padding-inline-start:10px;color:var(--muted);font-size:.875rem;direction:ltr}
+.wx-hl span{display:flex;align-items:center;gap:4px}
+.wx-hl em{font-style:normal}
+.wx-hl .ic{width:16px;height:16px}
+.dock{inset-inline:0;bottom:0;height:calc(var(--nav-h) + env(safe-area-inset-bottom));padding:0 0 env(safe-area-inset-bottom);border:0;border-top:1px solid var(--line);border-radius:0;background:var(--nav-bg);backdrop-filter:none;box-shadow:none}
+.dock button{border-radius:0}
+.dock button.on{background:transparent}
+.dock button.on::after{bottom:6px;width:38px}
+main{padding-bottom:calc(var(--nav-h) + 28px + env(safe-area-inset-bottom))}
+@media (max-width:370px){.hero-info .next-name{font-size:2rem}.hero-info .next-time{font-size:1.375rem}.ring-in .count{font-size:1.25rem}.tile-tx b{font-size:1.25rem}.duo{grid-template-columns:1fr}}
+.duo{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}
+.duo>*{min-width:0}
+.tile{padding:10px;gap:8px}
+.tile-ic{width:42px;height:42px}
+.tile-tx b{font-size:1.375rem}
+.wx-ic{width:32px}.wx-ic .ic{width:30px;height:30px}
+.wx-hl{padding-inline-start:8px;font-size:.8125rem}
