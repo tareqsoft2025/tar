@@ -582,3 +582,21 @@ body:has(#tab-times.active){overflow:hidden;height:100dvh}
 @media (min-width:600px){#tab-times.active{max-width:560px;margin-inline:auto}}
 html:has(#tab-times.active){overflow:hidden}
 @media (max-width:400px){#tab-times .tile .chev{display:none}#tab-times .tile-tx small{font-size:.75rem}}
+
+/* الدولار والشيكل */
+.fxbar{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);text-align:start}
+.fxbar .fx-l{display:flex;align-items:center;gap:6px;color:var(--ok)}
+.fxbar .fx-l b{color:var(--text);font-size:.875rem}
+.fxbar .fx-l .ic{width:18px;height:18px}
+.fxbar .fx-v{flex:1;display:flex;justify-content:flex-end;gap:12px;direction:ltr;font-size:.875rem;font-variant-numeric:tabular-nums}
+.fxbar .fx-v em{font-style:normal}
+.fxbar .chev{width:16px;height:16px;color:var(--muted)}
+.fx-big{font-size:2.25rem;font-weight:700;color:var(--gold);direction:ltr;margin:6px 0}
+.fx-conv{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.fx-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 4px}
+.fx-row .cur{font-weight:700;white-space:nowrap}
+.fx-row input{flex:1;min-width:0;max-width:60%;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:1.25rem;font-weight:700;text-align:end;padding:0 12px;direction:ltr}
+.fx-swap{align-self:center;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--gold)}
+#tab-times .fxbar{margin:0}
+@media (max-height:660px){#tab-times .fxbar{display:none}}
+#fxBigIls{direction:ltr}.fx-row input::-webkit-outer-spin-button,.fx-row input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.fx-row input{-moz-appearance:textfield}

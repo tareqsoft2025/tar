@@ -155,6 +155,7 @@
         <span class="wx-hl"><span><svg class="ic"><use href="#i-up"/></svg><em id="wxHi">--°</em></span><span><svg class="ic"><use href="#i-down2"/></svg><em id="wxLo">--°</em></span></span>
       </div>
     </div>
+    <button id="fxBar" class="fxbar" type="button" aria-label="سعر الدولار مقابل الشيكل"><span class="fx-l"><svg class="ic"><use href="#i-chart"/></svg><b>دولار / شيكل</b></span><span class="fx-v"><em id="fxUsd">$1 = ₪--</em><em id="fxIls">₪1 = $--</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <button id="jumahBanner" class="jbanner" type="button" hidden></button>
     <button id="asmaCard" class="asma-card" type="button"></button>
     <button id="dailyHadith" class="hcard" type="button"></button>
@@ -221,6 +222,7 @@
     <div class="sub">أدوات تعينك على المحافظة على صلاتك وعبادتك</div>
     <div class="hub">
       <button class="hub-card" data-go="jumah"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>يوم الجمعة</b><small>سنن وساعة الإجابة والصلاة على النبي</small></button>
+      <button class="hub-card" data-go="fx"><span class="hub-ic"><svg class="ic"><use href="#i-chart"/></svg></span><b>الدولار والشيكل</b><small>سعر الصرف والتحويل</small></button>
       <button class="hub-card" data-go="khatma"><span class="hub-ic"><svg class="ic"><use href="#i-quran"/></svg></span><b>ختمة القرآن</b><small>خطة يومية وتقدّم</small></button>
       <button class="hub-card" data-go="asma"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>أسماء الله الحسنى</b><small>معانٍ واختبار</small></button>
       <button class="hub-card" data-go="duas"><span class="hub-ic"><svg class="ic"><use href="#i-heart"/></svg></span><b>أدعية مأثورة</b><small>حسب الموقف</small></button>
@@ -233,6 +235,25 @@
       <button class="hub-card" data-go="tasbih"><span class="hub-ic"><svg class="ic"><use href="#i-beads"/></svg></span><b>المسبحة</b><small>عدّاد التسبيح</small></button>
       <button class="hub-card" data-go="azkar"><span class="hub-ic"><svg class="ic"><use href="#i-note"/></svg></span><b>الأذكار</b><small>صباح، مساء، بعد الصلاة، نوم</small></button>
     </div>
+  </section>
+
+  <!-- الدولار والشيكل -->
+  <section id="tab-fx" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">الدولار والشيكل</h1></div>
+    <div class="kh-hero">
+      <div class="eyebrow">سعر الصرف الحالي</div>
+      <div class="fx-big"><span id="fxBigUsd">$1 = ₪--</span></div>
+      <div class="muted" id="fxBigIls">₪1 = $--</div>
+      <div class="muted small" id="fxStamp" style="margin-top:8px"></div>
+    </div>
+    <div class="group pad fx-conv">
+      <label class="fx-row"><span class="cur">$ دولار أمريكي</span><input id="fxA" type="number" inputmode="decimal" min="0" step="any" value="1" aria-label="دولار"></label>
+      <button id="fxSwap" class="fx-swap" type="button" aria-label="تبديل"><svg class="ic"><use href="#i-refresh"/></svg></button>
+      <label class="fx-row"><span class="cur">₪ شيكل</span><input id="fxB" type="number" inputmode="decimal" min="0" step="any" aria-label="شيكل"></label>
+    </div>
+    <div id="fxChips" class="chips" style="margin-top:12px"></div>
+    <button id="fxRefresh" class="btn-outline wide" type="button"><svg class="ic"><use href="#i-refresh"/></svg><span>تحديث السعر الآن</span></button>
+    <p class="note c"><span>السعر مرجعي (متوسط السوق) ويتحدّث تلقائياً، وقد يختلف عن أسعار الصرافين والبنوك.</span></p>
   </section>
 
   <!-- أسماء الله الحسنى -->
@@ -545,5 +566,6 @@
 <script src="data2.js"></script>
 <script src="features.js"></script>
 <script src="weather.js"></script>
+<script src="fx.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 {
-  "versionCode": 25,
-  "versionName": "5.4",
-  "notes": "الشاشة الرئيسية في صفحة واحدة بلا تمرير ومتجاوبة مع كل الأحجام",
+  "versionCode": 26,
+  "versionName": "5.5",
+  "notes": "الدولار مقابل الشيكل والعكس، وربط الطقس بموقعك الحالي مع تحديث تلقائي",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
