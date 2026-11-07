@@ -75,19 +75,8 @@
       const t = timeParts(e.time);
       const noBell = e.key === 'sunrise';
       const muted = noBell || state.mute[e.key] || !state.notify;
-      const ds = Tracker.dayStr(now);
-      const started = e.time <= now;
-      const logged = !noBell && Tracker.isLogged(ds, e.key);
       li.innerHTML = `<span class="pn">${Core.nameFor(state, e.key, e.time)}</span><span class="pt">${t.hm} ${t.ap}</span>` +
-        (noBell ? '<span class="logb off" style="visibility:hidden"></span>' : `<button class="logb ${logged ? 'on' : ''} ${started ? '' : 'off'}" aria-label="تسجيل صلاة ${Core.nameFor(state, e.key, e.time)}">${icon('check')}</button>`) +
         `<button class="bell ${muted ? 'off' : ''}" ${noBell ? 'disabled' : ''} aria-label="تنبيه ${Core.nameFor(state, e.key, e.time)}">${icon(muted ? 'bell-off' : 'bell')}</button>`;
-      if (!noBell) li.querySelector('.logb').onclick = () => {
-        if (!started) { toast(`لم يحن وقت صلاة ${Core.nameFor(state, e.key, e.time)} بعد`); return; }
-        const on = Tracker.toggle(ds, e.key);
-        toast(on ? `تقبّل الله منك · سُجّلت صلاة ${Core.nameFor(state, e.key, e.time)}` : `أُلغي تسجيل صلاة ${Core.nameFor(state, e.key, e.time)}`);
-        if (navigator.vibrate) navigator.vibrate(on ? 30 : 10);
-        renderTimes(); if (App.screens.stats && isActive('stats')) App.screens.stats();
-      };
       if (!noBell) li.querySelector('.bell').onclick = () => {
         if (!state.notify) { toast('فعّل تنبيهات الصلاة أولاً'); return; }
         state.mute[e.key] = !state.mute[e.key];
@@ -433,7 +422,7 @@
     if (B && B.setCountdown) B.setCountdown(state.cd);
     toast(state.cd ? 'سيظهر الوقت المتبقي في الإشعارات وعلى شاشة القفل' : 'تم إيقاف عرض الوقت المتبقي');
   };
-  [['nudge', 'nudge'], ['afterRemind', 'afterRemind'], ['fastRemind', 'fastRemind'], ['eventsRemind', 'eventsRemind']].forEach(([id, key]) => {
+  [['afterRemind', 'afterRemind'], ['fastRemind', 'fastRemind'], ['eventsRemind', 'eventsRemind']].forEach(([id, key]) => {
     $(id).checked = !!state[key];
     $(id).onchange = (e) => { state[key] = e.target.checked; store.set(key, state[key]); scheduleNotifications(); };
   });
@@ -526,7 +515,7 @@
 
   /* ---------- التنقل ---------- */
   const App = { screens: {} };
-  const PARENT = { stats: 'more', qada: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', jumah: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
+  const PARENT = { qada: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', jumah: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
   const stack = [];
   let current = 'times';
   const isActive = (n) => current === n;
@@ -550,7 +539,7 @@
   document.querySelectorAll('.back').forEach((b) => b.onclick = goBack);
   document.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => go(b.dataset.go));
   $('openAzkar').onclick = () => go('azkar');
-  // فتح شاشة من إشعار: "azkar:morning" أو "stats" أو "calendar"
+  // فتح شاشة من إشعار: "azkar:morning" أو "calendar"
   window.openTab = (spec) => {
     const [tab, arg] = String(spec).split(':');
     stack.length = 0;
@@ -590,7 +579,6 @@
     syncSettingsText();
     scheduleNotifications();
   }
-  Tracker.syncNative();
   buildDial();
   renderTasbih();
   renderAzkar();

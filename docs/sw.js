@@ -1,5 +1,5 @@
 // خدمة تخزين مؤقت: تعمل الصفحة دون إنترنت بعد أول زيارة
-const CACHE = 'prayer-v7';
+const CACHE = 'prayer-v8';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'places.js', 'core.js', 'content.js', 'content-ui.js', 'jumah.js', 'quran-data.js', 'tracker.js', 'screens.js', 'azkar.js', 'lib/adhan.umd.min.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'fonts/plex-400.ttf', 'fonts/plex-500.ttf', 'fonts/plex-700.ttf', 'fonts/amiri-400.ttf'];

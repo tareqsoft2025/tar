@@ -201,13 +201,6 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 .hub-card b{font-size:1.0625rem;margin-top:auto}
 .hub-card small{color:var(--muted);font-size:.8125rem;line-height:1.4}
 .hub-ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold)}
-/* log button in prayer list */
-.plist .logb{width:34px;height:34px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;color:transparent;flex:none;transition:all .2s var(--ease)}
-.plist .logb .ic{width:18px;height:18px;stroke-width:3}
-.plist .logb.on{background:var(--gold);color:var(--on-gold)}
-.plist li.next .logb{border-color:var(--on-gold)}
-.plist li.next .logb.on{background:var(--on-gold);color:var(--gold)}
-.plist .logb.off{border-color:var(--line);opacity:.6}
 .plist li{gap:10px}
 .plist .pt{min-width:76px}
 /* stats */
