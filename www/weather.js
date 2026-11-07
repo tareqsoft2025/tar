@@ -26,13 +26,13 @@
     $('wxLo').textContent = deg(w.lo);
   }
 
-  async function load() {
+  async function load(force) {
     if (busy || !state.coords) return;
     const { lat, lon } = state.coords;
     const c = store.get('wx', null);
     const fresh = c && Date.now() - c.at < TTL && Core.distKm({ lat, lon }, { lat: c.lat, lon: c.lon }) < 5;
     if (c) paint(c);
-    if (fresh) return;
+    if (fresh && force !== true) return;
     busy = true;
     try {
       const ctl = new AbortController();
@@ -49,6 +49,12 @@
     }
     busy = false;
   }
+  $('weatherCard').onclick = () => {
+    const c = store.get('wx', null);
+    const t = c ? new Date(c.at).toLocaleTimeString('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit' }) : '';
+    App.toast(c ? `الطقس في ${state.place || 'موقعك'} · آخر تحديث ${t}` : 'جارٍ تحديث الطقس لموقعك…');
+    load(true);
+  };
   window.renderWeather = load;
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
   setInterval(() => { if (!document.hidden) load(); }, 10 * 60000);
