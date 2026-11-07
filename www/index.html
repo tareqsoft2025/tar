@@ -33,6 +33,9 @@
     <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></symbol>
     <symbol id="i-sunrise" viewBox="0 0 24 24"><path d="M12 2v6M4.9 10.9l1.4 1.4M2 18h2M20 18h2M17.7 12.3l1.4-1.4M22 22H2M8 6l4-4 4 4M16 18a4 4 0 0 0-8 0"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-mosque" viewBox="0 0 24 24"><path d="M3 21v-7a4.5 4.5 0 0 1 9 0v7M7.5 9.5V7M2 21h20M15 21V9l2-3 2 3v12M17 3v3"/></symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3v3.5a5 5 0 0 0 2 4l1 1.5-1 1.5a5 5 0 0 0-2 4V21M17 3v3.5a5 5 0 0 1-2 4L14 12l1 1.5a5 5 0 0 1 2 4V21"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
     <symbol id="i-quran" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M9 7h6M9 11h6"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></symbol>
@@ -95,6 +98,31 @@
 <main>
   <!-- المواقيت -->
   <section id="tab-times" class="tab active">
+    <svg class="sky" viewBox="0 0 430 290" preserveAspectRatio="xMinYMin meet" aria-hidden="true">
+      <defs>
+        <linearGradient id="skyMoon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F6E3A8"/><stop offset="1" stop-color="#C9973F"/></linearGradient>
+        <mask id="skyCres"><rect width="390" height="200" fill="#fff"/><circle cx="160" cy="40" r="15" fill="#000"/></mask>
+      </defs>
+      <g transform="translate(0,-5)"><g class="stars"><circle cx="30" cy="22" r="1.2"/><circle cx="62" cy="48" r="1"/><circle cx="96" cy="18" r="1.3"/><circle cx="168" cy="26" r="1"/><circle cx="196" cy="60" r="1.2"/><circle cx="224" cy="20" r="1"/><circle cx="250" cy="44" r="1.3"/><circle cx="20" cy="84" r="1"/><circle cx="278" cy="14" r="1"/><circle cx="318" cy="38" r="1.1"/><circle cx="352" cy="22" r="1"/><circle cx="372" cy="66" r="1.2"/></g>
+      <circle cx="150" cy="44" r="17" fill="url(#skyMoon)" mask="url(#skyCres)"/>
+      <g class="sil">
+        <path d="M0 200V150c6-10 14-14 26-16-8-2-16 0-26 8z"/>
+        <path d="M14 200c3-30 4-58 2-90" fill="none" stroke-width="3.5"/>
+        <path d="M16 110c-12-14-24-12-34-6M16 110c10-16 22-16 32-8M16 112c-6-18-6-28-2-38M16 112c8-14 14-22 24-26M16 112c-14-4-24 2-30 12" fill="none" stroke-width="2.6"/>
+        <path d="M46 200v-28c0-9 3-14 8-18v-6h-3v-6h12v6h-3v6c5 4 8 9 8 18v28z"/>
+        <path d="M70 200v-34c0-14 9-24 22-24s22 10 22 24v34z"/>
+        <path d="M92 142v-10M92 132l-3-3h6z" stroke-width="2"/>
+        <path d="M112 200v-24c0-18 12-30 30-30s30 12 30 30v24z"/>
+        <path d="M142 146v-12M142 134l-3-4h6z" stroke-width="2"/>
+        <path d="M184 200V74l-7-12h28l-7 12v126z"/>
+        <path d="M180 66h20M178 100h24M178 132h24" stroke-width="3" fill="none"/>
+        <path d="M191 62V44M191 44l-4-6h8z" stroke-width="2"/>
+        <path d="M206 200v-30c0-10 7-18 16-18s16 8 16 18v30z"/>
+        <path d="M240 200v-18h20v18zM264 200v-12h18v12z"/>
+      </g>
+      <g class="win"><rect x="88" y="168" width="3.5" height="7" rx="1.7"/><rect x="138" y="170" width="3.5" height="7" rx="1.7"/><rect x="150" y="176" width="3.5" height="6" rx="1.7"/><rect x="219" y="168" width="3.5" height="7" rx="1.7"/><rect x="60" y="176" width="3" height="6" rx="1.5"/><rect x="189" y="116" width="3" height="6" rx="1.5"/></g>
+    </g>
+    </svg>
     <div class="topbar">
       <button id="placeChip" class="place" type="button"><svg class="ic"><use href="#i-pin"/></svg><span id="place"></span></button>
       <button id="bellBtn" class="icon-btn" type="button" aria-label="تفعيل التنبيهات"><svg class="ic"><use href="#i-bell"/></svg></button>
@@ -103,17 +131,40 @@
     <div id="hijri" class="date-sub"></div>
 
     <div class="hero">
-      <div class="hrow">
-        <div>
-          <div class="eyebrow">الصلاة القادمة</div>
-          <div id="nextName" class="next-name">—</div>
+      <svg class="hero-art" viewBox="0 0 120 200" aria-hidden="true">
+        <defs>
+          <linearGradient id="haSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16244a"/><stop offset=".55" stop-color="#4a4f86"/><stop offset=".8" stop-color="#e59a5c"/><stop offset="1" stop-color="#f6c07a"/></linearGradient>
+          <radialGradient id="haSun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff2c4"/><stop offset=".5" stop-color="#ffc66d"/><stop offset="1" stop-color="#ffc66d" stop-opacity="0"/></radialGradient>
+          <clipPath id="haClip"><path d="M8 200V102C8 80 30 72 42 50C52 33 56 22 60 6C64 22 68 33 78 50C90 72 112 80 112 102V200Z"/></clipPath>
+        </defs>
+        <g clip-path="url(#haClip)">
+          <rect width="120" height="200" fill="url(#haSky)"/>
+          <circle cx="62" cy="152" r="26" fill="url(#haSun)"/>
+          <circle cx="62" cy="152" r="9" fill="#fff0bf"/>
+          <path d="M0 156c20-8 36-6 62-2s44-2 58-6V200H0z" fill="#2a2f55" opacity=".85"/>
+          <g fill="#171c3a">
+            <path d="M8 200v-22h6v-8h5v-6l4-6 4 6v6h5v8h8v22z"/><path d="M34 200v-14c0-7 4-11 9-11s9 4 9 11v14z"/><path d="M43 175v-6" stroke="#171c3a" stroke-width="1.5"/>
+            <path d="M0 200V178h8v22z"/>
+          </g>
+          <path d="M96 200c1-18 2-34-1-52" stroke="#10142e" stroke-width="2.6" fill="none"/>
+          <path d="M95 148c-10-8-18-6-24 0M95 148c8-10 16-10 22-4M95 150c-4-12-3-18 0-24M95 150c6-8 12-12 20-10M95 149c-12-2-20 4-24 10" stroke="#10142e" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <path d="M0 184c30-8 70-8 120 0V200H0z" fill="#10142e"/>
+        </g>
+        <path d="M8 200V102C8 80 30 72 42 50C52 33 56 22 60 6C64 22 68 33 78 50C90 72 112 80 112 102V200" fill="none" stroke="var(--gold)" stroke-width="2.6" stroke-linejoin="round"/>
+      </svg>
+      <div class="hero-body">
+        <div class="hrow">
+          <div>
+            <div class="eyebrow">الصلاة القادمة</div>
+            <div id="nextName" class="next-name">—</div>
+          </div>
+          <div id="nextAt" class="next-time"></div>
         </div>
-        <div id="nextAt" class="next-time"></div>
-      </div>
-      <div class="hdiv"></div>
-      <div class="hrow">
-        <div class="eyebrow">متبقٍ على الأذان</div>
-        <div id="countdown" class="count">--:--:--</div>
+        <div class="hdiv"></div>
+        <div class="cd-pill">
+          <div class="eyebrow"><svg class="ic gold"><use href="#i-hourglass"/></svg> متبقٍ على الأذان</div>
+          <div id="countdown" class="count">--:--:--</div>
+        </div>
       </div>
     </div>
 
