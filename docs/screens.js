@@ -270,6 +270,8 @@
     go('reader', { push: true, surah: s, ayah: a });
   }
   App.openSurah = (n) => openReader(n, 1);
+  App.openAyah = openReader;
+  App.choose = choose;
   function renderReader(opts) {
     opts = opts || {};
     if (opts.back && !opts.surah) return;

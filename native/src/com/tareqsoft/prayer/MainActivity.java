@@ -154,6 +154,24 @@ public class MainActivity extends Activity {
         catch (Exception e) { return Integer.MAX_VALUE; }
     }
 
+    private String titleOf(Uri u) {
+        if (u == null) return "";
+        try { return android.media.RingtoneManager.getRingtone(this, u).getTitle(this); } catch (Exception e) { return "مخصّص"; }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if ((req == 7001 || req == 7002) && res == RESULT_OK && data != null) {
+            String kind = req == 7002 ? "fajr" : "adhan";
+            Uri u = data.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+            if (u != null) {
+                getSharedPreferences("prayer", MODE_PRIVATE).edit().putString("snd_" + kind, u.toString()).apply();
+                js("window.onSoundPicked&&window.onSoundPicked('" + kind + "')");
+            }
+        }
+    }
+
     private void js(final String code) {
         runOnUiThread(new Runnable() { public void run() { web.evaluateJavascript(code, null); } });
     }
@@ -270,7 +288,41 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void setLogged(String json) { Scheduler.saveLogged(MainActivity.this, json); }
+        public boolean dndAllowed() { return Scheduler.dndAllowed(MainActivity.this); }
+
+        @JavascriptInterface
+        public void requestDnd() {
+            runOnUiThread(new Runnable() { public void run() {
+                try { startActivity(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)); } catch (Exception e) { /* ignore */ }
+            } });
+        }
+
+        @JavascriptInterface
+        public void mosqueEnd() { Scheduler.mosque(MainActivity.this, false); }
+
+        @JavascriptInterface
+        public String soundTitle(String kind) { return titleOf(Scheduler.soundFor(MainActivity.this, kind)); }
+
+        @JavascriptInterface
+        public void pickSound(final String kind) {
+            runOnUiThread(new Runnable() { public void run() {
+                try {
+                    Intent in = new Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER);
+                    in.putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_ALL);
+                    in.putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, false);
+                    in.putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false);
+                    in.putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TITLE, "fajr".equals(kind) ? "صوت أذان الفجر" : "صوت الأذان");
+                    Uri cur = Scheduler.soundFor(MainActivity.this, kind);
+                    if (cur != null) in.putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, cur);
+                    startActivityForResult(in, "fajr".equals(kind) ? 7002 : 7001);
+                } catch (Exception e) { /* ignore */ }
+            } });
+        }
+
+        @JavascriptInterface
+        public void clearSound(String kind) {
+            getSharedPreferences("prayer", MODE_PRIVATE).edit().remove("snd_" + kind).apply();
+        }
 
         /** Opens the maps app on a place (mosque directions). */
         @JavascriptInterface
