@@ -396,3 +396,30 @@ main{padding:20px 20px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom));m
 .sal-text{font-family:"Amiri","Plex",serif;font-size:1.25rem;line-height:2;text-align:center;margin:4px 0}
 .cd.fri{border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
 #calDow span:first-child{}
+
+/* أسماء الله والأدعية والختمة */
+.asma-card{display:block;width:100%;text-align:center;margin-top:12px;padding:14px 16px;border-radius:var(--r-md);background:var(--card);border:1px solid var(--line)}
+.asma-card small{display:block;color:var(--gold);font-weight:700;font-size:.8125rem}
+.asma-card b{display:block;font-family:"Amiri","Plex",serif;font-size:1.75rem;color:var(--gold);margin:2px 0}
+.asma-card span{color:var(--muted);font-size:.875rem;line-height:1.6}
+.as-name{font-family:"Amiri","Plex",serif;font-size:3rem;color:var(--gold);line-height:1.4;margin:6px 0}
+.as-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.as-it{padding:12px;border-radius:14px;background:var(--card);border:1px solid var(--line);text-align:center}
+.as-it b{display:block;font-family:"Amiri","Plex",serif;font-size:1.375rem;color:var(--gold)}
+.as-it small{display:block;color:var(--muted);font-size:.75rem;line-height:1.6;margin-top:2px}
+.as-it .n{color:var(--muted);font-size:.6875rem}
+.quiz{margin-top:14px;padding:16px;border-radius:var(--r-md);background:var(--card);border:1px solid var(--line)}
+.quiz .qn{font-family:"Amiri","Plex",serif;font-size:2rem;color:var(--gold);text-align:center;margin:4px 0 12px}
+.quiz .qo{display:block;width:100%;text-align:start;min-height:48px;padding:10px 14px;margin-top:8px;border-radius:12px;background:var(--bg);border:1px solid var(--line);line-height:1.6}
+.quiz .qo.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.quiz .qo.bad{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+.quiz .qh{display:flex;justify-content:space-between;color:var(--muted);font-size:.8125rem}
+.dcard{margin-top:12px;padding:16px;border-radius:var(--r-md);background:var(--card);border:1px solid var(--line)}
+.dcard .dw{color:var(--gold);font-weight:700;font-size:.875rem;margin-bottom:6px}
+.dcard .dt{font-family:"Amiri","Plex",serif;font-size:1.375rem;line-height:2.1}
+.dcard .df{display:flex;justify-content:space-between;align-items:center;margin-top:8px;color:var(--muted);font-size:.8125rem}
+.kh-hero{padding:18px;border-radius:var(--r-md);background:var(--card);border:1px solid var(--line);text-align:center}
+.kh-hero .big{font-size:2.5rem;font-weight:700;color:var(--gold)}
+.kh-row{display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--line)}
+.kh-row:last-child{border:0}
+.kh-row span{color:var(--muted)}

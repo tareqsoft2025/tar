@@ -7,6 +7,8 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
+import android.media.AudioAttributes;
 import android.os.Build;
 import android.content.SharedPreferences;
 import java.text.SimpleDateFormat;
@@ -18,7 +20,7 @@ import org.json.JSONObject;
 
 /** Alarm scheduling + notification helpers shared by the activity and receivers. */
 final class Scheduler {
-    static final int MAX = 240;
+    static final int MAX = 420;
     static final int REFRESH_CODE = 9999;
     static final String CHANNEL = "prayer";
 
@@ -65,7 +67,8 @@ final class Scheduler {
                 in.putExtra("title", o.optString("title"));
                 in.putExtra("body", o.optString("body"));
                 if (o.has("tab")) in.putExtra("tab", o.optString("tab"));
-                if (o.has("chk")) in.putExtra("chk", o.optString("chk"));
+                if (o.has("snd")) in.putExtra("snd", o.optString("snd"));
+                if (o.has("mosque")) in.putExtra("mosque", o.optString("mosque"));
                 in.putExtra("id", n);
                 setAlarm(c, at, PendingIntent.getBroadcast(c, n, in, flags()), true);
                 n++;
@@ -209,29 +212,57 @@ final class Scheduler {
         return Build.VERSION.SDK_INT < 24 || nm.areNotificationsEnabled();
     }
 
-    /** Keys like "2026-10-14|asr" of prayers the user already logged (used to skip the gentle reminder). */
-    static void saveLogged(Context c, String json) {
-        c.getSharedPreferences("prayer", Context.MODE_PRIVATE).edit().putString("logged", json).apply();
+    static boolean dndAllowed(Context c) {
+        if (Build.VERSION.SDK_INT < 23) return false;
+        return ((NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE)).isNotificationPolicyAccessGranted();
     }
 
-    static boolean isLogged(Context c, String key) {
-        try {
-            JSONArray a = new JSONArray(c.getSharedPreferences("prayer", Context.MODE_PRIVATE).getString("logged", "[]"));
-            for (int i = 0; i < a.length(); i++) if (key.equals(a.getString(i))) return true;
-        } catch (Exception e) { /* ignore */ }
-        return false;
+    /** Mosque mode: on = allow only alarms (silences calls/notifications), off = restore the previous filter. */
+    static void mosque(Context c, boolean on) {
+        if (!dndAllowed(c)) return;
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        SharedPreferences sp = c.getSharedPreferences("prayer", Context.MODE_PRIVATE);
+        boolean active = sp.getBoolean("mosque_active", false);
+        if (on) {
+            if (!active) sp.edit().putInt("mosque_prev", nm.getCurrentInterruptionFilter()).putBoolean("mosque_active", true).apply();
+            nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS);
+        } else if (active) {
+            int prev = sp.getInt("mosque_prev", NotificationManager.INTERRUPTION_FILTER_ALL);
+            if (prev < 1 || prev > 4) prev = NotificationManager.INTERRUPTION_FILTER_ALL;
+            nm.setInterruptionFilter(prev);
+            sp.edit().putBoolean("mosque_active", false).apply();
+        }
     }
 
-    static void notifyNow(Context c, int id, String title, String body) { notifyNow(c, id, title, body, null); }
+    /** Saved custom sound (picked by the user) for kind "adhan" or "fajr"; fajr falls back to adhan. */
+    static Uri soundFor(Context c, String kind) {
+        if (kind == null) return null;
+        SharedPreferences sp = c.getSharedPreferences("prayer", Context.MODE_PRIVATE);
+        String u = sp.getString("snd_" + kind, null);
+        if (u == null && "fajr".equals(kind)) u = sp.getString("snd_adhan", null);
+        return u == null ? null : Uri.parse(u);
+    }
 
-    static void notifyNow(Context c, int id, String title, String body, String tab) {
+    static void notifyNow(Context c, int id, String title, String body) { notifyNow(c, id, title, body, null, null); }
+
+    static void notifyNow(Context c, int id, String title, String body, String tab, String snd) {
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         Notification.Builder nb;
+        Uri sound = soundFor(c, snd);
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(new NotificationChannel(CHANNEL, "تنبيهات الصلاة", NotificationManager.IMPORTANCE_HIGH));
-            nb = new Notification.Builder(c, CHANNEL);
+            String chId = CHANNEL;
+            if (sound != null) {
+                chId = "adhan_" + Math.abs(sound.toString().hashCode());
+                NotificationChannel ch = new NotificationChannel(chId, "صوت الأذان", NotificationManager.IMPORTANCE_HIGH);
+                ch.setSound(sound, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+                nm.createNotificationChannel(ch);
+            } else {
+                nm.createNotificationChannel(new NotificationChannel(CHANNEL, "تنبيهات الصلاة", NotificationManager.IMPORTANCE_HIGH));
+            }
+            nb = new Notification.Builder(c, chId);
         } else {
             nb = new Notification.Builder(c);
+            if (sound != null) nb.setSound(sound);
         }
         int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
         Intent open = new Intent(c, MainActivity.class);

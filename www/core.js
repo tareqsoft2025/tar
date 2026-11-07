@@ -51,6 +51,7 @@
       remind: store.get('remind', 5),
       mute: store.get('mute', {}),
       adhkarCfg: loadAdhkarCfg(),
+      mosque: store.get('mosque', { on: false, mins: 20 }),  // وضع المسجد: صمت تلقائي وقت الصلاة
       jumahCfg: loadJumahCfg(),                         // تذكيرات يوم الجمعة
       fridayLabel: store.get('fridayLabel', true),        // تسمية الظهر "الجمعة" يوم الجمعة                       // تذكير الأذكار: لكل نوع تشغيل + وقت
       afterRemind: store.get('afterRemind', false),   // أذكار بعد الصلاة
@@ -175,7 +176,14 @@
         const nm = nameFor(state, k, t[k]);
         const jum = nm === 'الجمعة';
         if (remind > 0) push(ms(k) - remind * 60000, jum ? 'اقتربت صلاة الجمعة' : `اقتربت صلاة ${nm}`, jum ? `تبقّى ${remind} دقائق على أذان الجمعة، بادر إلى المسجد` : `تبقّى ${remind} دقائق على أذان ${nm}`, jum ? { tab: 'jumah' } : null);
-        push(ms(k), jum ? 'حان وقت صلاة الجمعة' : 'حان وقت الصلاة', jum ? 'حان الآن موعد صلاة الجمعة، لا تنسَ الإنصات للخطبة' : `حان الآن موعد صلاة ${nm}`, jum ? { tab: 'jumah' } : null);
+        push(ms(k), jum ? 'حان وقت صلاة الجمعة' : 'حان وقت الصلاة', jum ? 'حان الآن موعد صلاة الجمعة، لا تنسَ الإنصات للخطبة' : `حان الآن موعد صلاة ${nm}`, Object.assign({ snd: k === 'fajr' ? 'fajr' : 'adhan' }, jum ? { tab: 'jumah' } : null));
+      });
+      // 2) وضع المسجد: صمت بعد الأذان بدقيقتين ولمدة محددة ثم إعادة الوضع السابق
+      if (state.mosque && state.mosque.on) PRAYERS.forEach((k) => {
+        const from = ms(k) + 2 * 60000;
+        const dur = (+state.mosque.mins || 20) * 60000;
+        push(from, '', '', { mosque: 'on' });
+        push(from + dur, '', '', { mosque: 'off' });
       });
       // 3) تذكير الأذكار
       const cfg = state.adhkarCfg || ADHKAR_DEFAULT;

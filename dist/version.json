@@ -1,6 +1,6 @@
 {
-  "versionCode": 20,
-  "versionName": "4.2",
-  "notes": "إزالة ميزة متابعة الصلاة",
+  "versionCode": 21,
+  "versionName": "5.0",
+  "notes": "وضع المسجد، صوت الأذان، أسماء الله الحسنى، أدعية مأثورة، ختمة القرآن",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

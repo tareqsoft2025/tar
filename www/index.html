@@ -119,6 +119,7 @@
 
     <ul id="list" class="plist"></ul>
     <button id="jumahBanner" class="jbanner" type="button" hidden></button>
+    <button id="asmaCard" class="asma-card" type="button"></button>
     <button id="dailyHadith" class="hcard" type="button"></button>
   </section>
 
@@ -183,6 +184,9 @@
     <div class="sub">أدوات تعينك على المحافظة على صلاتك وعبادتك</div>
     <div class="hub">
       <button class="hub-card" data-go="jumah"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>يوم الجمعة</b><small>سنن وساعة الإجابة والصلاة على النبي</small></button>
+      <button class="hub-card" data-go="khatma"><span class="hub-ic"><svg class="ic"><use href="#i-quran"/></svg></span><b>ختمة القرآن</b><small>خطة يومية وتقدّم</small></button>
+      <button class="hub-card" data-go="asma"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>أسماء الله الحسنى</b><small>معانٍ واختبار</small></button>
+      <button class="hub-card" data-go="duas"><span class="hub-ic"><svg class="ic"><use href="#i-heart"/></svg></span><b>أدعية مأثورة</b><small>حسب الموقف</small></button>
       <button class="hub-card" data-go="qada"><span class="hub-ic"><svg class="ic"><use href="#i-refresh"/></svg></span><b>قضاء الصلوات</b><small>عدّاد للفوائت</small></button>
       <button class="hub-card" data-go="calendar"><span class="hub-ic"><svg class="ic"><use href="#i-cal"/></svg></span><b>التقويم الهجري</b><small>الأيام البيض والمناسبات</small></button>
       <button class="hub-card" data-go="mosques"><span class="hub-ic"><svg class="ic"><use href="#i-pin"/></svg></span><b>أقرب المساجد</b><small>حول موقعك الحالي</small></button>
@@ -192,6 +196,31 @@
       <button class="hub-card" data-go="tasbih"><span class="hub-ic"><svg class="ic"><use href="#i-beads"/></svg></span><b>المسبحة</b><small>عدّاد التسبيح</small></button>
       <button class="hub-card" data-go="azkar"><span class="hub-ic"><svg class="ic"><use href="#i-note"/></svg></span><b>الأذكار</b><small>صباح، مساء، بعد الصلاة، نوم</small></button>
     </div>
+  </section>
+
+  <!-- أسماء الله الحسنى -->
+  <section id="tab-asma" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">أسماء الله الحسنى</h1></div>
+    <div class="card-flat center"><div class="eyebrow">اسم الله اليوم</div><div id="asToday" class="as-name"></div><div id="asTodayM" class="muted"></div></div>
+    <button id="asQuizBtn" class="btn-gold" type="button">اختبر نفسك</button>
+    <div id="asQuiz" hidden></div>
+    <div class="search" style="margin-top:16px"><svg class="ic"><use href="#i-search"/></svg><input id="asSearch" type="search" placeholder="ابحث في الأسماء ومعانيها" aria-label="بحث"></div>
+    <div id="asList" class="as-grid"></div>
+  </section>
+
+  <!-- أدعية مأثورة -->
+  <section id="tab-duas" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">أدعية مأثورة</h1></div>
+    <div class="search"><svg class="ic"><use href="#i-search"/></svg><input id="duSearch" type="search" placeholder="ابحث في الأدعية" aria-label="بحث"></div>
+    <div id="duCats" class="chips"></div>
+    <div id="duList"></div>
+    <p class="note c"><span>الأدعية من القرآن والسنة الصحيحة مع العزو المختصر. يُرجى الرجوع إلى كتب الحديث للتثبّت.</span></p>
+  </section>
+
+  <!-- ختمة القرآن -->
+  <section id="tab-khatma" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">ختمة القرآن</h1></div>
+    <div id="khBody"></div>
   </section>
 
   <!-- قضاء الصلوات -->
@@ -408,6 +437,22 @@
       <button id="testNotif" class="srow link" type="button"><svg class="ic gold"><use href="#i-bell"/></svg><span class="st"><b>إرسال إشعار تجريبي</b></span></button>
     </div>
 
+    <div class="sec" id="mosqSec">وضع المسجد وصوت الأذان</div>
+    <div class="group" id="mosqGroup">
+      <label class="srow"><span class="st"><b>وضع المسجد (صمت تلقائي)</b><small>بعد الأذان بدقيقتين يكتم الجوال ثم يعيد الوضع السابق</small></span><input type="checkbox" id="mosqOn" class="switch"></label>
+      <div class="srow sel" id="mosqMinsRow">
+        <span class="st"><b>مدة الصمت</b><small id="mosqSub"></small></span>
+        <svg class="ic chev"><use href="#i-chev"/></svg>
+        <select id="mosqMins" aria-label="مدة الصمت">
+          <option value="10">10 دقائق</option><option value="20">20 دقيقة</option><option value="30">30 دقيقة</option><option value="45">45 دقيقة</option><option value="60">ساعة</option>
+        </select>
+      </div>
+      <button id="mosqPerm" class="srow link" type="button" hidden><svg class="ic gold"><use href="#i-bell-off"/></svg><span class="st"><b>السماح بالتحكم بوضع عدم الإزعاج</b><small>مطلوب لتفعيل وضع المسجد، يفتح إعدادات النظام</small></span></button>
+      <button id="sndAdhan" class="srow link" type="button"><svg class="ic gold"><use href="#i-volume"/></svg><span class="st"><b>صوت إشعار الأذان</b><small id="sndAdhanT">افتراضي</small></span></button>
+      <button id="sndFajr" class="srow link" type="button"><svg class="ic gold"><use href="#i-volume"/></svg><span class="st"><b>صوت إشعار الفجر</b><small id="sndFajrT">مثل صوت الأذان</small></span></button>
+      <button id="sndReset" class="srow link" type="button"><svg class="ic gold"><use href="#i-refresh"/></svg><span class="st"><b>إعادة الأصوات الافتراضية</b></span></button>
+    </div>
+
     <div class="sec">يوم الجمعة</div>
     <div class="group">
       <label class="srow"><span class="st"><b>تسمية الظهر «الجمعة» يوم الجمعة</b><small>في قائمة المواقيت والإشعارات والودجت</small></span><input type="checkbox" id="fridayLabel" class="switch"></label>
@@ -460,5 +505,7 @@
 <script src="screens.js"></script>
 <script src="content-ui.js"></script>
 <script src="jumah.js"></script>
+<script src="data2.js"></script>
+<script src="features.js"></script>
 </body>
 </html>
