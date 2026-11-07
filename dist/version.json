@@ -1,6 +1,6 @@
 {
-  "versionCode": 24,
-  "versionName": "5.3",
-  "notes": "تصميم جديد للرئيسية: حلقة العدّ التنازلي والحالة الجوية وبطاقة القبلة وآية متجددة",
+  "versionCode": 25,
+  "versionName": "5.4",
+  "notes": "الشاشة الرئيسية في صفحة واحدة بلا تمرير ومتجاوبة مع كل الأحجام",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
