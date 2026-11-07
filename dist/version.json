@@ -1,6 +1,6 @@
 {
-  "versionCode": 22,
-  "versionName": "5.1",
-  "notes": "تصميم جديد للشاشة الرئيسية: سماء ليلية وبطاقة زجاجية وقائمة مواقيت بأيقونات",
+  "versionCode": 23,
+  "versionName": "5.2",
+  "notes": "ودجت الصلاة بتصميم جديد: خلفية متدرجة وإطار ذهبي وخلايا للصلوات وعدّ تنازلي",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
