@@ -43,6 +43,10 @@ public class PrayerWidget extends AppWidgetProvider {
         return hm.format(d) + " " + (ap.format(d).startsWith("A") ? "ص" : "م");
     }
 
+    private static String shortClock(long at) { return clock(at).replace(" ص", "").replace(" م", ""); }
+
+    private static final int[] CELLS = { R.id.w_c0, R.id.w_c1, R.id.w_c2, R.id.w_c3, R.id.w_c4 };
+
     static void updateAll(Context c) {
         try {
             AppWidgetManager m = AppWidgetManager.getInstance(c);
@@ -63,11 +67,15 @@ public class PrayerWidget extends AppWidgetProvider {
             if (next == null) {
                 rv.setTextViewText(R.id.w_name, "افتح التطبيق");
                 rv.setTextViewText(R.id.w_time, "");
+                rv.setTextViewText(R.id.w_date, "");
                 rv.setChronometer(R.id.w_count, SystemClock.elapsedRealtime(), null, false);
             } else {
                 long at = next.getLong("at");
                 rv.setTextViewText(R.id.w_name, next.getString("n"));
                 rv.setTextViewText(R.id.w_time, clock(at));
+                SimpleDateFormat df = new SimpleDateFormat("EEEE d MMMM", new Locale("ar"));
+                df.setTimeZone(TimeZone.getTimeZone("Asia/Hebron"));
+                rv.setTextViewText(R.id.w_date, df.format(new Date(now)));
                 if (Build.VERSION.SDK_INT >= 24) rv.setChronometerCountDown(R.id.w_count, true);
                 rv.setChronometer(R.id.w_count, SystemClock.elapsedRealtime() + (at - now), null, true);
                 String day = next.getString("d");
@@ -79,9 +87,11 @@ public class PrayerWidget extends AppWidgetProvider {
                         if (o.getString("d").equals(day) && o.getString("k").equals(DAY[k])) {
                             boolean isNext = o.getString("k").equals(next.getString("k"));
                             rv.setTextViewText(nameIds[k], o.getString("n"));
-                            rv.setTextViewText(timeIds[k], clock(o.getLong("at")));
-                            rv.setTextColor(nameIds[k], isNext ? GOLD : 0xFF8FA2B2);
-                            rv.setTextColor(timeIds[k], isNext ? GOLD : TEXT);
+                            boolean past = o.getLong("at") <= now;
+                            rv.setTextViewText(timeIds[k], shortClock(o.getLong("at")));
+                            rv.setTextColor(nameIds[k], isNext ? GOLD : past ? 0xFF5D7184 : 0xFF8FA2B2);
+                            rv.setTextColor(timeIds[k], isNext ? GOLD : past ? 0xFF8FA2B2 : TEXT);
+                            rv.setInt(CELLS[k], "setBackgroundResource", isNext ? R.drawable.w_cell_next : R.drawable.w_cell);
                         }
                     }
                 }
