@@ -96,7 +96,15 @@
   <div class="qs-scrim" data-close></div>
   <div class="qs-box" role="dialog" aria-modal="true"><div id="gsTitle" class="qs-title"></div><div id="gsItems"></div></div>
 </div>
-<div id="miniPlayer" class="tile" hidden>
+<div id="wxSheet" class="qsheet" hidden>
+  <div class="qs-scrim" data-close></div>
+  <div class="qs-box wxs" role="dialog" aria-modal="true" aria-label="توقعات الطقس">
+    <div class="wxs-grab"></div>
+    <div class="wxs-head"><div class="qs-title">توقعات الطقس</div><button class="icon-btn" data-close aria-label="إغلاق"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div id="wxBody"></div>
+  </div>
+</div>
+<div id="miniPlayer" class="mini" hidden>
   <button id="mpToggle" class="icon-btn" aria-label="تشغيل/إيقاف"><svg class="ic"><use href="#i-pause"/></svg></button>
   <div class="mp-info"><b id="mpTitle"></b><small id="mpReciter" class="muted"></small></div>
   <button id="mpClose" class="icon-btn" aria-label="إغلاق"><svg class="ic"><use href="#i-x"/></svg></button>
