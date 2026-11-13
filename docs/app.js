@@ -576,10 +576,12 @@
     $('update').hidden = false;
     $('updVer').textContent = `الإصدار ${info.versionName} متاح، ولا يمكن متابعة الاستخدام قبل التحديث.`;
     $('updNotes').textContent = info.notes || '';
+    $('updBtn').textContent = info.ready ? 'تثبيت الآن' : 'تحديث الآن';
+    if (info.ready) $('updMsg').textContent = 'تم تنزيل التحديث مسبقاً، اضغط للتثبيت فوراً';
     $('updBtn').onclick = () => {
       $('updBtn').disabled = true;
       $('updBar').style.display = 'block';
-      $('updMsg').textContent = 'جارٍ تنزيل التحديث…';
+      $('updMsg').textContent = info.ready ? 'جارٍ فتح نافذة التثبيت…' : 'جارٍ تنزيل التحديث…';
       window.AndroidBridge.startUpdate(info.apk);
     };
   };

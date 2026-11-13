@@ -1,6 +1,6 @@
 {
-  "versionCode": 28,
-  "versionName": "5.7",
-  "notes": "جديد: الأجندة — مهام ومواعيد وملاحظات، وجدولة المهام بالنسبة لأوقات الصلاة مثل \"بعد العصر بربع ساعة\" مع التذكير والتكرار",
+  "versionCode": 29,
+  "versionName": "5.8",
+  "notes": "التحديثات تصلك الآن مباشرة: فحص تلقائي بالخلفية وتنزيل مسبق وإشعار للتثبيت بضغطة واحدة",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
