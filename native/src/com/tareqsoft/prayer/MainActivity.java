@@ -54,6 +54,14 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         web.setWebViewClient(new WebViewClient() {
+            /** روابط الاتصال والرسائل وواتساب تُفتح في تطبيقاتها بدل الصفحة */
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView v, String url) {
+                if (url == null || url.startsWith("file:")) return false;
+                openExternalUrl(url);
+                return true;
+            }
+
             @Override
             public void onPageFinished(WebView v, String url) {
                 checkUpdate();
@@ -239,6 +247,21 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    /** يسمح فقط بالاتصال والرسائل والبريد وواتساب وروابط https */
+    private void openExternalUrl(String url) {
+        if (url == null) return;
+        String u = url.trim();
+        String low = u.toLowerCase(java.util.Locale.ROOT);
+        if (!(low.startsWith("tel:") || low.startsWith("sms:") || low.startsWith("smsto:") || low.startsWith("mailto:") || low.startsWith("whatsapp:") || low.startsWith("https://"))) return;
+        Intent i = low.startsWith("tel:") ? new Intent(Intent.ACTION_DIAL, Uri.parse(u)) : new Intent(Intent.ACTION_VIEW, Uri.parse(u));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try { startActivity(i); }
+        catch (Exception e) {
+            String msg = low.startsWith("whatsapp:") || low.contains("wa.me") ? "واتساب غير مثبّت على هذا الجوال" : "لا يوجد تطبيق لفتح هذا الرابط";
+            js("window.toast && window.toast(" + JSONObject.quote(msg) + ")");
+        }
+    }
+
     @Override
     public void onBackPressed() { moveTaskToBack(true); }
 
@@ -367,6 +390,11 @@ public class MainActivity extends Activity {
         }
 
         /** Opens the maps app on a place (mosque directions). */
+        @JavascriptInterface
+        public void openExternal(final String url) {
+            runOnUiThread(new Runnable() { public void run() { openExternalUrl(url); } });
+        }
+
         @JavascriptInterface
         public void openMap(double lat, double lon, String name) {
             Uri geo = Uri.parse("geo:" + lat + "," + lon + "?q=" + lat + "," + lon + "(" + Uri.encode(name) + ")");

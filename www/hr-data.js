@@ -76,7 +76,7 @@
       name: pick(x, 'fullNameAr', 'nameAr', 'name', 'fullNameEn') || '—', nameEn: pick(x, 'fullNameEn', 'nameEn'),
       nid: pick(x, 'nationalId'), dept: pick(x, 'departmentName', 'department.nameAr', 'department.name', 'department'),
       pos: pick(x, 'positionName', 'position.nameAr', 'position.name', 'position'), mgr: pick(x, 'directManagerName', 'manager.fullNameAr'),
-      phone: pick(x, 'phone', 'mobile', 'phoneNumber'), email: pick(x, 'email'),
+      phone: pick(x, 'mobileNumber', 'mobile', 'phone', 'phoneNumber', 'mobilePhone'), email: pick(x, 'email'),
       join: d10(pick(x, 'joinDate', 'hireDate', 'startDate')), term: d10(pick(x, 'terminationDate', 'endDate')),
       active: x.activeOnJob != null ? !!x.activeOnJob : !(pick(x, 'terminationDate') && d10(x.terminationDate) < dayStr()) && String(x.status || 'active').toLowerCase() !== 'inactive',
       validContract: x.hasValidContract, org: hho ? 'HHO' : 'PEF', type: mode.includes('field') ? 'field' : 'office', mode, raw: x
