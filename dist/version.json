@@ -1,6 +1,6 @@
 {
-  "versionCode": 31,
-  "versionName": "6.0",
-  "notes": "جديد: قسم الموارد البشرية — ربط حسابك بنظام PEF ومزامنة الموظفين والعقود والتكليفات والحضور وحفظها على جوالك",
+  "versionCode": 32,
+  "versionName": "6.1",
+  "notes": "تفاصيل الحضور: وقت الدخول والخروج، ساعات العمل، ومكان كل تسجيل (داخل موقع العمل أو خارجه والمسافة) مع فتحه على الخريطة",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

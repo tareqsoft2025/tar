@@ -21,6 +21,10 @@
   const STATUS = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'] };
   const LEAVE = { annual: 'سنوية', sick: 'مرضية', mission: 'مهمة عمل', task: 'مهمة', official: 'رسمية', unpaid: 'بدون راتب', leave: 'إجازة', holiday: 'عطلة', compensatory: 'تعويضية', maternity: 'أمومة' };
   const leaveLbl = (n) => LEAVE[n] || n || 'إجازة';
+  const hrs = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} س`;
+  const plName = (pl) => pl.name || (pl.st === 'outside' && pl.near ? 'أقرب موقع: ' + pl.near : PLACE[pl.st][0]);
+  const PLACE = { matched: ['داخل موقع العمل', 'ok'], outside: ['خارج نطاق الموقع', 'bad'], unknown: ['بلا موقع جغرافي', 'mute'] };
+  const fmtDist = (d) => d == null ? '' : d >= 1000 ? (d / 1000).toFixed(1) + ' كم' : d + ' م';
 
   let tab = store.get('hrTab', 'dash');
   const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', as: 'active', proj: 'all' }, store.get('hrF', {}));
@@ -204,21 +208,27 @@
     filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
     filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
     const c = (s) => base.filter((r) => s === 'in' ? r.list.length : r.status === s).length;
-    filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['noasg', 'بلا تكليف']],
-      { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), noasg: base.filter((r) => !r.hasAsg).length });
+    filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['outside', 'خارج الموقع'], ['noasg', 'بلا تكليف']],
+      { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), outside: base.filter((r) => r.outside).length, noasg: base.filter((r) => !r.hasAsg).length });
     search(body, 'ابحث بالاسم أو الرقم أو القسم');
-    const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
+    const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : f.st === 'outside' ? r.outside : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
       .sort((a, b) => (b.lateMin - a.lateMin) || String(a.firstIn || 'z').localeCompare(String(b.firstIn || 'z')) || a.e.name.localeCompare(b.e.name, 'ar'));
     const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><button>${icon('share')}مشاركة القائمة</button>`);
-    tools.querySelector('button').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
+    tools.querySelector('button').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}${r.workMin ? ' [' + hrs(r.workMin) + ']' : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.outside ? ' (خارج الموقع)' : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
     body.appendChild(tools);
     list(body, rows.map((r) => {
       const st = STATUS[r.status];
       let right = badge(st[0], st[1]);
       if (r.status === 'late') right = badge('+' + r.lateMin + ' د', 'warn');
       if (r.status === 'leave') right = badge(leaveLbl(r.leave), 'info');
-      const times = r.firstIn ? `${tf.format(new Date(r.firstIn))}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}` : '';
-      return personRow(r.e, right + (times ? `<small>${times}</small>` : ''), esc([r.e.dept, TYPE[r.e.type], r.e.org].filter(Boolean).join(' · ')), st[1]);
+      const times = r.firstIn ? `${tf.format(new Date(r.firstIn))}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : r.live ? ' ← الآن' : ''}` : '';
+      const pl = r.list.length ? HR.place(r.list[0]) : null;
+      const sub = r.list.length
+        ? `<span class="hr-pl ${PLACE[pl.st][1]}">${icon('pin')}${esc(plName(pl))}${r.outside && pl.st !== 'outside' ? ' · تسجيل خارج النطاق' : ''}</span>`
+        : esc([r.e.dept, TYPE[r.e.type], r.e.org].filter(Boolean).join(' · '));
+      const row = personRow(r.e, right + (times ? `<small>${times}</small>` : '') + (r.workMin ? `<small class="hr-h">${icon('clock')}${hrs(r.workMin)}</small>` : ''), sub, st[1]);
+      row.onclick = () => openDay(r.e.id, f.day);
+      return row;
     }), 'لا نتائج بهذه الفلاتر');
   }
 
@@ -344,7 +354,7 @@
       const ds = addDays(today(), -i);
       const r = HR.events(ds) ? HR.dayReport(ds).rows.find((x) => x.e.id === id) : null;
       const st = r ? STATUS[r.status] : ['غير مزامن', 'none'];
-      cells.push(`<i class="${st[1]}" title="${fd(ds)}: ${st[0]}${r && r.firstIn ? ' ' + tf.format(new Date(r.firstIn)) : ''}"><small>${+ds.slice(8)}</small></i>`);
+      cells.push(`<i class="${st[1]}" data-day="${ds}" title="${fd(ds)}: ${st[0]}${r && r.firstIn ? ' ' + tf.format(new Date(r.firstIn)) : ''}"><small>${+ds.slice(8)}</small></i>`);
     }
     const info = [['الرقم الوظيفي', e.empId], ['رقم الهوية', e.nid], ['القسم', e.dept], ['المسمى', e.pos], ['المدير المباشر', e.mgr], ['تاريخ الالتحاق', fd(e.join)], ['انتهاء الخدمة', e.term ? fd(e.term) : null], ['الجوال', e.phone ? `<a href="tel:${esc(e.phone)}">${esc(e.phone)}</a>` : null], ['البريد', e.email]].filter((x) => x[1]);
     sheet(`
@@ -356,11 +366,54 @@
       <div class="hr-sec"><span>التكليفات (${asgs.length})</span></div>
       <div class="hr-tl">${asgs.map((a) => `<div class="hr-tli"><b>${esc([a.code, a.project].filter(Boolean).join(' · ') || 'مشروع')}${a.pct != null ? ' · ' + esc(a.pct) + '%' : ''}</b><small>${fd(a.start)} ← ${fd(a.end)} ${remain(a.end)}</small></div>`).join('') || '<div class="hr-none">لا تكليفات</div>'}</div>
       ${rawTable(raw)}`);
+    $('hrSheetBody').querySelectorAll('[data-day]').forEach((c) => { c.onclick = () => openDay(id, c.dataset.day); });
+  }
+
+  /* ---------- تفاصيل حضور يوم ---------- */
+  function openDay(id, ds) {
+    const raw = HR.db.get('employees', {})[id];
+    if (!raw) return;
+    const e = HR.emp(raw);
+    const evs = HR.events(ds);
+    const r = evs ? HR.dayReport(ds).rows.find((x) => x.e.id === id) : null;
+    const st = r ? STATUS[r.status] : ['غير مزامن', 'mute'];
+    const evRows = (r ? r.list : []).map((x) => {
+      const pl = HR.place(x);
+      const isIn = x.eventType === 'check_in';
+      const maps = pl.lat != null ? `<button class="hr-map" data-lat="${pl.lat}" data-lon="${pl.lon}" data-n="${esc(pl.name || e.name)}">${icon('nav')}الخريطة</button>` : '';
+      return `<div class="hr-ev ${isIn ? 'in' : 'out'}">
+        <span class="hr-evdot"></span>
+        <div class="hr-evb">
+          <div class="hr-evh"><b>${isIn ? 'تسجيل دخول' : x.eventType === 'check_out' ? 'تسجيل خروج' : esc(x.eventType)}</b><span class="hr-evt">${tf.format(new Date(x.recordedAt))}</span></div>
+          <div class="hr-evp ${PLACE[pl.st][1]}">${icon('pin')}<span>${esc(plName(pl))}</span>${pl.st !== 'unknown' ? badge(PLACE[pl.st][0] + (pl.dist != null ? ' · ' + fmtDist(pl.dist) : ''), PLACE[pl.st][1]) : ''}</div>
+          ${pl.lat != null ? `<small class="hr-evc">${pl.lat.toFixed(5)}, ${pl.lon.toFixed(5)}${pl.acc ? ' · دقة ±' + Math.round(pl.acc) + ' م' : ''}</small>` : ''}
+          ${x.source || x.device ? `<small class="hr-evc">${esc([x.source, x.mode, x.device].filter(Boolean).join(' · '))}</small>` : ''}
+          ${x.note ? `<small class="hr-evc">ملاحظة: ${esc(x.note)}</small>` : ''}${x.by ? `<small class="hr-evc">بواسطة: ${esc(x.by)}</small>` : ''}
+          ${maps}
+        </div></div>`;
+    }).join('');
+    sheet(`
+      <div class="hr-ph"><span class="hr-ava big ${st[1]}">${esc(initials(e.name))}</span><div><b>${esc(e.name)}</b><small>${dLong.format(noon(ds))} · ${fd(ds)}</small><div class="hr-tags">${badge(st[0], st[1])}${r && r.leave ? badge(leaveLbl(r.leave), 'info') : ''}${r && r.outside ? badge('تسجيل خارج النطاق', 'bad') : ''}</div></div></div>
+      <div class="hr-dsum">
+        <div><small>أول دخول</small><b>${r && r.firstIn ? tf.format(new Date(r.firstIn)) : '—'}</b></div>
+        <div><small>آخر خروج</small><b>${r && r.lastOut ? tf.format(new Date(r.lastOut)) : r && r.live ? 'لم يخرج بعد' : '—'}</b></div>
+        <div><small>ساعات العمل</small><b>${r && r.workMin ? hrs(r.workMin) : '—'}${r && r.live ? ' <em>مستمر</em>' : ''}</b></div>
+        <div><small>التأخير</small><b class="${r && r.lateMin ? 'warn' : ''}">${r && r.lateMin ? r.lateMin + ' دقيقة' : 'لا يوجد'}</b></div>
+      </div>
+      <div class="hr-sec"><span>سجل اليوم (${r ? r.list.length : 0})</span></div>
+      ${evs ? (evRows ? `<div class="hr-evs">${evRows}</div>` : '<div class="hr-none">لا يوجد تسجيل في هذا اليوم</div>') : '<div class="hr-none">هذا اليوم غير مزامن على الجهاز</div>'}
+      <button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>`);
+    const body = $('hrSheetBody');
+    body.querySelectorAll('.hr-map').forEach((b) => b.onclick = () => {
+      const la = +b.dataset.lat, lo = +b.dataset.lon;
+      if (B && B.openMap) B.openMap(la, lo, b.dataset.n); else window.open(`https://www.google.com/maps?q=${la},${lo}`, '_blank');
+    });
+    $('hrToEmp').onclick = () => openEmp(id);
   }
 
   /* ---------- الربط ---------- */
   $('hrSync').onclick = doSync;
   $('hrSheet').onclick = (e) => { if (e.target.hasAttribute('data-close')) closeSheet(); };
   App.screens.hr = () => render();
-  window.hrOpenEmp = openEmp;
+  window.hrOpenEmp = openEmp; window.hrOpenDay = openDay;
 })();
