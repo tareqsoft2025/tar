@@ -27,9 +27,10 @@
   const fmtDist = (d) => d == null ? '' : d >= 1000 ? (d / 1000).toFixed(1) + ' كم' : d + ' م';
 
   let tab = store.get('hrTab', 'dash');
-  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', as: 'active', proj: 'all' }, store.get('hrF', {}));
+  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', as: 'month', av: 'emp', am: today().slice(0, 7), proj: 'all' }, store.get('hrF', {}));
+  if (!/^\d{4}-\d{2}$/.test(f.am || '')) f.am = today().slice(0, 7);
   f.day = today(); f.q = '';
-  const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, cf: f.cf, as: f.as });
+  const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, cf: f.cf, as: f.as, av: f.av });
 
   /* ---------- الهيكل ---------- */
   function render() {
@@ -319,7 +320,7 @@
   }
 
   /* ---------- التكليفات ---------- */
-  const ENTRY = { draft: ['مسودة', 'mute'], pending: ['بانتظار الاعتماد', 'warn'], submitted: ['مُرسل', 'warn'], approved: ['معتمد', 'ok'], active: ['فعّال', 'ok'], confirmed: ['مؤكد', 'ok'], ended: ['منتهٍ', 'mute'], closed: ['مغلق', 'mute'], cancelled: ['ملغى', 'bad'], canceled: ['ملغى', 'bad'], rejected: ['مرفوض', 'bad'], locked: ['مقفل', 'info'] };
+  const ENTRY = { new: ['جديد', 'info'], draft: ['مسودة', 'mute'], pending: ['بانتظار الاعتماد', 'warn'], submitted: ['مُرسل', 'warn'], approved: ['معتمد', 'ok'], active: ['فعّال', 'ok'], confirmed: ['مؤكد', 'ok'], ended: ['منتهٍ', 'mute'], closed: ['مغلق', 'mute'], cancelled: ['ملغى', 'bad'], canceled: ['ملغى', 'bad'], rejected: ['مرفوض', 'bad'], locked: ['مقفل', 'info'] };
   const entry = (a) => { const k = String(a.status || '').toLowerCase(); const v = ENTRY[k] || (a.status ? [a.status, 'mute'] : null); return a.locked ? [((v && v[0]) || '') + ' · فترة مقفلة', 'info'] : v; };
   const empName = (id) => { const r = HR.db.get('employees', {})[id]; return r ? HR.emp(r).name : null; };
   function asgRow(a) {
@@ -345,16 +346,118 @@
       ${a.empId && HR.db.get('employees', {})[a.empId] ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}${rawTable(a.raw)}`);
     const b = $('hrToEmp'); if (b) b.onclick = () => openEmp(a.empId);
   }
+  /* ----- التكليفات حسب الشهر ----- */
+  const MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
+  const monthName = (ym) => { const [y, m] = ym.split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; };
+  const monthBounds = (ym) => { const [y, m] = ym.split('-').map(Number); const days = new Date(Date.UTC(y, m, 0)).getUTCDate(); return { from: `${ym}-01`, to: `${ym}-${String(days).padStart(2, '0')}`, days }; };
+  const shiftMonth = (ym, n) => { const [y, m] = ym.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; };
+  const dayDiff = (a, b) => Math.round((noon(b) - noon(a)) / 864e5) + 1;
+  // نصيب التكليف من الشهر: النسبة × (أيام التكليف داخل الشهر ÷ أيام الشهر)
+  function inMonth(a, ym) {
+    const mb = monthBounds(ym);
+    const s0 = a.start && a.start > mb.from ? a.start : mb.from, e0 = a.end && a.end < mb.to ? a.end : mb.to;
+    if (s0 > e0) return null;
+    const days = dayDiff(s0, e0), pct = parseFloat(a.pct) || 0;
+    return { from: s0, to: e0, days, full: days === mb.days, pct, eff: pct * days / mb.days };
+  }
+  // العقد الساري للموظف خلال الشهر (الأحدث بدايةً) لاستدعاء الراتب
+  function contractFor(empId, ym) {
+    const mb = monthBounds(ym);
+    const list = HR.contracts().filter((c) => c.empId === empId && (!c.start || c.start <= mb.to) && (!c.end || c.end >= mb.from));
+    const withSal = list.filter((c) => c.salary != null && c.salary !== '');
+    return (withSal.length ? withSal : list).sort((a, b) => String(b.start).localeCompare(String(a.start)))[0] || null;
+  }
+  const pctTxt = (n) => (Math.round(n * 100) / 100).toLocaleString('en', { maximumFractionDigits: 2 }) + '%';
+  const pctTone = (n) => Math.abs(n - 100) < 0.01 ? 'ok' : n > 100 ? 'bad' : 'warn';
+  function monthNav(body) {
+    const nav = el('div', 'hr-dnav', `<button class="icon-btn flip" data-m="-1" aria-label="الشهر السابق">${icon('chev')}</button><label><b>${monthName(f.am)}</b><small>${f.am === today().slice(0, 7) ? 'الشهر الحالي' : 'اضغط لاختيار شهر'}</small><input type="month" value="${f.am}"></label><button class="icon-btn" data-m="1" aria-label="الشهر التالي">${icon('chev')}</button>`);
+    nav.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => { f.am = shiftMonth(f.am, +b.dataset.m); render(); });
+    nav.querySelector('input').onchange = (e) => { if (e.target.value) { f.am = e.target.value; render(); } };
+    body.appendChild(nav);
+  }
+  function monthGroups(ym) {
+    const by = {};
+    HR.assignments().forEach((a) => { const m = inMonth(a, ym); if (!m) return; (by[a.empId] = by[a.empId] || []).push({ a, m }); });
+    return Object.entries(by).map(([empId, items]) => {
+      const total = items.reduce((t, x) => t + x.m.eff, 0);
+      return { empId, items, total, name: items[0].a.name || empName(empId) || '—' };
+    });
+  }
+  function renderAsgByEmp(body) {
+    const groups = monthGroups(f.am);
+    const cnt = { all: groups.length, full: 0, under: 0, over: 0 };
+    groups.forEach((g) => { cnt[pctTone(g.total) === 'ok' ? 'full' : g.total > 100 ? 'over' : 'under']++; });
+    if (!['all', 'full', 'under', 'over'].includes(f.ag)) f.ag = 'all';
+    filterChips(body, 'ag', [['all', 'كل الموظفين'], ['full', 'مكتمل 100%'], ['under', 'أقل من 100%'], ['over', 'أكثر من 100%']], cnt);
+    search(body, 'اسم الموظف أو المشروع');
+    const rows = groups.filter((g) => (f.ag === 'all' || (f.ag === 'full' ? pctTone(g.total) === 'ok' : f.ag === 'over' ? g.total > 100.001 : g.total < 99.999)) && match(f.q, g.name, ...g.items.map((x) => x.a.project), ...g.items.map((x) => x.a.pno), ...g.items.map((x) => x.a.code)))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    const tools = el('div', 'hr-tools', `<small>${rows.length} موظف · ${rows.reduce((t, g) => t + g.items.length, 0)} تكليف</small><button>${icon('share')}مشاركة</button>`);
+    tools.querySelector('button').onclick = () => shareList(`التكليفات حسب الموظف — ${monthName(f.am)}`, rows.map((g, i) => `${i + 1}. ${g.name} — ${pctTxt(g.total)} (${g.items.length} تكليف)`));
+    body.appendChild(tools);
+    list(body, rows.map((g) => {
+      const tone = pctTone(g.total);
+      const r = el('button', 'hr-row hr-crow');
+      const projs = g.items.map((x) => x.a.pno || x.a.code || x.a.project).filter(Boolean);
+      r.innerHTML = `<span class="hr-ava ${tone}">${esc(initials(g.name))}</span><span class="hr-rt"><b>${esc(g.name)}</b><small>${g.items.length} ${g.items.length === 1 ? 'تكليف' : 'تكليفات'} · ${esc(projs.slice(0, 2).join(' · '))}${projs.length > 2 ? ' …' : ''}</small>
+        <span class="hr-pbar ${tone}"><i style="width:${Math.min(100, g.total)}%"></i></span></span><span class="hr-rr"><b class="hr-pt ${tone}">${pctTxt(g.total)}</b><small>من الشهر</small></span>`;
+      r.onclick = () => openAsgMonth(g.empId);
+      return r;
+    }), 'لا تكليفات في هذا الشهر');
+  }
+  function openAsgMonth(empId) {
+    const g = monthGroups(f.am).find((x) => x.empId === empId);
+    if (!g) return;
+    const c = contractFor(empId, f.am);
+    const sal = c && c.salary != null && c.salary !== '' ? +c.salary : null;
+    const cur = c ? c.cur : null;
+    const tone = pctTone(g.total);
+    const rowsHtml = g.items.sort((a, b) => b.m.eff - a.m.eff).map(({ a, m }) => {
+      const amt = sal != null ? sal * m.eff / 100 : null;
+      const en = entry(a);
+      return `<div class="hr-am">
+        <div class="hr-amh"><b>${esc(a.pno || a.code || 'مشروع')}</b><span class="hr-amp">${pctTxt(m.eff)}</span></div>
+        ${a.project ? `<small class="hr-amn">${esc(a.project)}</small>` : ''}
+        <div class="hr-pbar"><i style="width:${Math.min(100, m.eff)}%"></i></div>
+        <div class="hr-amg">
+          <span><small>رقم التكليف</small><b>${esc(a.no || '—')}</b></span>
+          <span><small>نسبة التكليف</small><b>${pctTxt(m.pct)}</b></span>
+          <span><small>الفترة في الشهر</small><b>${fd(m.from)} ← ${fd(m.to)}${m.full ? '' : ` (${m.days} يوم)`}</b></span>
+          <span><small>المبلغ من الراتب</small><b class="hr-money">${amt != null ? money(amt, cur) : '—'}</b></span>
+          ${a.cur ? `<span><small>عملة المشروع</small><b>${esc(a.cur)}</b></span>` : ''}
+          ${en ? `<span><small>حالة الإدخال</small><b>${badge(en[0], en[1])}</b></span>` : ''}
+        </div></div>`;
+    }).join('');
+    const totalAmt = sal != null ? sal * g.total / 100 : null;
+    sheet(`<div class="hr-ph"><span class="hr-ava big ${tone}">${esc(initials(g.name))}</span><div><b>${esc(g.name)}</b><small>التكليفات في ${monthName(f.am)}</small></div></div>
+      <div class="hr-dsum">
+        <div><small>مجموع النسب</small><b class="hr-pt ${tone}">${pctTxt(g.total)}</b></div>
+        <div><small>عدد التكليفات</small><b>${g.items.length}</b></div>
+        <div><small>الراتب (من العقد)</small><b>${sal != null ? money(sal, cur) : '—'}</b></div>
+        <div><small>الموزّع على المشاريع</small><b>${totalAmt != null ? money(totalAmt, cur) : '—'}</b></div>
+      </div>
+      ${c ? `<div class="hr-ctag">${icon('note')}<span>العقد ${c.no ? '#' + esc(c.no) : ''} · ${esc(c.pos || '')} · ${fd(c.start)} ← ${fd(c.end)}${gls(c) ? ' · ' + esc(gls(c)) : ''}</span></div>` : `<div class="hr-err">لا يوجد عقد ساري لهذا الموظف خلال الشهر، فلا يمكن حساب المبالغ.</div>`}
+      ${tone !== 'ok' ? `<div class="hr-warnbox ${tone}">${g.total > 100 ? 'مجموع النسب يتجاوز 100% بـ ' + pctTxt(g.total - 100) : 'مجموع النسب أقل من 100% بـ ' + pctTxt(100 - g.total) + (sal != null ? ' (غير موزّع: ' + money(sal * (100 - g.total) / 100, cur) + ')' : '')}</div>` : ''}
+      <div class="hr-sec"><span>تفاصيل النسب والتكليفات</span></div>${rowsHtml}
+      <p class="note c"><span>المبلغ = الراتب × نسبة التكليف × (أيام التكليف داخل الشهر ÷ أيام الشهر).</span></p>
+      ${HR.db.get('employees', {})[empId] ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}`);
+    const b = $('hrToEmp'); if (b) b.onclick = () => openEmp(empId);
+  }
   function renderAsg(body) {
     const all = HR.assignments();
-    filterChips(body, 'as', [['active', 'سارية'], ['soon', 'تنتهي خلال 30 يوماً'], ['ended', 'منتهية'], ['all', 'الكل']]);
-    const projs = {}; all.forEach((a) => { const k = a.code || a.project; if (k) projs[k] = (projs[k] || 0) + 1; });
+    const seg = el('div', 'seg hr-vseg', `<button data-v="emp" class="${f.av === 'emp' ? 'on' : ''}">${icon('users')}حسب الموظف</button><button data-v="list" class="${f.av !== 'emp' ? 'on' : ''}">${icon('briefcase')}قائمة مسطّحة</button>`);
+    seg.querySelectorAll('button').forEach((b) => b.onclick = () => { f.av = b.dataset.v; saveF(); render(); });
+    body.appendChild(seg);
+    if (f.av === 'emp' || f.as === 'month') monthNav(body);
+    if (f.av === 'emp') { renderAsgByEmp(body); return; }
+    filterChips(body, 'as', [['month', 'خلال الشهر'], ['active', 'سارية اليوم'], ['soon', 'تنتهي خلال 30 يوماً'], ['ended', 'منتهية'], ['all', 'الكل']]);
+    const projs = {}; all.forEach((a) => { const k = a.pno || a.code || a.project; if (k) projs[k] = (projs[k] || 0) + 1; });
     const top = Object.entries(projs).sort((a, b) => b[1] - a[1]).slice(0, 12);
     if (top.length > 1) filterChips(body, 'proj', [['all', 'كل المشاريع']].concat(top.map(([k]) => [k, k])), Object.assign({ all: all.length }, projs));
     search(body, 'الاسم أو المشروع');
     const t = today();
-    const st = (a) => f.as === 'all' || (f.as === 'active' ? (!a.start || a.start <= t) && (!a.end || a.end >= t) : f.as === 'ended' ? a.end && a.end < t : a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
-    const rows = all.filter((a) => st(a) && (f.proj === 'all' || (a.code || a.project) === f.proj) && match(f.q, a.name || empName(a.empId), a.project, a.code, a.pno, a.no, a.status)).sort((a, b) => String(a.end || '9').localeCompare(String(b.end || '9')));
+    const st = (a) => f.as === 'all' || (f.as === 'month' ? !!inMonth(a, f.am) : f.as === 'active' ? (!a.start || a.start <= t) && (!a.end || a.end >= t) : f.as === 'ended' ? a.end && a.end < t : a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
+    const rows = all.filter((a) => st(a) && (f.proj === 'all' || (a.pno || a.code || a.project) === f.proj) && match(f.q, a.name || empName(a.empId), a.project, a.code, a.pno, a.no, a.status)).sort((a, b) => String(a.end || '9').localeCompare(String(b.end || '9')));
     body.appendChild(el('div', 'hr-tools', `<small>${rows.length} تكليف</small>`));
     list(body, rows.map(asgRow), 'لا تكليفات بهذه الفلاتر');
   }
