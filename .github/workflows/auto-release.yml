@@ -1,0 +1,76 @@
+name: Auto release (forced update)
+
+# عند كل دمج في main يغيّر التطبيق (www أو native):
+# يرفع رقم النسخة، يبني APK موقّعاً، ويحدّث dist/version.json
+# فيظهر للمستخدمين التحديث الإجباري تلقائياً عند فتح التطبيق.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - 'native/**'
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: 'ملاحظات التحديث (اختياري)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether to release
+        id: check
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # إذا كان الدمج نفسه أصدر نسخة يدوياً (عدّل dist/version.json) فلا نصدر مرة ثانية
+          if [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -qE '^0+$' \
+             && git diff --name-only "$BEFORE" HEAD | grep -qx 'dist/version.json'; then
+            echo "Version already bumped in this push; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install aapt and zipalign
+        if: steps.check.outputs.skip != 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq aapt zipalign
+
+      - name: Build and publish new version
+        if: steps.check.outputs.skip != 'true'
+        env:
+          MANUAL_NOTES: ${{ github.event.inputs.notes }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          NAME=$(python3 native/next_version.py)
+          NOTES="$MANUAL_NOTES"
+          if [ -z "$NOTES" ]; then
+            # أول سطر من رسالة الدمج بدون رقم الـ PR أو رقم النسخة
+            NOTES=$(printf '%s\n' "$COMMIT_MSG" | head -n1 | sed -E 's/ *\(#[0-9]+\)$//; s/ *\(v[0-9.]+\)$//')
+          fi
+          [ -n "$NOTES" ] || NOTES="تحسينات وإصلاحات"
+          ./native/release.sh "$NAME" "$NOTES"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A dist docs native/AndroidManifest.xml
+          git commit -m "release $NAME [skip ci]"
+          git push origin HEAD:main
