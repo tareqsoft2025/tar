@@ -2,22 +2,38 @@
 (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const COLORS = { in: '#2FBF71', out: '#F0A64B', bad: '#F2716A', site: '#5B9DFF', other: '#A98BFF' };
-  let map = null, base = null, labels = null, layer = null, mode = 'map', markers = [];
+  let map = null, base = null, layer = null, mode = 'map', markers = [];
 
   const light = () => document.documentElement.getAttribute('data-theme') === 'light';
-  function tiles() {
+  // خرائط Esri (بلا مفتاح): رمادية فاتحة/داكنة حسب الثيم، الشوارع، والقمر الصناعي مع الأسماء والطرق.
+  // (خرائط CARTO صارت تتطلب مفتاحاً، وOpenStreetMap يرفض طلبات WebView)
+  const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+  const lay = (path, native) => ({ url: ESRI + path + '/MapServer/tile/{z}/{y}/{x}', opt: { maxZoom: 20, maxNativeZoom: native || 19, attribution: '© Esri, HERE, Garmin, OpenStreetMap' } });
+  const MODES = {
+    // الطبقة الرمادية دقيقة حتى تكبير 16؛ بعدها: الخريطة الطبوغرافية التفصيلية (فاتح) أو تكبير ناعم (داكن)، بلا طبقة أسماء Esri (عبرية/إنجليزية)؛ أسماء الشوارع العربية ضمن الخريطة نفسها
+    map: () => light() ? { base: [lay('Canvas/World_Light_Gray_Base', 16), lay('World_Topo_Map')], deep: lay('World_Topo_Map'), over: [] }
+      : { base: [lay('Canvas/World_Dark_Gray_Base', 16), lay('World_Street_Map')], over: [] },
+    street: () => ({ base: [lay('World_Street_Map'), lay('World_Topo_Map')], over: [] }),
+    sat: () => ({ base: [lay('World_Imagery'), lay('World_Street_Map')], over: [lay('Reference/World_Transportation')] })
+  };
+  let overs = [];
+  function tiles(step) {
+    step = step || 0;
+    const m = (MODES[mode] || MODES.map)(), list = m.base, prov = list[Math.min(step, list.length - 1)];
     if (base) map.removeLayer(base);
-    if (labels) { map.removeLayer(labels); labels = null; }
-    if (mode === 'sat') {
-      base = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri' }).addTo(map);
-      labels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO', pane: 'overlayPane' }).addTo(map);
-    } else {
-      base = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${light() ? 'voyager' : 'dark_all'}/{z}/{x}/{y}{r}.png`, { maxZoom: 20, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO' }).addTo(map);
-    }
-    // رسالة انقطاع فقط إذا لم تُحمَّل أي بلاطة خلال 5 ثوانٍ
-    let loaded = 0; const n = document.getElementById('hmNet'); if (n) n.hidden = true;
+    overs.forEach((o) => map.removeLayer(o)); overs = [];
+    base = L.tileLayer(prov.url, prov.opt).addTo(map);
+    overs = m.over.map((o) => L.tileLayer(o.url, Object.assign({}, o.opt, { pane: 'overlayPane', attribution: '' }, o.cap ? { maxZoom: o.cap } : {})).addTo(map));
+    if (m.deep && step === 0) overs.unshift(L.tileLayer(m.deep.url, Object.assign({}, m.deep.opt, { minZoom: 17, attribution: '' })).addTo(map));
+    document.getElementById('hmMap').dataset.mode = mode;
+    let loaded = 0, errors = 0; const n = document.getElementById('hmNet'); if (n) n.hidden = true;
     base.on('tileload', () => { loaded++; if (n) n.hidden = true; });
-    clearTimeout(tiles.t); tiles.t = setTimeout(() => { if (!loaded && n) n.hidden = false; }, 5000);
+    base.on('tileerror', () => {
+      errors++;
+      if (!loaded && errors >= 4 && step + 1 < list.length) { clearTimeout(tiles.t); tiles(step + 1); }
+    });
+    clearTimeout(tiles.t);
+    tiles.t = setTimeout(() => { if (!loaded) { if (step + 1 < list.length) tiles(step + 1); else if (n) n.hidden = false; } }, 6000);
   }
   function pin(color, label, pulse, big) {
     return L.divIcon({
@@ -49,7 +65,7 @@
     document.getElementById('hmSub').textContent = opts.sub || '';
     if (!window.L) { document.getElementById('hmNet').hidden = false; return; }
     if (!map) {
-      map = L.map('hmMap', { zoomControl: false, attributionControl: true, tap: true });
+      map = L.map('hmMap', { zoomControl: false, maxZoom: 20, minZoom: 3, attributionControl: true, tap: true });
       L.control.zoom({ position: 'topleft' }).addTo(map);
       map.attributionControl.setPrefix('');
     }
