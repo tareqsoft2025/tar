@@ -104,37 +104,49 @@
     <div id="wxBody"></div>
   </div>
 </div>
-<div id="agSheet" class="qsheet" hidden>
+<div id="agSheet" class="qsheet ag-sheet" hidden>
   <div class="qs-scrim" data-close></div>
-  <div class="qs-box wxs ag-ed" role="dialog" aria-modal="true" aria-labelledby="agEdTitle">
+  <div class="qs-box ag-ed" role="dialog" aria-modal="true" aria-labelledby="agEdTitle">
     <div class="wxs-grab"></div>
-    <div class="wxs-head"><div id="agEdTitle" class="qs-title"></div><button class="icon-btn" data-close aria-label="إغلاق"><svg class="ic"><use href="#i-x"/></svg></button></div>
-    <div id="agType" class="seg"><button data-t="task" type="button"><svg class="ic"><use href="#i-check"/></svg>مهمة / موعد</button><button data-t="note" type="button"><svg class="ic"><use href="#i-note"/></svg>ملاحظة</button></div>
-    <input id="agTitle" class="ag-in" type="text" maxlength="120" placeholder="العنوان" aria-label="العنوان">
-    <textarea id="agNote" class="ag-in" rows="3" maxlength="4000" placeholder="تفاصيل (اختياري)" aria-label="التفاصيل"></textarea>
-    <div class="ag-lbl">التصنيف</div><div id="agCats" class="chips"></div>
+    <div class="ag-edh"><button class="icon-btn" data-close aria-label="إغلاق"><svg class="ic" data-close><use href="#i-x"/></svg></button><div id="agEdTitle" class="qs-title"></div><button id="agStar" class="icon-btn ag-starb" type="button" aria-label="مهمة مميزة"><svg class="ic"><use href="#i-star"/></svg></button></div>
+    <div id="agType" class="seg"><button data-t="task" type="button"><svg class="ic"><use href="#i-check"/></svg>مهمة</button><button data-t="note" type="button"><svg class="ic"><use href="#i-note"/></svg>ملاحظة</button></div>
+    <input id="agTitle" class="ag-in ag-tin" type="text" maxlength="120" placeholder="ما الذي تريد إنجازه؟" aria-label="العنوان">
+    <textarea id="agNote" class="ag-in" rows="2" maxlength="4000" placeholder="تفاصيل (اختياري)" aria-label="التفاصيل"></textarea>
     <label id="agPinRow" class="ag-check"><input id="agPin" type="checkbox"> تثبيت في الأعلى</label>
     <div id="agTaskOpts">
-      <div class="ag-lbl">اليوم</div><div id="agDates" class="chips"></div>
-      <input id="agDate2" class="ag-in" type="date" aria-label="التاريخ" hidden>
+      <div class="ag-blk">
+        <div class="ag-lbl"><svg class="ic"><use href="#i-cal"/></svg>اليوم</div>
+        <div id="agDates" class="chips"></div>
+        <button id="agDateRow" class="ag-daterow" type="button"><span id="agDateLbl"></span><small>تغيير</small></button>
+        <input id="agDate2" class="ag-hide" type="date" aria-label="التاريخ" tabindex="-1">
+      </div>
       <div id="agWhen">
-        <div class="ag-lbl">الوقت</div><div id="agModes" class="chips"></div>
-        <div id="agTimeBox"><input id="agTime" class="ag-in" type="time" aria-label="الوقت"></div>
-        <div id="agPrayBox" class="ag-pray">
-          <div id="agRel" class="chips"></div>
-          <div id="agPrays" class="chips"></div>
-          <div id="agOffs" class="chips"></div>
-          <div id="agPrev" class="ag-prev"></div>
+        <div class="ag-blk">
+          <div class="ag-lbl"><svg class="ic"><use href="#i-clock"/></svg>الوقت</div>
+          <div class="ag-timerow"><div id="agTimes" class="chips"></div><label class="ag-tpick"><input id="agTime" type="time" aria-label="وقت مخصص"><span>وقت آخر</span></label></div>
         </div>
-        <div id="agWarn" class="ag-warn" hidden></div>
-        <div id="agRemBox"><div class="ag-lbl">التذكير</div><div id="agRems" class="chips"></div></div>
-        <div id="agRepBox"><div class="ag-lbl">التكرار</div><div id="agReps" class="chips"></div></div>
+        <div id="agRemBox" class="ag-blk">
+          <div class="ag-lbl"><svg class="ic"><use href="#i-bell"/></svg>التذكير</div>
+          <div id="agRems" class="chips"></div>
+          <div id="agRemHint" class="ag-hint"></div>
+        </div>
+        <div class="ag-blk">
+          <div class="ag-lbl"><svg class="ic"><use href="#i-refresh"/></svg>التكرار</div>
+          <div id="agReps" class="chips"></div>
+        </div>
+      </div>
+      <div class="ag-blk">
+        <div class="ag-lbl"><svg class="ic"><use href="#i-check"/></svg>خطوات المهمة</div>
+        <div id="agSubs"></div>
+        <button id="agSubAdd" class="ag-subadd" type="button"><svg class="ic"><use href="#i-plus"/></svg>إضافة خطوة</button>
       </div>
     </div>
+    <div class="ag-blk"><div class="ag-lbl">التصنيف</div><div id="agCats" class="chips"></div></div>
     <button id="agSave" class="btn-gold" type="button">حفظ</button>
     <button id="agDel" class="btn-outline wide ag-delb" type="button"><svg class="ic"><use href="#i-x"/></svg><span>حذف</span></button>
   </div>
 </div>
+<div id="remPop"></div>
 <div id="miniPlayer" class="mini" hidden>
   <button id="mpToggle" class="icon-btn" aria-label="تشغيل/إيقاف"><svg class="ic"><use href="#i-pause"/></svg></button>
   <div class="mp-info"><b id="mpTitle"></b><small id="mpReciter" class="muted"></small></div>
@@ -260,7 +272,7 @@
     <h1 class="page-title">المزيد</h1>
     <div class="sub">أدوات تعينك على المحافظة على صلاتك وعبادتك</div>
     <div class="hub">
-      <button class="hub-card ag-hub" data-go="agenda"><span class="hub-ic"><svg class="ic"><use href="#i-cal"/></svg></span><b>الأجندة</b><small>مهام ومواعيد وملاحظات مرتبطة بأوقات الصلاة</small></button>
+      <button class="hub-card ag-hub" data-go="agenda"><span class="hub-ic"><svg class="ic"><use href="#i-cal"/></svg></span><b>الأجندة</b><small>مهامك ومواعيدك بالتاريخ والوقت، مع تذكير في منتصف الشاشة</small></button>
       <button class="hub-card" data-go="jumah"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>يوم الجمعة</b><small>سنن وساعة الإجابة والصلاة على النبي</small></button>
       <button class="hub-card" data-go="fx"><span class="hub-ic"><svg class="ic"><use href="#i-chart"/></svg></span><b>الدولار والشيكل</b><small>سعر الصرف والتحويل</small></button>
       <button class="hub-card" data-go="khatma"><span class="hub-ic"><svg class="ic"><use href="#i-quran"/></svg></span><b>ختمة القرآن</b><small>خطة يومية وتقدّم</small></button>
@@ -380,21 +392,11 @@
   <!-- الأجندة -->
   <section id="tab-agenda" class="tab">
     <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">الأجندة</h1></div>
-    <div id="agSeg" class="seg three"><button data-v="day" type="button">يومي</button><button data-v="tasks" type="button">المهام</button><button data-v="notes" type="button">الملاحظات</button></div>
-    <div id="agDayNav" class="ag-nav">
-      <div class="ag-navtop">
-        <button id="agPrevD" class="icon-btn flip" type="button" aria-label="اليوم السابق"><svg class="ic"><use href="#i-chev"/></svg></button>
-        <button id="agToday" class="ag-dt" type="button"><b id="agDate"></b><small id="agHijri"></small></button>
-        <button id="agNextD" class="icon-btn" type="button" aria-label="اليوم التالي"><svg class="ic"><use href="#i-chev"/></svg></button>
-      </div>
-      <div id="agWeek" class="ag-week"></div>
-    </div>
-    <div id="agNoteSearch" class="search" hidden><svg class="ic"><use href="#i-search"/></svg><input id="agQ" type="search" placeholder="ابحث في الملاحظات" aria-label="بحث"></div>
+    <div id="agSeg" class="seg three ag-seg"><button data-v="tasks" type="button"><svg class="ic"><use href="#i-check"/></svg>المهام</button><button data-v="cal" type="button"><svg class="ic"><use href="#i-cal"/></svg>التقويم</button><button data-v="notes" type="button"><svg class="ic"><use href="#i-note"/></svg>الملاحظات</button></div>
     <div id="agBody"></div>
     <button id="agFab" class="ag-fab" type="button" aria-label="إضافة"><svg class="ic"><use href="#i-plus"/></svg></button>
   </section>
 
-  <!-- يوم الجمعة -->
   <section id="tab-jumah" class="tab">
     <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">يوم الجمعة</h1></div>
     <div class="card-flat jm-hero">
@@ -624,6 +626,8 @@
 <script src="features.js"></script>
 <script src="weather.js"></script>
 <script src="fx.js"></script>
+<script src="agenda-core.js"></script>
+<script src="remind-ui.js"></script>
 <script src="agenda.js"></script>
 </body>
 </html>
