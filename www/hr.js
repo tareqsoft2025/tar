@@ -673,7 +673,33 @@
     out.push(['معلومات إضافية', 'info', extra]);
     return out.filter((g) => g[2].length);
   }
-  const telLink = (k, v) => /mobile|phone/i.test(k) ? `<a href="tel:${esc(v)}">${esc(v)}</a>` : /email/i.test(k) ? `<a href="mailto:${esc(v)}">${esc(v)}</a>` : esc(v);
+  // أرقام الجوال: 0598815128 أو 598815128 أو +970/+972… → رقم محلي للاتصال، ورقمان دوليان محتملان لواتساب
+  function phoneInfo(raw) {
+    let d = String(raw || '').replace(/[^\d+]/g, '').replace(/^\+/, '').replace(/^00/, '');
+    if (!d) return null;
+    let nat = d;
+    if (/^97[02]\d{8,9}$/.test(d)) nat = d.slice(3);
+    nat = nat.replace(/^0+/, '');
+    if (nat.length < 8 || nat.length > 10) return { dial: String(raw).trim(), wa: [] };
+    // 059 جوال و056 أوريدو (فلسطين +970)، وباقي 05x شبكات +972
+    const ps = /^5[69]/.test(nat);
+    const wa = (ps ? ['970', '972'] : ['972', '970']).map((cc) => ({ cc, num: cc + nat, label: '+' + cc + ' ' + nat }));
+    return { dial: '0' + nat, nat, wa };
+  }
+  const openExt = (url) => { if (B && B.openExternal) B.openExternal(url); else window.open(url, '_blank'); };
+  window.hrDial = (n) => openExt('tel:' + n);
+  window.hrWa = (n) => openExt('https://wa.me/' + n);
+  window.hrSms = (n) => openExt('sms:' + n);
+  function contactBar(raw) {
+    const p = phoneInfo(raw);
+    if (!p) return '';
+    return `<div class="hr-contact">
+      <button class="hr-cbtn call" onclick="hrDial('${p.dial}')">${icon('phone')}<span><b>اتصال</b><small>${esc(p.dial)}</small></span></button>
+      ${p.wa.map((w, i) => `<button class="hr-cbtn wa${i ? ' alt' : ''}" onclick="hrWa('${w.num}')"><svg viewBox="0 0 24 24" class="ic"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.1 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7a2.8 2.8 0 0 0 1.8-1.3 2.3 2.3 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg><span><b>واتساب ${i ? '(بديل)' : ''}</b><small dir="ltr">${esc(w.label)}</small></span></button>`).join('')}
+      <button class="hr-cbtn sms" onclick="hrSms('${p.dial}')">${icon('note')}<span><b>رسالة</b><small>SMS</small></span></button>
+    </div>${p.wa.length ? '<p class="hr-wanote">إذا ظهر في واتساب أن الرقم غير مسجّل، جرّب زر البديل (+970 / +972).</p>' : ''}`;
+  }
+  const telLink = (k, v) => /mobile|phone/i.test(k) ? (phoneInfo(v) ? `<button class="hr-tel" onclick="hrDial('${phoneInfo(v).dial}')">${icon('phone')}${esc(v)}</button>` : esc(v)) : /email/i.test(k) ? `<a href="mailto:${esc(v)}">${esc(v)}</a>` : esc(v);
   function openRaw(title, o) { sheet(`<div class="hr-ph"><b>${title}</b></div>${rawTable(o)}`); }
   function openEmp(id, focusCon) {
     const raw = HR.db.get('employees', {})[id];
@@ -696,10 +722,11 @@
         <div class="hr-tags">${badge(e.org, 'info')}${badge(TYPE[e.type], 'mute')}${badge(e.active ? 'على رأس العمل' : 'منتهية الخدمة', e.active ? 'ok' : 'bad')}${flags(sm)}</div></div></div>
       <div class="hr-quick">
         <div><b>${e.empId ? esc(e.empId) : '—'}</b><small>الرقم الوظيفي</small></div>
-        <div><b>${e.join ? e.join.split('-').reverse().join('/') : '—'}</b><small>تاريخ التعيين</small></div>
+        <div><b>${e.join ? fd(e.join) : '—'}</b><small>تاريخ التعيين</small></div>
         <div><b>${sm.count || cons.length}</b><small>${(sm.count || cons.length) === 1 ? 'عقد' : 'عقود'}</small></div>
         <div><b>${asgs.length}</b><small>تكليفات</small></div>
       </div>
+      ${contactBar(e.phone)}
       ${groups.map(([title, ic, cells]) => `<div class="hr-grp"><div class="hr-grph">${icon(ic)}<span>${title}</span></div><div class="hr-info">${cells.map(([k, v, key]) => `<div><small>${esc(k)}</small><b>${telLink(key, v)}</b></div>`).join('')}</div></div>`).join('')}
       <div class="hr-sec"><span>الحضور آخر 14 يوماً</span><small>اضغط على يوم لعرض التفاصيل</small></div><div class="hr-cal14">${cells.join('')}</div>
       <div class="hr-sec"><span>العقود (${cons.length})</span></div>
