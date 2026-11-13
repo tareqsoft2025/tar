@@ -105,12 +105,20 @@
       })), upd: pick(x, 'updatedAt'), raw: x
     };
   }
+  // المشاريع (من /api/projects/lookup) لربط التكليف برقم المشروع ورمزه واسمه وعملته
+  let projIdx = null;
+  function projOf(id) {
+    if (id == null) return null;
+    if (!projIdx) { projIdx = {}; Object.values(db.get('projects', {})).forEach((p) => { if (p.id != null) projIdx[String(p.id)] = p; if (p.projectId != null && !projIdx[String(p.projectId)]) projIdx[String(p.projectId)] = p; }); }
+    return projIdx[String(id)] || null;
+  }
   function asg(x) {
+    const pr = projOf(pick(x, 'projectId', 'project.id')) || {};
     return {
       id: idOf(x), empId: String(pick(x, 'employeeId', 'employee.id') || ''), name: pick(x, 'employeeNameAr', 'employeeName', 'fullNameAr', 'employee.fullNameAr'),
-      no: pick(x, 'assignmentNumber', 'number'), project: txt(pick(x, 'projectName', 'project.nameAr', 'project.name', 'project.titleAr', 'nameAr', 'name')),
-      code: pick(x, 'codeProject', 'projectCode', 'project.code'), pno: pick(x, 'projectNumber', 'project.projectNumber', 'project.number'),
-      cur: pick(x, 'currency', 'project.currency', 'projectCurrency'), pct: pick(x, 'percent', 'percentage'),
+      no: pick(x, 'assignmentNumber', 'number'), project: txt(pick(x, 'projectName', 'project.nameAr', 'project.name', 'project.titleAr')) || pr.nameAr || pr.name || pr.nameEn || null,
+      code: pick(x, 'codeProject', 'projectCode', 'project.codeProject', 'project.code') || pr.codeProject || null, pno: pick(x, 'projectNumber', 'project.projectNumber', 'project.number') || pr.projectNumber || null,
+      cur: pick(x, 'currency', 'project.currency', 'projectCurrency') || pr.currency || null, pct: pick(x, 'percent', 'percentage'),
       status: pick(x, 'status', 'entryStatus'), locked: x.periodLocked === true,
       start: d10(pick(x, 'startDate')), end: d10(pick(x, 'endDate')), raw: x
     };
@@ -143,13 +151,19 @@
     return { total: items.length, added, updated, removed };
   }
   const monthKey = (ds) => 'att_' + ds.slice(0, 7);
+  // حدود اليوم بتوقيت فلسطين كما يرسلها النظام نفسه: from=بداية اليوم و to=نهايته بصيغة ISO
+  const offFmt = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  function tzOff(ms) { const p = {}; offFmt.formatToParts(new Date(ms)).forEach((x) => { p[x.type] = x.value; }); return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000; }
+  function localMidnight(ds) { const [y, m, d] = ds.split('-').map(Number); const g = Date.UTC(y, m - 1, d); return g - tzOff(g - tzOff(g)); }
+  const dayRange = (ds) => ({ from: new Date(localMidnight(ds)).toISOString(), to: new Date(localMidnight(addDays(ds, 1)) - 1).toISOString() });
   async function syncDay(ds) {
-    const r = await get('/api/hr/attendance/events?from=' + ds + '&to=' + ds + '&limit=500');
+    const rg = dayRange(ds);
+    const r = await get('/api/hr/attendance/events?from=' + encodeURIComponent(rg.from) + '&to=' + encodeURIComponent(rg.to) + '&limit=500');
     if (!r.ok) throw Object.assign(new Error(errText(r)), { res: r });
     const m = db.get(monthKey(ds), {});
     const num = (v) => v == null || v === '' || !isFinite(+v) ? null : +v;
     const evs = listOf(r.data).map((e) => ({
-      id: e.id, employeeId: String(e.employeeId), eventType: e.eventType, recordedAt: e.recordedAt, hiddenAt: e.hiddenAt || null,
+      id: e.id, employeeId: String(e.employeeId != null ? e.employeeId : pick(e, 'employee.id', 'empId')), eventType: String(e.eventType || e.type || '').toLowerCase().replace('checkin', 'check_in').replace('checkout', 'check_out'), recordedAt: e.recordedAt, hiddenAt: e.hiddenAt || null,
       source: e.source || null, kind: e.kind || null, mode: e.registrationMode || null,
       lat: num(pick(e, 'latitude', 'lat', 'location.latitude')), lon: num(pick(e, 'longitude', 'lng', 'lon', 'location.longitude')), acc: num(pick(e, 'accuracy', 'accuracyMeters')),
       siteId: pick(e, 'workSiteId', 'siteId'), match: e.workSiteMatchStatus || null, siteName: pick(e, 'matchedSiteNameAr', 'workSiteNameAr', 'workSite.nameAr', 'siteName'),
@@ -184,6 +198,11 @@
       progress && progress('العقود…');
       st.contracts = merge('contracts', await pagedAll('/api/hr/contracts?pageSize=100&sortBy=employeeName&sortDir=asc', progress, 'العقود'));
       progress && progress('التكليفات…');
+      progress && progress('المشاريع…');
+      try {
+        const projs = await pagedAll('/api/projects/lookup?pageSize=50', progress, 'المشاريع');
+        if (projs.length) { st.projects = merge('projects', projs); projIdx = null; }
+      } catch (e) { /* قد لا يملك الحساب صلاحية المشاريع */ }
       const ar = await get('/api/hr/assignments');
       if (ar.ok) st.assignments = merge('assignments', listOf(ar.data && ar.data.data ? ar.data.data : ar.data));
       const es = await get('/api/hr/assignments/ending-soon');
@@ -200,7 +219,7 @@
       else {
         if (start < meta.attFrom) addRange(start, addDays(meta.attFrom, -1));       // الفترة الأقدم الجديدة
         addRange(addDays(meta.attUntil, -1), t);                                     // من آخر مزامنة حتى اليوم
-        if (meta.evVer !== 2) addRange(meta.attFrom, t);                             // النسخ السابقة لم تحفظ المكان
+        if (meta.evVer !== 3) addRange(meta.attFrom < start ? meta.attFrom : start, t); // إعادة جلب: النسخ السابقة أرسلت التاريخ بصيغة خاطئة
         if (opts && opts.from) addRange(opts.from, t);
       }
       const days = [...want].sort();
@@ -214,7 +233,7 @@
       meta.attUntil = t;
       meta.attFrom = meta.attFrom && meta.attFrom < from ? meta.attFrom : from;
       meta.bg = !!(opts && opts.background);
-      meta.lastSync = st.at; meta.last = st; meta.evVer = 2;
+      meta.lastSync = st.at; meta.last = st; meta.evVer = 3;
       db.put('meta', meta);
       return st;
     } finally { syncing = false; }
