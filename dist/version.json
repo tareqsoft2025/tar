@@ -1,6 +1,6 @@
 {
-  "versionCode": 29,
-  "versionName": "5.8",
-  "notes": "التحديثات تصلك الآن مباشرة: فحص تلقائي بالخلفية وتنزيل مسبق وإشعار للتثبيت بضغطة واحدة",
+  "versionCode": 30,
+  "versionName": "5.9",
+  "notes": "الأجندة الجديدة: مهام بالتاريخ والوقت، تقويم وخريطة لليوم، خطوات فرعية ومهام مميزة، وتذكير يظهر في منتصف الشاشة",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

@@ -41,7 +41,7 @@ final class Scheduler {
         }
     }
 
-    private static void setAlarm(Context c, long at, PendingIntent pi, boolean exactWanted) {
+    static void setAlarm(Context c, long at, PendingIntent pi, boolean exactWanted) {
         AlarmManager a = am(c);
         boolean exact = exactWanted && (Build.VERSION.SDK_INT < 31 || a.canScheduleExactAlarms());
         if (Build.VERSION.SDK_INT >= 23) {
@@ -69,6 +69,7 @@ final class Scheduler {
                 if (o.has("tab")) in.putExtra("tab", o.optString("tab"));
                 if (o.has("snd")) in.putExtra("snd", o.optString("snd"));
                 if (o.has("mosque")) in.putExtra("mosque", o.optString("mosque"));
+                if (o.has("popup")) in.putExtra("popup", o.optString("popup"));
                 in.putExtra("id", n);
                 setAlarm(c, at, PendingIntent.getBroadcast(c, n, in, flags()), true);
                 n++;

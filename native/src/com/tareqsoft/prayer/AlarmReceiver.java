@@ -9,6 +9,8 @@ public class AlarmReceiver extends BroadcastReceiver {
     public void onReceive(Context c, Intent i) {
         String m = i.getStringExtra("mosque");
         if (m != null) { Scheduler.mosque(c, "on".equals(m)); return; }
+        String popup = i.getStringExtra("popup");
+        if (popup != null) { ReminderActivity.fire(c, popup, i.getStringExtra("title"), i.getStringExtra("body")); return; }
         Scheduler.notifyNow(c, i.getIntExtra("id", 0), i.getStringExtra("title"), i.getStringExtra("body"), i.getStringExtra("tab"), i.getStringExtra("snd"));
     }
 }
