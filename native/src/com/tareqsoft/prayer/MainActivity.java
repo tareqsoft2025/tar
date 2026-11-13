@@ -68,6 +68,8 @@ public class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new Bridge(), "AndroidBridge");
         pendingTab = getIntent().getStringExtra("tab");
+        pendingInstall = getIntent().getBooleanExtra("install", false);
+        UpdateChecker.arm(this);
         requestPerms();
         maybeSendTest();
         web.loadUrl("file:///android_asset/www/index.html");
@@ -111,6 +113,7 @@ public class MainActivity extends Activity {
         setIntent(in);
         String tab = in.getStringExtra("tab");
         if (tab != null && web != null) openTab(tab);
+        if (in.getBooleanExtra("install", false)) { pendingInstall = true; if (web != null) checkUpdate(); }
     }
 
     @Override
@@ -118,7 +121,24 @@ public class MainActivity extends Activity {
         super.onResume();
         if (web != null) checkUpdate();
         maybeSendTest();
+        poll.removeCallbacks(pollTick);
+        poll.postDelayed(pollTick, POLL_MS);
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        poll.removeCallbacks(pollTick);
+    }
+
+    /** While the app is on screen, look for a new version every few minutes so it appears without reopening. */
+    private static final long POLL_MS = 10 * 60 * 1000L;
+    private final android.os.Handler poll = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable pollTick = new Runnable() {
+        public void run() { checkUpdate(); poll.postDelayed(this, POLL_MS); }
+    };
+    private volatile boolean pendingInstall = false;
+    private volatile int latestCode = 0;
 
     /** Matches the system bars and WebView background to the chosen theme. */
     private void applyBars(String bg, String nav, boolean light) {
@@ -145,8 +165,6 @@ public class MainActivity extends Activity {
         js("window.toast && window.toast('تم إرسال إشعار تجريبي')");
     }
 
-    private static final String VERSION_URL = "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/version.json";
-    private static final String APK_PREFIX = "https://raw.githubusercontent.com/tareqsoft2025/tar/";
     private volatile boolean downloading = false;
 
     private int currentVersion() {
@@ -181,36 +199,21 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             public void run() {
                 try {
-                    String json = new String(readAll(open(VERSION_URL, 8000)), "UTF-8");
-                    JSONObject o = new JSONObject(json);
-                    if (o.getInt("versionCode") > currentVersion())
-                        js("window.showUpdate && window.showUpdate(JSON.parse(" + JSONObject.quote(json) + "))");
+                    JSONObject o = UpdateChecker.latest(MainActivity.this);
+                    if (o == null) return;
+                    latestCode = o.getInt("versionCode");
+                    boolean ready = UpdateChecker.ready(MainActivity.this, latestCode);
+                    o.put("ready", ready);
+                    js("window.showUpdate && window.showUpdate(JSON.parse(" + JSONObject.quote(o.toString()) + "))");
+                    if (pendingInstall) { pendingInstall = false; downloadAndInstall(o.getString("apk")); }
                 } catch (Exception e) { /* offline: keep using the app */ }
             }
         }).start();
     }
 
-    private static HttpURLConnection open(String url, int timeout) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url + (url.contains("?") ? "&" : "?") + "t=" + System.currentTimeMillis()).openConnection();
-        c.setConnectTimeout(timeout);
-        c.setReadTimeout(timeout * 3);
-        c.setUseCaches(false);
-        return c;
-    }
-
-    private static byte[] readAll(HttpURLConnection c) throws Exception {
-        InputStream in = c.getInputStream();
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buf = new byte[8192];
-        int n;
-        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-        in.close();
-        return out.toByteArray();
-    }
-
     private void downloadAndInstall(final String url) {
         if (downloading) return;
-        if (!url.startsWith(APK_PREFIX)) { js("window.updateError && window.updateError('رابط غير موثوق')"); return; }
+        if (!url.startsWith(UpdateChecker.APK_PREFIX)) { js("window.updateError && window.updateError('رابط غير موثوق')"); return; }
         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
             js("window.updateError && window.updateError('اسمح للتطبيق بتثبيت التحديثات ثم ارجع واضغط تحديث')");
             startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
@@ -220,26 +223,14 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             public void run() {
                 try {
-                    HttpURLConnection c = open(url, 15000);
-                    int total = c.getContentLength();
-                    InputStream in = c.getInputStream();
-                    File f = UpdateProvider.apk(MainActivity.this);
-                    FileOutputStream out = new FileOutputStream(f);
-                    byte[] buf = new byte[16384];
-                    long done = 0;
-                    int n, last = -1;
-                    while ((n = in.read(buf)) > 0) {
-                        out.write(buf, 0, n);
-                        done += n;
-                        int pct = total > 0 ? (int) (done * 100 / total) : 0;
-                        if (pct != last) { last = pct; js("window.updateProgress && window.updateProgress(" + pct + ")"); }
+                    // نزّلناه مسبقاً في الخلفية؟ ثبّت فوراً بلا انتظار
+                    if (!UpdateChecker.ready(MainActivity.this, latestCode)) {
+                        UpdateChecker.download(MainActivity.this, url, latestCode, new UpdateChecker.Progress() {
+                            public void on(int pct) { js("window.updateProgress && window.updateProgress(" + Math.min(pct, 99) + ")"); }
+                        });
                     }
-                    out.close();
-                    in.close();
-                    Intent i = new Intent(Intent.ACTION_VIEW);
-                    i.setDataAndType(Uri.parse("content://com.tareqsoft.prayer.update/update.apk"), "application/vnd.android.package-archive");
-                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(i);
+                    UpdateChecker.cancelNotification(MainActivity.this);
+                    UpdateChecker.install(MainActivity.this);
                     js("window.updateProgress && window.updateProgress(100)");
                 } catch (Exception e) {
                     js("window.updateError && window.updateError('فشل التنزيل، تحقق من الإنترنت وحاول مجدداً')");

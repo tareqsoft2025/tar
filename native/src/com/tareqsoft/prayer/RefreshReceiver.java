@@ -26,6 +26,11 @@ public class RefreshReceiver extends BroadcastReceiver {
         final Context app = ctx.getApplicationContext();
         final PendingResult pr = goAsync();
         Scheduler.armRefresh(app, INTERVAL);
+        UpdateChecker.arm(app);
+        String act = intent == null ? null : intent.getAction();
+        if (Intent.ACTION_BOOT_COMPLETED.equals(act) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(act)) {
+            new Thread(new Runnable() { public void run() { UpdateChecker.check(app); } }).start();
+        }
         Location loc = bestLocation(app);
         final String url = "file:///android_asset/www/refresh.html"
             + (loc == null ? "" : String.format(Locale.US, "?lat=%.5f&lon=%.5f", loc.getLatitude(), loc.getLongitude()));
