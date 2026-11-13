@@ -140,7 +140,15 @@
     const r = await get('/api/hr/attendance/events?from=' + ds + '&to=' + ds + '&limit=500');
     if (!r.ok) throw Object.assign(new Error(errText(r)), { res: r });
     const m = db.get(monthKey(ds), {});
-    const evs = listOf(r.data).map((e) => ({ id: e.id, employeeId: String(e.employeeId), eventType: e.eventType, recordedAt: e.recordedAt, hiddenAt: e.hiddenAt || null, source: e.source || null, site: e.workSiteMatchStatus || null, kind: e.kind || null }));
+    const num = (v) => v == null || v === '' || !isFinite(+v) ? null : +v;
+    const evs = listOf(r.data).map((e) => ({
+      id: e.id, employeeId: String(e.employeeId), eventType: e.eventType, recordedAt: e.recordedAt, hiddenAt: e.hiddenAt || null,
+      source: e.source || null, kind: e.kind || null, mode: e.registrationMode || null,
+      lat: num(pick(e, 'latitude', 'lat', 'location.latitude')), lon: num(pick(e, 'longitude', 'lng', 'lon', 'location.longitude')), acc: num(pick(e, 'accuracy', 'accuracyMeters')),
+      siteId: pick(e, 'workSiteId', 'siteId'), match: e.workSiteMatchStatus || null, siteName: pick(e, 'matchedSiteNameAr', 'workSiteNameAr', 'workSite.nameAr', 'siteName'),
+      dist: num(pick(e, 'distanceMeters', 'distance')), device: typeof e.deviceInfo === 'string' ? e.deviceInfo.slice(0, 120) : e.deviceInfo ? JSON.stringify(e.deviceInfo).slice(0, 120) : null,
+      note: pick(e, 'note', 'reason', 'changeReason'), by: pick(e, 'createdByUserName')
+    }));
     const before = JSON.stringify(m[ds] || []), after = JSON.stringify(evs);
     m[ds] = evs; db.put(monthKey(ds), m);
     return before === after ? 0 : 1;
@@ -173,9 +181,13 @@
       if (ar.ok) st.assignments = merge('assignments', listOf(ar.data && ar.data.data ? ar.data.data : ar.data));
       const es = await get('/api/hr/assignments/ending-soon');
       if (es.ok) db.put('asgEnding', listOf(es.data && es.data.data ? es.data.data : es.data).map((x) => idOf(x)));
+      const ws = await get('/api/hr/attendance/work-sites?all=1');
+      if (ws.ok) db.put('sites', listOf(ws.data).map((x) => ({ id: x.id, name: pick(x, 'nameAr', 'name', 'nameEn'), lat: +x.latitude, lon: +x.longitude, r: +x.radiusMeters || 150 })));
       // الحضور: الأيام التي لم تُزامن بعد + اليوم وأمس دائماً (لأنها تتغيّر)
       const t = dayStr();
       let from = meta.attUntil ? addDays(meta.attUntil, -1) : addDays(t, -((opts && opts.firstDays) || 14));
+      // النسخ السابقة لم تحفظ المكان: نعيد جلب الأيام المحفوظة مرة واحدة
+      if (meta.attUntil && meta.evVer !== 2 && meta.attFrom) from = meta.attFrom < addDays(t, -60) ? addDays(t, -60) : meta.attFrom;
       if (opts && opts.from) from = opts.from;
       const days = []; for (let d = from; d <= t && days.length < 120; d = addDays(d, 1)) days.push(d);
       let changedDays = 0, done = 0;
@@ -186,7 +198,7 @@
       st.leaves = await syncLeaves(addDays(from, -1), addDays(t, 30));
       meta.attUntil = t;
       meta.attFrom = meta.attFrom && meta.attFrom < from ? meta.attFrom : from;
-      meta.lastSync = st.at; meta.last = st;
+      meta.lastSync = st.at; meta.last = st; meta.evVer = 2;
       db.put('meta', meta);
       return st;
     } finally { syncing = false; }
@@ -203,6 +215,34 @@
   const minutesOf = (iso) => { const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso)).forEach((x) => { p[x.type] = x.value; }); return (+p.hour % 24) * 60 + +p.minute; };
   const hmToMin = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
   const activeOn = (e, ds) => (!e.join || e.join <= ds) && (!e.term || e.term >= ds) && e.active !== false;
+
+  // المكان: اسم موقع العمل، وهل التسجيل داخل نطاقه، والمسافة
+  const sites = () => db.get('sites', []);
+  function haversine(a, b, c, d) { const R = 6371e3, r = Math.PI / 180, x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
+  function place(ev) {
+    const ss = sites();
+    const byId = ev.siteId != null ? ss.find((x) => String(x.id) === String(ev.siteId)) : null;
+    let near = null;
+    if (ev.lat != null && ev.lon != null) ss.forEach((x) => { if (!isFinite(x.lat) || !isFinite(x.lon)) return; const dd = haversine(ev.lat, ev.lon, x.lat, x.lon); if (!near || dd < near.d) near = { s: x, d: dd }; });
+    const site = byId || (near && near.s) || null;
+    const dist = ev.dist != null ? ev.dist : near ? near.d : null;
+    let st = ev.match;
+    if (!st || st === 'unknown') st = ev.lat == null ? 'unknown' : near ? (near.d <= near.s.r ? 'matched' : 'outside') : 'unknown';
+    const nm = ev.siteName || (site && site.name) || null;
+    return { name: st === 'outside' ? null : nm, near: nm, st, dist: dist != null ? Math.round(dist) : null, lat: ev.lat, lon: ev.lon, acc: ev.acc };
+  }
+  // ساعات العمل: مجموع فترات (دخول ← خروج)، والفترة المفتوحة اليوم تُحسب حتى الآن
+  function worked(list, ds) {
+    let ms = 0, open = null;
+    list.forEach((x) => {
+      const t = Date.parse(x.recordedAt);
+      if (x.eventType === 'check_in') { if (open == null) open = t; }
+      else if (x.eventType === 'check_out' && open != null) { ms += Math.max(0, t - open); open = null; }
+    });
+    const live = open != null && ds === dayStr();
+    if (live) ms += Math.max(0, Date.now() - open);
+    return { min: Math.round(ms / 60000), open: open != null, live };
+  }
 
   // حالة كل موظف في يوم معيّن
   function dayReport(ds) {
@@ -226,12 +266,14 @@
         if (!list.length) status = leave ? 'leave' : weekend ? 'off' : 'absent';
         else if (lateMin > 0) status = 'late';
         if (list.length && !ins.length) status = 'noin';
-        return { e, list, firstIn, lastOut, lateMin, leave, hasAsg, status };
+        const w = worked(list, ds);
+        const outside = list.some((x) => place(x).st === 'outside');
+        return { e, list, firstIn, lastOut, lateMin, leave, hasAsg, status, workMin: w.min, openShift: w.open, live: w.live, outside };
       })
     };
   }
 
-  window.HR = { get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  window.HR = { place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     hasSession: () => B && B.erpSession ? B.erpSession() : !!localStorage.getItem('hrWebSession'),
     logout() { if (B && B.erpLogout) B.erpLogout(); else { webCall('POST', '/api/auth/logout', {}); localStorage.removeItem('hrWebSession'); } db.wipe(); localStorage.removeItem('hrUser'); },
     meta: () => db.get('meta', {}) };
