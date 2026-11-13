@@ -1056,3 +1056,25 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-srow span small{display:block;color:var(--muted);font-size:.6875rem}
 .hr-tog{width:22px!important;min-height:22px!important;height:22px;accent-color:var(--gold)}
 .hr-rem{margin:2px 4px 12px}
+/* التكليفات حسب الشهر */
+.hr-vseg{margin-bottom:10px}
+.hr-pbar{display:block;height:5px;border-radius:4px;margin-top:6px;overflow:hidden;background:color-mix(in srgb,var(--text) 9%,transparent)}
+.hr-pbar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#7fb3ff,#3f7fe0)}
+.hr-pbar.ok i{background:var(--ok)}.hr-pbar.warn i{background:#F0A64B}.hr-pbar.bad i{background:#F2716A}
+.hr-pt{font-size:1.0625rem;font-weight:800}
+.hr-pt.ok{color:var(--ok)}.hr-pt.warn{color:#F0A64B}.hr-pt.bad{color:#F2716A}
+.hr-ctag{display:flex;align-items:flex-start;gap:8px;margin:10px 0;padding:10px 12px;border-radius:12px;font-size:.8125rem;color:var(--muted);background:color-mix(in srgb,var(--text) 4%,var(--card));border:1px solid var(--line)}
+.hr-ctag .ic{width:16px;height:16px;color:var(--gold);flex:none;margin-top:2px}
+.hr-warnbox{padding:10px 14px;border-radius:12px;font-size:.875rem;font-weight:700;margin-bottom:6px}
+.hr-warnbox.warn{color:#F0A64B;background:color-mix(in srgb,#F0A64B 12%,transparent)}
+.hr-warnbox.bad{color:#F2716A;background:color-mix(in srgb,#F2716A 12%,transparent)}
+.hr-am{padding:12px 14px;border-radius:16px;margin-bottom:10px;background:linear-gradient(160deg,color-mix(in srgb,#5B9DFF 9%,var(--card)),var(--card) 60%);border:1px solid color-mix(in srgb,#5B9DFF 26%,var(--line))}
+.hr-amh{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hr-amh b{font-size:.9375rem;overflow-wrap:anywhere}
+.hr-amp{font-weight:800;font-size:1.125rem;color:#5B9DFF;flex:none}
+.hr-amn{display:block;color:var(--muted);font-size:.75rem;line-height:1.5;margin-top:2px}
+.hr-amg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.hr-amg span{display:flex;flex-direction:column;min-width:0}
+.hr-amg small{color:var(--muted);font-size:.6875rem}
+.hr-amg b{font-size:.8125rem;overflow-wrap:anywhere}
+.hr-money{color:var(--gold)}
