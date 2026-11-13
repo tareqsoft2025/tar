@@ -12,7 +12,7 @@
   const today = () => Tracker.dayStr();
   const addDays = Tracker.addDays;
   const noon = (ds) => new Date(ds + 'T12:00:00Z');
-  const fd = (ds) => ds ? dF.format(noon(ds)) : '—';
+  const fd = (ds) => { if (!ds) return '—'; const [y, m, d] = String(ds).slice(0, 10).split('-'); return y && m && d ? `${+d}/${+m}/${y}` : String(ds); };
   const daysTo = (ds) => ds ? Math.round((noon(ds) - noon(today())) / 864e5) : null;
   const ago = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `منذ ${Math.round(m / 60)} س` : `منذ ${Math.round(m / 1440)} يوم`; };
   const initials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('');
@@ -327,21 +327,21 @@
     const en = entry(a);
     const r = el('button', 'hr-row hr-crow');
     r.innerHTML = `<span class="hr-ava info">${icon('briefcase')}</span><span class="hr-rt"><b>${esc(name)}</b>
-      <small>${a.no ? '#' + esc(a.no) + ' · ' : ''}${esc(a.project || a.code || 'مشروع')}${a.pno ? ' (' + esc(a.pno) + ')' : ''}</small>
+      <small>${esc([a.code, a.pno, a.project].filter(Boolean).join(' · ') || 'مشروع')}</small>${a.no ? `<small>#${esc(a.no)}</small>` : ''}
       <small>${fd(a.start)} ← ${fd(a.end)}${a.pct != null ? ' · ' + esc(a.pct) + '%' : ''}${a.cur ? ' · ' + esc(a.cur) : ''}</small>${en ? `<span class="hr-flags">${badge(en[0], en[1])}</span>` : ''}</span><span class="hr-rr">${remain(a.end)}</span>`;
     r.onclick = () => openAsg(a);
     return r;
   }
   function asgCard(a) {
     const en = entry(a);
-    const cells = [['رقم التكليف', a.no], ['حالة الإدخال', en ? badge(en[0], en[1]) : null, true], ['الموظف', a.name || empName(a.empId)], ['المشروع', a.project], ['رقم المشروع', a.pno || a.code], ['عملة المشروع', a.cur], ['النسبة', a.pct != null ? a.pct + '%' : null], ['البداية', fd(a.start)], ['النهاية', a.end ? fd(a.end) : null]].filter((x) => x[1]);
-    return `<div class="hr-con" style="--kc:#5B9DFF"><div class="hr-conh">${badge('تكليف', 'info')}<b>${esc(a.code || a.project || '')}</b>${remain(a.end)}</div>
+    const cells = [['رقم التكليف', a.no], ['حالة الإدخال', en ? badge(en[0], en[1]) : null, true], ['الموظف', a.name || empName(a.empId)], ['المشروع', a.project], ['رقم المشروع', a.pno], ['رمز المشروع', a.code], ['عملة المشروع', a.cur], ['النسبة', a.pct != null ? a.pct + '%' : null], ['البداية', fd(a.start)], ['النهاية', a.end ? fd(a.end) : null]].filter((x) => x[1]);
+    return `<div class="hr-con" style="--kc:#5B9DFF"><div class="hr-conh">${badge('تكليف', 'info')}<b>${esc([a.code, a.pno].filter(Boolean).join(' · ') || a.project || '')}</b>${remain(a.end)}</div>
       ${a.pct != null ? `<div class="hr-pct"><i style="width:${Math.min(100, +a.pct || 0)}%"></i></div>` : ''}
       <div class="hr-cgrid">${cells.map(([k, v, html]) => `<div><small>${k}</small><b>${html ? v : esc(v)}</b></div>`).join('')}</div></div>`;
   }
   function openAsg(a) {
     const name = a.name || empName(a.empId) || '—';
-    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('briefcase')}</span><div><b>${esc(name)}</b><small>${esc(a.project || '')}</small></div></div>${asgCard(a)}
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('briefcase')}</span><div><b>${esc(name)}</b><small>${esc([a.code, a.project].filter(Boolean).join(' · '))}</small></div></div>${asgCard(a)}
       ${a.empId && HR.db.get('employees', {})[a.empId] ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}${rawTable(a.raw)}`);
     const b = $('hrToEmp'); if (b) b.onclick = () => openEmp(a.empId);
   }
