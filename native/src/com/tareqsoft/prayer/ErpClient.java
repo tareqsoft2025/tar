@@ -111,11 +111,17 @@ final class ErpClient {
         if (r.status == 401) {
             Res f = request(c, "POST", "/api/auth/refresh", "{}");
             if (f.status >= 200 && f.status < 300) r = request(c, "GET", path, null);
+            if (r.status == 401) {
+                String[] cr = loadCreds(c);
+                if (cr != null && login(c, cr[0], cr[1], true).status / 100 == 2) r = request(c, "GET", path, null);
+            }
         }
         return r;
     }
 
-    static Res login(Context c, String user, String pass) {
+    static Res login(Context c, String user, String pass) { return login(c, user, pass, false); }
+
+    static Res login(Context c, String user, String pass, boolean keepCreds) {
         sp(c).edit().remove("cookies").apply();
         try {
             JSONObject b = new JSONObject();
@@ -124,9 +130,55 @@ final class ErpClient {
             b.put("rememberMe", true);
             Res r = request(c, "POST", "/api/auth/login", b.toString());
             if (r.status >= 200 && r.status < 300) sp(c).edit().putString("user", user).apply();
+            else if (!keepCreds && (r.status == 401 || r.status == 403)) forgetCreds(c);
             return r;
         } catch (Exception e) { return new Res(0, "{\"error\":\"client\"}"); }
     }
+
+    /* ---------- حفظ بيانات الدخول مشفّرة بمفتاح من مخزن مفاتيح أندرويد ---------- */
+    private static final String KEY_ALIAS = "pef_erp_creds";
+
+    private static javax.crypto.SecretKey key() throws Exception {
+        java.security.KeyStore ks = java.security.KeyStore.getInstance("AndroidKeyStore");
+        ks.load(null);
+        if (!ks.containsAlias(KEY_ALIAS)) {
+            javax.crypto.KeyGenerator kg = javax.crypto.KeyGenerator.getInstance("AES", "AndroidKeyStore");
+            kg.init(new android.security.keystore.KeyGenParameterSpec.Builder(KEY_ALIAS,
+                android.security.keystore.KeyProperties.PURPOSE_ENCRYPT | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                .build());
+            kg.generateKey();
+        }
+        return (javax.crypto.SecretKey) ks.getKey(KEY_ALIAS, null);
+    }
+
+    static boolean saveCreds(Context c, String user, String pass) {
+        try {
+            javax.crypto.Cipher ci = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            ci.init(javax.crypto.Cipher.ENCRYPT_MODE, key());
+            JSONObject o = new JSONObject(); o.put("u", user); o.put("p", pass);
+            byte[] enc = ci.doFinal(o.toString().getBytes("UTF-8"));
+            sp(c).edit().putString("cr", android.util.Base64.encodeToString(enc, android.util.Base64.NO_WRAP))
+                .putString("iv", android.util.Base64.encodeToString(ci.getIV(), android.util.Base64.NO_WRAP)).apply();
+            return true;
+        } catch (Exception e) { return false; }
+    }
+
+    static String[] loadCreds(Context c) {
+        try {
+            String cr = sp(c).getString("cr", null), iv = sp(c).getString("iv", null);
+            if (cr == null || iv == null) return null;
+            javax.crypto.Cipher ci = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            ci.init(javax.crypto.Cipher.DECRYPT_MODE, key(), new javax.crypto.spec.GCMParameterSpec(128, android.util.Base64.decode(iv, android.util.Base64.NO_WRAP)));
+            JSONObject o = new JSONObject(new String(ci.doFinal(android.util.Base64.decode(cr, android.util.Base64.NO_WRAP)), "UTF-8"));
+            return new String[] { o.getString("u"), o.getString("p") };
+        } catch (Exception e) { return null; }
+    }
+
+    static boolean hasCreds(Context c) { return sp(c).contains("cr"); }
+
+    static void forgetCreds(Context c) { sp(c).edit().remove("cr").remove("iv").apply(); }
 
     static void logout(Context c) {
         try { request(c, "POST", "/api/auth/logout", "{}"); } catch (Exception e) { /* ignore */ }

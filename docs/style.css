@@ -1015,3 +1015,44 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-evc{color:var(--muted);font-size:.75rem;overflow-wrap:anywhere}
 .hr-map{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;margin-top:4px;padding:6px 12px;border-radius:10px;color:var(--gold);font-weight:700;font-size:.8125rem;background:color-mix(in srgb,var(--gold) 12%,transparent)}
 .hr-map .ic{width:14px;height:14px}
+/* الموارد البشرية: العقود والتكليفات وملف الموظف */
+:root{--k-contract:#5B9DFF;--k-extension:#2FBF71;--k-annex:#A98BFF;--k-placement:#F0A64B;--k-amendment:#2EC4C4}
+.hr-crow{align-items:flex-start}
+.hr-crow .hr-ava{margin-top:2px}
+.hr-flags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.hr-con{position:relative;padding:14px;border-radius:18px;margin-bottom:10px;background:linear-gradient(160deg,color-mix(in srgb,var(--kc) 10%,var(--card)),var(--card) 60%);border:1px solid color-mix(in srgb,var(--kc) 30%,var(--line))}
+.hr-con.on{box-shadow:0 0 0 2px color-mix(in srgb,var(--kc) 55%,transparent)}
+.hr-conh{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.hr-conh b{flex:1;font-size:1rem}
+.hr-conr{margin:-4px 0 10px;color:var(--kc);font-size:.8125rem;font-weight:700}
+.hr-cgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hr-cgrid>div{padding:9px 11px;border-radius:12px;background:color-mix(in srgb,var(--text) 5%,transparent);display:flex;flex-direction:column;min-width:0}
+.hr-cgrid small{color:var(--muted);font-size:.6875rem}
+.hr-cgrid b{font-size:.9375rem;overflow-wrap:anywhere}
+.hr-pct{height:6px;border-radius:4px;background:color-mix(in srgb,var(--text) 8%,transparent);margin:-2px 0 10px;overflow:hidden}
+.hr-pct i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#7fb3ff,#3f7fe0)}
+.hr-hist{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);display:grid;gap:8px}
+.hr-histt{color:var(--muted);font-size:.75rem;font-weight:700}
+.hr-hi{display:flex;gap:10px;align-items:flex-start}
+.hr-hi i{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none;background:var(--kc);box-shadow:0 0 0 3px color-mix(in srgb,var(--kc) 20%,transparent)}
+.hr-hi div{display:flex;flex-direction:column;min-width:0}
+.hr-hi b{font-size:.875rem}
+.hr-hi small{color:var(--muted);font-size:.75rem}
+.hr-hero2{display:flex;align-items:center;gap:14px;padding:16px;margin:4px 0 12px;padding-inline-end:56px;border-radius:22px;background:radial-gradient(120% 140% at 100% 0%,color-mix(in srgb,var(--gold) 22%,transparent),transparent 60%),color-mix(in srgb,var(--text) 3%,var(--card));border:1px solid var(--line)}
+.hr-hero2>div{display:flex;flex-direction:column;min-width:0;line-height:1.4}
+.hr-hero2 b{font-size:1.25rem}
+.hr-hero2 small{color:var(--muted);font-size:.8125rem}
+.hr-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}
+.hr-quick>div{display:flex;flex-direction:column;align-items:center;text-align:center;padding:10px 4px;border-radius:14px;background:var(--card);border:1px solid var(--line);min-width:0}
+.hr-quick b{font-size:.9375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.hr-quick small{color:var(--muted);font-size:.6875rem}
+.hr-grp{margin-bottom:12px}
+.hr-grph{display:flex;align-items:center;gap:8px;margin:0 4px 8px;font-weight:800;font-size:.9375rem}
+.hr-grph .ic{width:18px;height:18px;color:var(--gold)}
+.hr-sec small{color:var(--muted);font-weight:500;font-size:.75rem}
+.hr-sl{display:flex;align-items:center;gap:6px}
+.hr-sl .ic{width:16px;height:16px;color:var(--gold)}
+.hr-sl2{color:var(--muted);font-size:.8125rem;margin:10px 0 6px}
+.hr-srow span small{display:block;color:var(--muted);font-size:.6875rem}
+.hr-tog{width:22px!important;min-height:22px!important;height:22px;accent-color:var(--gold)}
+.hr-rem{margin:2px 4px 12px}
