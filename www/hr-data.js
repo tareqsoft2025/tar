@@ -230,6 +230,16 @@
       st.attendance = { days: done, changed: changedDays };
       progress && progress('الإجازات والمهام…');
       st.leaves = await syncLeaves(addDays(from, -1), addDays(t, 30));
+      // طلبات الإجازات والمغادرات والمهام والعمل الإضافي والعمل في العطلة
+      st.requests = {};
+      for (const [k, path] of REQ_SRC) {
+        progress && progress('الطلبات: ' + REQ_LABEL[k] + '…');
+        const r = await get(path);
+        if (r.ok) { st.requests[k] = merge('req_' + k, listOf(r.data)); reqCache = null; }
+      }
+      // أرصدة الإجازات: كل 6 ساعات (أو عند الطلب)
+      const bm = db.get('balMeta', {});
+      if ((opts && opts.balances) || !bm.at || Date.now() - bm.at > 6 * 3600e3) st.balances = await syncBalances(progress);
       meta.attUntil = t;
       meta.attFrom = meta.attFrom && meta.attFrom < from ? meta.attFrom : from;
       meta.bg = !!(opts && opts.background);
@@ -238,6 +248,80 @@
       return st;
     } finally { syncing = false; }
   }
+
+  /* ---------- الطلبات والأرصدة ---------- */
+  const REQ_SRC = [
+    ['daily', '/api/hr/leaves/requests?search=&view=active'],
+    ['hourly', '/api/hr/leaves/requests/hourly?scope=personal_hourly&search=&view=active'],
+    ['mission', '/api/hr/leaves/requests/hourly?scope=work_mission&search=&view=active'],
+    ['overtime', '/api/hr/overtime?search=&view=active'],
+    ['holiday', '/api/hr/leaves/requests/holiday-work?scope=all']
+  ];
+  const REQ_LABEL = { daily: 'إجازة يومية', hourly: 'مغادرة ساعية', mission: 'مهمة عمل', overtime: 'عمل إضافي', holiday: 'عمل في عطلة' };
+  const tm = (v) => { if (!v) return null; const sv = String(v); if (/^\d{1,2}:\d{2}/.test(sv)) return sv.slice(0, 5); const d = new Date(sv); if (isNaN(d)) return sv; return new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d); };
+  function req(kind, x) {
+    const date = d10(pick(x, 'date', 'workDate', 'startDate'));
+    return {
+      id: kind + ':' + idOf(x), kind, empId: String(pick(x, 'employeeId', 'employee.id') || ''),
+      name: pick(x, 'employeeFullNameAr', 'employeeNameAr', 'employeeName', 'employee.fullNameAr', 'fullNameAr'),
+      nature: pick(x, 'nature', 'type', 'leaveType'), status: String(pick(x, 'status') || '').toLowerCase() || null,
+      from: d10(pick(x, 'startDate', 'date', 'workDate')) || date, to: d10(pick(x, 'endDate', 'date', 'workDate', 'startDate')) || date,
+      start: tm(pick(x, 'actualDepartureTime', 'plannedDepartureTime', 'startTime', 'fromTime')), end: tm(pick(x, 'actualReturnTime', 'plannedReturnTime', 'endTime', 'toTime', 'checkoutTime')),
+      planned: tm(pick(x, 'plannedDepartureTime')) ? tm(pick(x, 'plannedDepartureTime')) + (tm(pick(x, 'plannedReturnTime')) ? ' ← ' + tm(pick(x, 'plannedReturnTime')) : '') : null,
+      hours: pick(x, 'hours', 'totalHours', 'durationHours'), days: pick(x, 'days', 'workDays', 'totalDays'),
+      reason: pick(x, 'reason', 'notes', 'description'), project: pick(x, 'projectNameAr', 'projectName', 'projectLabel', 'projectNumber'),
+      by: pick(x, 'approvedByFullNameAr', 'approvedByFullNameEn'), raw: x
+    };
+  }
+  let reqCache = null;
+  function requests() {
+    if (!reqCache) { reqCache = []; REQ_SRC.forEach(([k]) => Object.values(db.get('req_' + k, {})).forEach((x) => reqCache.push(req(k, x)))); }
+    return reqCache;
+  }
+  const reqsOn = (empId, ds) => requests().filter((r) => r.empId === empId && r.from && r.from <= ds && (r.to || r.from) >= ds && !['rejected', 'cancelled', 'canceled', 'deleted'].includes(r.status));
+
+  // أرصدة الإجازات من /api/hr/leaves/balance (V2 مع سلاسل المنصب إن وُجدت)
+  function pool(p) { return p ? { ent: +p.entitlementDays || 0, used: +p.usedDays || 0, rem: p.remainingDays != null ? +p.remainingDays : null } : null; }
+  function addPool(a, b) { if (!b) return a; if (!a) return Object.assign({}, b); return { ent: a.ent + b.ent, used: a.used + b.used, rem: (a.rem || 0) + (b.rem || 0) }; }
+  function parseBalance(d) {
+    if (!d) return null;
+    const v2 = d.leaveBalanceV2 || d.v2Preview || null;
+    let annual = null, sickFull = null, sickHalf = null;
+    if (v2 && Array.isArray(v2.positionChains) && v2.positionChains.length) v2.positionChains.forEach((c) => { annual = addPool(annual, pool(c.annual)); sickFull = addPool(sickFull, pool(c.sickFull)); sickHalf = addPool(sickHalf, pool(c.sickHalf)); });
+    else if (v2) { annual = pool(v2.annual); sickFull = pool(v2.sickFull); sickHalf = pool(v2.sickHalf); }
+    if (!annual) annual = pool(d.annual);
+    if (!sickFull) sickFull = pool(d.sick || d.sickFull);
+    const c = (v2 && v2.compensatory) || d.compensatory || null;
+    const comp = c ? { earned: +c.earnedHours || 0, used: +c.usedHours || 0, remH: c.remainingHours != null ? +c.remainingHours : null, remD: c.remainingDays != null ? +c.remainingDays : null, exp: d10(c.earliestExpiry) } : null;
+    return { annual, sickFull, sickHalf, comp, asOf: (v2 && v2.asOf) || null, pending: v2 && v2.pendingAssignmentAttribution, year: d.year || null };
+  }
+  async function syncBalance(empId) {
+    const now = new Date(); const ym = dayStr().split('-');
+    const r = await get('/api/hr/leaves/balance?employeeId=' + encodeURIComponent(empId) + '&previewV2=1&throughMonth=' + (+ym[1]) + '&year=' + ym[0]);
+    if (!r.ok) return false;
+    const all = db.get('balances', {}); all[empId] = { at: now.getTime(), d: r.data }; db.put('balances', all);
+    return true;
+  }
+  async function syncBalances(progress) {
+    const ids = Object.values(db.get('employees', {})).map(emp).filter((e) => e.active).map((e) => e.id);
+    let done = 0, ok = 0; const q = ids.slice();
+    const all = db.get('balances', {});
+    const worker = async () => {
+      while (q.length) {
+        const id = q.shift();
+        const ym = dayStr().split('-');
+        const r = await get('/api/hr/leaves/balance?employeeId=' + encodeURIComponent(id) + '&previewV2=1&throughMonth=' + (+ym[1]) + '&year=' + ym[0]);
+        if (r.ok) { all[id] = { at: Date.now(), d: r.data }; ok++; }
+        else if (r.status === 403) { q.length = 0; }
+        done++; progress && progress(`الأرصدة ${done}/${ids.length}`);
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    db.put('balances', all);
+    db.put('balMeta', { at: Date.now(), ok, total: ids.length });
+    return { ok, total: ids.length };
+  }
+  const balanceOf = (empId) => { const b = db.get('balances', {})[empId]; return b ? Object.assign(parseBalance(b.d) || {}, { at: b.at }) : null; };
 
   /* ---------- الاستعلام ---------- */
   const employees = () => Object.values(db.get('employees', {})).map(emp);
@@ -294,7 +378,9 @@
         const list = (byEmp[e.id] || []).sort((a, b) => String(a.recordedAt).localeCompare(String(b.recordedAt)));
         const ins = list.filter((x) => x.eventType === 'check_in'), outs = list.filter((x) => x.eventType === 'check_out');
         const firstIn = ins[0] ? ins[0].recordedAt : null, lastOut = outs.length ? outs[outs.length - 1].recordedAt : null;
-        const leave = leaveOf(e.id, ds);
+        const reqs = reqsOn(e.id, ds);
+        const dayLeave = reqs.find((q) => q.kind === 'daily');
+        const leave = leaveOf(e.id, ds) || (dayLeave ? String(dayLeave.nature || 'leave').toLowerCase() : null);
         const hasAsg = asgs.some((a) => a.empId === e.id && (!a.start || a.start <= ds) && (!a.end || a.end >= ds));
         let lateMin = 0;
         if (firstIn) { const start = hmToMin(e.type === 'field' ? cfg.field : cfg.office); lateMin = Math.max(0, minutesOf(firstIn) - start - cfg.grace); }
@@ -304,12 +390,12 @@
         if (list.length && !ins.length) status = 'noin';
         const w = worked(list, ds);
         const outside = list.some((x) => place(x).st === 'outside');
-        return { e, list, firstIn, lastOut, lateMin, leave, hasAsg, status, workMin: w.min, openShift: w.open, live: w.live, outside };
+        return { e, list, firstIn, lastOut, lateMin, leave, hasAsg, status, workMin: w.min, openShift: w.open, live: w.live, outside, reqs };
       })
     };
   }
 
-  window.HR = { place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  window.HR = { requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),
     forgetCreds: () => { if (B && B.erpForgetCreds) B.erpForgetCreds(); },
     setBackground: (min) => { if (B && B.hrSetBackground) B.hrSetBackground(min | 0); },

@@ -20,7 +20,14 @@
   const KIND = { contract: 'عقد', extension: 'تمديد', annex: 'ملحق', placement: 'تسكين', amendment: 'تعديل' };
   const STATUS = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'] };
   const LEAVE = { annual: 'سنوية', sick: 'مرضية', mission: 'مهمة عمل', task: 'مهمة', official: 'رسمية', unpaid: 'بدون راتب', leave: 'إجازة', holiday: 'عطلة', compensatory: 'تعويضية', maternity: 'أمومة' };
-  const leaveLbl = (n) => LEAVE[n] || n || 'إجازة';
+  Object.assign(LEAVE, { emergency: 'طارئة', marriage: 'زواج', study_leave: 'دراسية', official_duty: 'مهمة رسمية', work_mission: 'مهمة عمل', personal_hourly: 'مغادرة شخصية', hajj: 'حج', bereavement: 'وفاة', paternity: 'أبوة' });
+  const leaveLbl = (n) => LEAVE[String(n || '').toLowerCase()] || n || 'إجازة';
+  const RQ = { daily: ['إجازة يومية', 'info', 'cal'], hourly: ['مغادرة ساعية', 'warn', 'clock'], mission: ['مهمة عمل', 'ok', 'briefcase'], overtime: ['عمل إضافي', 'k-annex', 'plus'], holiday: ['عمل في عطلة', 'k-placement', 'star'] };
+  const RQS = { draft: ['مسودة', 'mute'], submitted: ['مُرسل', 'warn'], pending: ['قيد الاعتماد', 'warn'], manager_approved: ['معتمد من المدير', 'info'], approved: ['معتمد', 'ok'], rejected: ['مرفوض', 'bad'], cancelled: ['ملغى', 'bad'], canceled: ['ملغى', 'bad'], new: ['جديد', 'info'] };
+  const rqStatus = (st) => st ? (RQS[st] || [st, 'mute']) : null;
+  const hhm = (h) => { const n = +h; if (!isFinite(n) || !n) return null; const H = Math.floor(n), M = Math.round((n - H) * 60); return `${H}:${String(M).padStart(2, '0')} س`; };
+  const rqWhen = (q) => q.kind === 'daily' ? (q.from === q.to ? fd(q.from) : `${fd(q.from)} ← ${fd(q.to)}`) + (q.days ? ` (${q.days} يوم)` : '') : `${fd(q.from)}${q.start ? ' · ' + q.start + (q.end ? ' ← ' + q.end : '') : ''}${hhm(q.hours) ? ' · ' + hhm(q.hours) : ''}`;
+  const rqChip = (q) => `<span class="hr-b ${RQ[q.kind][1]}">${RQ[q.kind][0]}${q.kind === 'daily' && q.nature ? ' · ' + esc(leaveLbl(q.nature)) : q.start ? ' ' + q.start + (q.end ? ' ← ' + q.end : '') : ''}</span>`;
   const hrs = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} س`;
   const plName = (pl) => pl.name || (pl.st === 'outside' && pl.near ? 'أقرب موقع: ' + pl.near : PLACE[pl.st][0]);
   const PLACE = { matched: ['داخل موقع العمل', 'ok'], outside: ['خارج نطاق الموقع', 'bad'], unknown: ['بلا موقع جغرافي', 'mute'] };
@@ -41,7 +48,7 @@
     const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
     box.appendChild(acc);
     const tabs = el('div', 'chips hr-tabs');
-    [['dash', 'لوحة اليوم', 'grid'], ['att', 'الحضور', 'clock'], ['emp', 'الموظفون', 'users'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase'], ['set', 'الإعدادات', 'sliders']].forEach(([k, n, ic]) => {
+    [['dash', 'لوحة اليوم', 'grid'], ['att', 'الحضور', 'clock'], ['lv', 'الإجازات', 'cal'], ['emp', 'الموظفون', 'users'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase'], ['set', 'الإعدادات', 'sliders']].forEach(([k, n, ic]) => {
       const b = el('button', 'chip sm' + (tab === k ? ' on' : ''), `${icon(ic)}${n}`);
       b.onclick = () => { tab = k; store.set('hrTab', k); render(); };
       tabs.appendChild(b);
@@ -49,7 +56,7 @@
     box.appendChild(tabs);
     const body = el('div', 'hr-view'); box.appendChild(body);
     if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
-    ({ dash: renderDash, att: renderAtt, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
+    ({ dash: renderDash, att: renderAtt, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
     const on = box.querySelector('.hr-tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   }
 
@@ -211,13 +218,13 @@
     filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
     filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
     const c = (s) => base.filter((r) => s === 'in' ? r.list.length : r.status === s).length;
-    filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['outside', 'خارج الموقع'], ['noasg', 'بلا تكليف']],
-      { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), outside: base.filter((r) => r.outside).length, noasg: base.filter((r) => !r.hasAsg).length });
+    filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['outside', 'خارج الموقع'], ['rq_hourly', 'مغادرة ساعية'], ['rq_mission', 'مهمة عمل'], ['rq_overtime', 'عمل إضافي'], ['rq_holiday', 'عمل في عطلة'], ['noasg', 'بلا تكليف']],
+      { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), outside: base.filter((r) => r.outside).length, rq_hourly: base.filter((r) => r.reqs.some((q) => q.kind === 'hourly')).length, rq_mission: base.filter((r) => r.reqs.some((q) => q.kind === 'mission')).length, rq_overtime: base.filter((r) => r.reqs.some((q) => q.kind === 'overtime')).length, rq_holiday: base.filter((r) => r.reqs.some((q) => q.kind === 'holiday')).length, noasg: base.filter((r) => !r.hasAsg).length });
     search(body, 'ابحث بالاسم أو الرقم أو القسم');
-    const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : f.st === 'outside' ? r.outside : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
+    const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : f.st === 'outside' ? r.outside : f.st.startsWith('rq_') ? r.reqs.some((q) => q.kind === f.st.slice(3)) : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
       .sort((a, b) => (b.lateMin - a.lateMin) || String(a.firstIn || 'z').localeCompare(String(b.firstIn || 'z')) || a.e.name.localeCompare(b.e.name, 'ar'));
     const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><button>${icon('share')}مشاركة القائمة</button>`);
-    tools.querySelector('button').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}${r.workMin ? ' [' + hrs(r.workMin) + ']' : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.outside ? ' (خارج الموقع)' : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
+    tools.querySelector('button').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}${r.workMin ? ' [' + hrs(r.workMin) + ']' : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.outside ? ' (خارج الموقع)' : ''}${r.reqs.length ? ' — ' + r.reqs.map((q) => RQ[q.kind][0] + (q.start ? ' ' + q.start + (q.end ? '-' + q.end : '') : '')).join('، ') : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
     body.appendChild(tools);
     list(body, rows.map((r) => {
       const st = STATUS[r.status];
@@ -229,7 +236,8 @@
       const sub = r.list.length
         ? `<span class="hr-pl ${PLACE[pl.st][1]}">${icon('pin')}${esc(plName(pl))}${r.outside && pl.st !== 'outside' ? ' · تسجيل خارج النطاق' : ''}</span>`
         : esc([r.e.dept, TYPE[r.e.type], r.e.org].filter(Boolean).join(' · '));
-      const row = personRow(r.e, right + (times ? `<small>${times}</small>` : '') + (r.workMin ? `<small class="hr-h">${icon('clock')}${hrs(r.workMin)}</small>` : ''), sub, st[1]);
+      const rqs = r.reqs.filter((q) => !(q.kind === 'daily' && r.status === 'leave'));
+      const row = personRow(r.e, right + (times ? `<small>${times}</small>` : '') + (r.workMin ? `<small class="hr-h">${icon('clock')}${hrs(r.workMin)}</small>` : ''), sub + (rqs.length ? `<span class="hr-flags">${rqs.map(rqChip).join('')}</span>` : ''), st[1]);
       row.onclick = () => openDay(r.e.id, f.day);
       return row;
     }), 'لا نتائج بهذه الفلاتر');
@@ -462,6 +470,96 @@
     list(body, rows.map(asgRow), 'لا تكليفات بهذه الفلاتر');
   }
 
+  /* ---------- الإجازات: الأرصدة والطلبات ---------- */
+  function rqCard(q) {
+    const st = rqStatus(q.status);
+    const cells = [['النوع', q.kind === 'daily' && q.nature ? leaveLbl(q.nature) : RQ[q.kind][0]], ['التاريخ', q.kind === 'daily' && q.from !== q.to ? `${fd(q.from)} ← ${fd(q.to)}` : fd(q.from)], ['الوقت', q.start ? q.start + (q.end ? ' ← ' + q.end : '') : null], ['المخطط', q.planned && q.planned !== (q.start + (q.end ? ' ← ' + q.end : '')) ? q.planned : null], ['المدة', q.kind === 'daily' ? (q.days ? q.days + ' يوم' : null) : hhm(q.hours)], ['المشروع', q.project], ['اعتمده', q.by]].filter((x) => x[1]);
+    return `<div class="hr-con" style="--kc:var(--rq-${q.kind})"><div class="hr-conh">${rqChip(q)}<b></b>${st ? badge(st[0], st[1]) : ''}</div>
+      <div class="hr-cgrid">${cells.map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join('')}</div>${q.reason ? `<div class="hr-conr" style="color:var(--muted);margin:8px 0 0">${esc(q.reason)}</div>` : ''}</div>`;
+  }
+  const num2 = (n) => n == null ? '—' : (Math.round(n * 100) / 100).toLocaleString('en', { maximumFractionDigits: 2 });
+  function poolCard(title, p, unit, tone) {
+    if (!p) return '';
+    const pct = p.ent ? Math.max(0, Math.min(100, (p.rem || 0) / p.ent * 100)) : 0;
+    return `<div class="hr-pool ${tone}"><small>${title}</small><b class="${p.rem < 0 ? 'neg' : ''}">${num2(p.rem)} <em>${unit}</em></b><span class="hr-pbar ${tone}"><i style="width:${pct}%"></i></span><small>مستحقة ${num2(p.ent)} · مستهلكة ${num2(p.used)}</small></div>`;
+  }
+  function openBalance(empId) {
+    const raw = HR.db.get('employees', {})[empId];
+    const e = raw ? HR.emp(raw) : { name: empName(empId) || '—', id: empId };
+    const b = HR.balanceOf(empId);
+    const yr = today().slice(0, 4);
+    const rq = HR.requests().filter((q) => q.empId === empId && String(q.from || '').startsWith(yr)).sort((a, z) => String(z.from).localeCompare(String(a.from)));
+    const sum = (k) => rq.filter((q) => q.kind === k && !['rejected', 'cancelled', 'canceled'].includes(q.status));
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${esc(initials(e.name))}</span><div><b>${esc(e.name)}</b><small>رصيد الإجازات ${yr}${b && b.at ? ' · حُدّث ' + ago(b.at) : ''}</small></div></div>
+      ${b ? `<div class="hr-pools">${poolCard('السنوية / الطارئة', b.annual, 'يوم', 'ok')}${poolCard('المرضية (كامل الأجر)', b.sickFull, 'يوم', 'warn')}${poolCard('المرضية (نصف الأجر)', b.sickHalf, 'يوم', 'mute')}
+        ${b.comp ? `<div class="hr-pool info"><small>التعويضية</small><b>${num2(b.comp.remH)} <em>ساعة</em></b><small>مكتسبة ${num2(b.comp.earned)} · مستخدمة ${num2(b.comp.used)}${b.comp.exp ? ' · أقرب انتهاء ' + fd(b.comp.exp) : ''}</small></div>` : ''}</div>`
+        : '<div class="hr-none">لم يُجلب رصيد هذا الموظف بعد</div>'}
+      <button class="btn-outline wide" id="hrBalRe">${icon('refresh')}<span>تحديث الرصيد من النظام</span></button>
+      <div class="hr-quick"><div><b>${sum('daily').length}</b><small>إجازة يومية</small></div><div><b>${sum('hourly').length}</b><small>مغادرة</small></div><div><b>${sum('mission').length}</b><small>مهمة عمل</small></div><div><b>${sum('overtime').length}</b><small>عمل إضافي</small></div></div>
+      <div class="hr-sec"><span>طلبات ${yr} (${rq.length})</span></div>${rq.map(rqCard).join('') || '<div class="hr-none">لا طلبات</div>'}
+      ${raw ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}`);
+    $('hrBalRe').onclick = async () => { $('hrBalRe').disabled = true; const ok = await HR.syncBalance(empId); toast(ok ? 'تم تحديث الرصيد' : 'تعذّر جلب الرصيد (تحقق من الصلاحية)'); openBalance(empId); };
+    const t = $('hrToEmp'); if (t) t.onclick = () => openEmp(empId);
+  }
+  function renderLv(body) {
+    if (!['bal', 'req'].includes(f.lv)) f.lv = 'bal';
+    const seg = el('div', 'seg hr-vseg', `<button data-v="bal" class="${f.lv === 'bal' ? 'on' : ''}">${icon('chart')}الأرصدة</button><button data-v="req" class="${f.lv === 'req' ? 'on' : ''}">${icon('note')}الطلبات</button>`);
+    seg.querySelectorAll('button').forEach((b) => b.onclick = () => { f.lv = b.dataset.v; render(); });
+    body.appendChild(seg);
+    if (f.lv === 'bal') {
+      const bm = HR.db.get('balMeta', {});
+      const head = el('div', 'hr-tools', `<small>${bm.at ? 'الأرصدة محدّثة ' + ago(bm.at) + ` · ${bm.ok || 0} موظف` : 'لم تُجلب الأرصدة بعد'}</small><button>${icon('refresh')}جلب كل الأرصدة</button>`);
+      head.querySelector('button').onclick = async (ev) => { const b = ev.currentTarget; b.disabled = true; b.textContent = 'جارٍ الجلب…'; try { const st = await HR.syncBalances((m) => { b.textContent = m; }); toast(`تم جلب ${st.ok} من ${st.total} رصيد`); } catch (e) { toast(e.message); } render(); };
+      body.appendChild(head);
+      if (!['all', 'low', 'neg'].includes(f.lb)) f.lb = 'all';
+      const emps = HR.employees().filter((e) => e.active && orgOk(e) && typeOk(e));
+      const rows = emps.map((e) => ({ e, b: HR.balanceOf(e.id) }));
+      filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']]);
+      filterChips(body, 'lb', [['all', 'كل الموظفين'], ['low', 'رصيد سنوي ≤ 2 يوم'], ['neg', 'رصيد سالب']], { all: rows.length, low: rows.filter((x) => x.b && x.b.annual && x.b.annual.rem != null && x.b.annual.rem <= 2).length, neg: rows.filter((x) => x.b && x.b.annual && x.b.annual.rem < 0).length });
+      search(body, 'ابحث عن موظف لعرض رصيده');
+      const list2 = rows.filter((x) => (f.lb === 'all' || (x.b && x.b.annual && (f.lb === 'neg' ? x.b.annual.rem < 0 : x.b.annual.rem <= 2))) && match(f.q, x.e.name, x.e.empId, x.e.nid, x.e.dept))
+        .sort((a, z) => a.e.name.localeCompare(z.e.name, 'ar'));
+      const tools = el('div', 'hr-tools', `<small>${list2.length} موظف</small><button>${icon('share')}مشاركة</button>`);
+      tools.querySelector('button').onclick = () => shareList('أرصدة الإجازات', list2.map((x, i) => `${i + 1}. ${x.e.name} — سنوية: ${x.b && x.b.annual ? num2(x.b.annual.rem) : '—'} يوم · مرضية: ${x.b && x.b.sickFull ? num2(x.b.sickFull.rem) : '—'} يوم${x.b && x.b.comp ? ' · تعويضية: ' + num2(x.b.comp.remH) + ' س' : ''}`));
+      body.appendChild(tools);
+      list(body, list2.map(({ e, b }) => {
+        const r = el('button', 'hr-row hr-crow');
+        const an = b && b.annual, sk = b && b.sickFull;
+        const tone = !an || an.rem == null ? 'mute' : an.rem < 0 ? 'bad' : an.rem <= 2 ? 'warn' : 'ok';
+        r.innerHTML = `<span class="hr-ava ${tone}">${esc(initials(e.name))}</span><span class="hr-rt"><b>${esc(e.name)}</b><small>${esc([e.dept, e.org].filter(Boolean).join(' · '))}</small>
+          ${b ? `<span class="hr-flags">${badge('مرضية ' + num2(sk ? sk.rem : null), 'warn')}${b.comp && b.comp.remH ? badge('تعويضية ' + num2(b.comp.remH) + ' س', 'info') : ''}</span>` : ''}</span>
+          <span class="hr-rr"><b class="hr-pt ${tone}">${an ? num2(an.rem) : '—'}</b><small>${an ? 'يوم سنوي' : 'غير مجلوب'}</small></span>`;
+        r.onclick = () => openBalance(e.id);
+        return r;
+      }), 'لا موظفين');
+      return;
+    }
+    // الطلبات
+    const all = HR.requests();
+    if (!f.rk) f.rk = 'all'; if (!f.rs) f.rs = 'all';
+    monthNav(body);
+    const mb = monthBounds(f.am);
+    const inM = all.filter((q) => q.from && q.from <= mb.to && (q.to || q.from) >= mb.from);
+    const kc = { all: inM.length }; inM.forEach((q) => { kc[q.kind] = (kc[q.kind] || 0) + 1; });
+    filterChips(body, 'rk', [['all', 'الكل'], ['daily', 'إجازة يومية'], ['hourly', 'مغادرة ساعية'], ['mission', 'مهمة عمل'], ['overtime', 'عمل إضافي'], ['holiday', 'عمل في عطلة']], kc);
+    filterChips(body, 'rs', [['all', 'كل الحالات'], ['approved', 'معتمد'], ['pending', 'قيد الاعتماد'], ['draft', 'مسودة'], ['rejected', 'مرفوض']]);
+    search(body, 'اسم الموظف أو السبب أو المشروع');
+    const okSt = (q) => f.rs === 'all' || (f.rs === 'pending' ? ['pending', 'submitted', 'manager_approved', 'new'].includes(q.status) : f.rs === 'rejected' ? ['rejected', 'cancelled', 'canceled'].includes(q.status) : q.status === f.rs);
+    const rows = inM.filter((q) => (f.rk === 'all' || q.kind === f.rk) && okSt(q) && match(f.q, q.name || empName(q.empId), q.reason, q.project, leaveLbl(q.nature)))
+      .sort((a, z) => String(z.from).localeCompare(String(a.from)));
+    const tools = el('div', 'hr-tools', `<small>${rows.length} طلب</small><button>${icon('share')}مشاركة</button>`);
+    tools.querySelector('button').onclick = () => shareList(`الطلبات — ${monthName(f.am)}`, rows.map((q, i) => `${i + 1}. ${q.name || empName(q.empId) || '—'} — ${RQ[q.kind][0]}${q.nature && q.kind === 'daily' ? ' (' + leaveLbl(q.nature) + ')' : ''} — ${rqWhen(q)}${q.status ? ' — ' + rqStatus(q.status)[0] : ''}`));
+    body.appendChild(tools);
+    if (!all.length) { body.appendChild(el('div', 'hr-none', 'لم تُجلب الطلبات بعد — اضغط زر المزامنة')); return; }
+    list(body, rows.map((q) => {
+      const st = rqStatus(q.status);
+      const r = el('button', 'hr-row hr-crow');
+      r.innerHTML = `<span class="hr-ava ${RQ[q.kind][1]}">${icon(RQ[q.kind][2])}</span><span class="hr-rt"><b>${esc(q.name || empName(q.empId) || '—')}</b><small>${RQ[q.kind][0]}${q.kind === 'daily' && q.nature ? ' · ' + esc(leaveLbl(q.nature)) : ''}${q.project ? ' · ' + esc(q.project) : ''}</small><small>${rqWhen(q)}</small>${q.reason ? `<small>${esc(q.reason)}</small>` : ''}</span><span class="hr-rr">${st ? badge(st[0], st[1]) : ''}</span>`;
+      r.onclick = () => openBalance(q.empId);
+      return r;
+    }), 'لا طلبات بهذه الفلاتر');
+  }
+
   /* ---------- الإعدادات ---------- */
   function renderSet(body) {
     const s = HR.settings();
@@ -643,6 +741,7 @@
         <div><small>ساعات العمل</small><b>${r && r.workMin ? hrs(r.workMin) : '—'}${r && r.live ? ' <em>مستمر</em>' : ''}</b></div>
         <div><small>التأخير</small><b class="${r && r.lateMin ? 'warn' : ''}">${r && r.lateMin ? r.lateMin + ' دقيقة' : 'لا يوجد'}</b></div>
       </div>
+      ${r && r.reqs.length ? `<div class="hr-sec"><span>الطلبات في هذا اليوم (${r.reqs.length})</span></div>${r.reqs.map(rqCard).join('')}` : ''}
       <div class="hr-sec"><span>سجل اليوم (${r ? r.list.length : 0})</span></div>
       ${evs ? (evRows ? `<div class="hr-evs">${evRows}</div>` : '<div class="hr-none">لا يوجد تسجيل في هذا اليوم</div>') : '<div class="hr-none">هذا اليوم غير مزامن على الجهاز</div>'}
       <button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>`);

@@ -1078,3 +1078,13 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-amg small{color:var(--muted);font-size:.6875rem}
 .hr-amg b{font-size:.8125rem;overflow-wrap:anywhere}
 .hr-money{color:var(--gold)}
+/* الإجازات والأرصدة */
+:root{--rq-daily:#5B9DFF;--rq-hourly:#F0A64B;--rq-mission:#2FBF71;--rq-overtime:#A98BFF;--rq-holiday:#F2719B}
+.hr-pools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.hr-pool{display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:16px;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--pc,var(--gold))}
+.hr-pool.ok{--pc:var(--ok)}.hr-pool.warn{--pc:#F0A64B}.hr-pool.info{--pc:#5B9DFF}.hr-pool.mute{--pc:var(--muted)}
+.hr-pool>small{color:var(--muted);font-size:.6875rem}
+.hr-pool b{font-size:1.5rem;line-height:1.2;color:var(--pc)}
+.hr-pool b.neg{color:#F2716A}
+.hr-pool b em{font-style:normal;font-size:.75rem;color:var(--muted);font-weight:600}
+.hr-pool .hr-pbar{margin:4px 0}
