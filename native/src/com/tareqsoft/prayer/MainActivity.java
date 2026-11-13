@@ -249,9 +249,26 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void erpLogin(final String id, final String user, final String pass) {
-            new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.login(MainActivity.this, user, pass)); } }).start();
+        public void erpLogin(final String id, final String user, final String pass) { erpLogin2(id, user, pass, false); }
+
+        @JavascriptInterface
+        public void erpLogin2(final String id, final String user, final String pass, final boolean remember) {
+            new Thread(new Runnable() { public void run() {
+                ErpClient.Res r = ErpClient.login(MainActivity.this, user, pass);
+                if (r.status / 100 == 2) { if (remember) ErpClient.saveCreds(MainActivity.this, user, pass); else ErpClient.forgetCreds(MainActivity.this); }
+                erpReply(id, r);
+            } }).start();
         }
+
+        @JavascriptInterface
+        public boolean erpHasCreds() { return ErpClient.hasCreds(MainActivity.this); }
+
+        @JavascriptInterface
+        public void erpForgetCreds() { ErpClient.forgetCreds(MainActivity.this); }
+
+        /** المزامنة التلقائية في الخلفية: كل عدد دقائق، أو 0 للإيقاف */
+        @JavascriptInterface
+        public void hrSetBackground(int minutes) { HrSyncJob.arm(MainActivity.this, minutes); }
 
         @JavascriptInterface
         public void erpGet(final String id, final String path) {

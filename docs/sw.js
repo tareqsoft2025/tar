@@ -1,6 +1,6 @@
 // خدمة تخزين مؤقت: تعمل الصفحة دون إنترنت بعد أول زيارة
-const CACHE = 'prayer-v18';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'places.js', 'core.js', 'content.js', 'content-ui.js', 'jumah.js', 'data2.js', 'features.js', 'weather.js', 'fx.js', 'agenda-core.js', 'remind-ui.js', 'agenda.js', 'hr-data.js', 'hr.js', 'reminder.html', 'quran-data.js', 'tracker.js', 'screens.js', 'azkar.js', 'lib/adhan.umd.min.js', 'manifest.webmanifest',
+const CACHE = 'prayer-v19';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'places.js', 'core.js', 'content.js', 'content-ui.js', 'jumah.js', 'data2.js', 'features.js', 'weather.js', 'fx.js', 'agenda-core.js', 'remind-ui.js', 'agenda.js', 'hr-data.js', 'hr.js', 'hr-sync.html', 'reminder.html', 'quran-data.js', 'tracker.js', 'screens.js', 'azkar.js', 'lib/adhan.umd.min.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'fonts/plex-400.ttf', 'fonts/plex-500.ttf', 'fonts/plex-700.ttf', 'fonts/amiri-400.ttf'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });

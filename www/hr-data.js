@@ -25,9 +25,9 @@
     if (!B || !B.erpGet) return webCall('GET', path);
     return new Promise((res) => { const id = 'r' + (++seq); pending[id] = res; B.erpGet(id, path); });
   }
-  function login(user, pass) {
+  function login(user, pass, remember) {
     if (!B || !B.erpLogin) return webCall('POST', '/api/auth/login', { username: user, password: pass, rememberMe: true });
-    return new Promise((res) => { const id = 'l' + (++seq); pending[id] = res; B.erpLogin(id, user, pass); });
+    return new Promise((res) => { const id = 'l' + (++seq); pending[id] = res; if (B.erpLogin2) B.erpLogin2(id, user, pass, !!remember); else B.erpLogin(id, user, pass); });
   }
   const LOGIN_ERRORS = {
     not_found: 'رقم الهوية أو كلمة المرور غير صحيحة', invalid_credentials: 'رقم الهوية أو كلمة المرور غير صحيحة',
@@ -64,6 +64,7 @@
   const idOf = (x) => String(x.id != null ? x.id : x.employeeId != null ? x.employeeId : x.empId != null ? x.empId : x.contractId != null ? x.contractId : JSON.stringify(x).length + ':' + (x.employeeRef || ''));
   const pick = (o, ...ks) => { for (const k of ks) { const v = k.split('.').reduce((a, p) => a == null ? a : a[p], o); if (v != null && v !== '') return v; } return null; };
   const d10 = (v) => v ? String(v).slice(0, 10) : null;
+  const txt = (v) => v == null ? null : typeof v === 'object' ? (v.titleAr || v.nameAr || v.name || v.titleEn || v.code || null) : v;
 
   /* ---------- النماذج ---------- */
   function emp(x) {
@@ -94,17 +95,23 @@
       id: idOf(x), empId: String(pick(x, 'employeeId', 'employee.id') || ''), name: pick(x, 'employeeNameAr', 'employeeName', 'fullNameAr', 'employee.fullNameAr') || '—',
       no: pick(x, 'contractNumber', 'number', 'code'), kind: contractKind(x), ext: pick(x, 'extensionNo'), annex: pick(x, 'annexNo'), amend: pick(x, 'amendmentNo'),
       start: d10(pick(x, 'startDate', 'effectiveFrom')), end: d10(pick(x, 'endDate', 'newEndDate', 'effectiveTo')),
-      pos: pick(x, 'position', 'positionName', 'position.nameAr'), dept: pick(x, 'department', 'departmentName', 'department.nameAr'),
-      scale: pick(x, 'salaryScaleBand', 'grade'), grade: pick(x, 'grade'), level: pick(x, 'level'),
-      salary: pick(x, 'basicSalary', 'salary'), cur: pick(x, 'currency'), status: pick(x, 'status'),
-      history: listOf(pick(x, 'versions', 'history', 'steps') || []), upd: pick(x, 'updatedAt'), raw: x
+      pos: txt(pick(x, 'position.titleAr', 'positionTitleAr', 'positionName', 'position.nameAr', 'position.titleEn', 'position')), dept: txt(pick(x, 'department.nameAr', 'departmentName', 'department.name', 'department')),
+      scale: txt(pick(x, 'salaryScaleBand.nameAr', 'salaryScaleBand.name', 'salaryScaleBand.code', 'salaryScaleBand')), grade: pick(x, 'grade', 'salaryRecord.grade'), level: pick(x, 'level', 'salaryRecord.level'), step: pick(x, 'step', 'salaryRecord.step'),
+      salary: pick(x, 'salary', 'basicSalary', 'salaryRecord.salary'), cur: pick(x, 'salaryScaleBand.currency', 'currency') || 'USD', pct: pick(x, 'employmentPercentage', 'percent'), status: pick(x, 'status'),
+      changeType: pick(x, 'changeType'), reason: pick(x, 'reason'),
+      history: listOf(pick(x, 'versions', 'history', 'steps', 'salaryHistory') || []).map((h) => ({
+        type: pick(h, 'changeType', 'type', 'kind'), from: d10(pick(h, 'effectiveFrom', 'startDate', 'date', 'createdAt')), to: d10(pick(h, 'effectiveTo', 'endDate')),
+        grade: pick(h, 'grade'), level: pick(h, 'level'), step: pick(h, 'step'), salary: pick(h, 'salary', 'basicSalary'), reason: pick(h, 'reason', 'reasonAr'), end: d10(pick(h, 'newEndDate'))
+      })), upd: pick(x, 'updatedAt'), raw: x
     };
   }
   function asg(x) {
     return {
       id: idOf(x), empId: String(pick(x, 'employeeId', 'employee.id') || ''), name: pick(x, 'employeeNameAr', 'employeeName', 'fullNameAr', 'employee.fullNameAr'),
-      no: pick(x, 'assignmentNumber', 'number'), project: pick(x, 'projectName', 'project.nameAr', 'project.name', 'nameAr', 'name'),
-      code: pick(x, 'codeProject', 'projectCode', 'projectNumber', 'project.code'), pct: pick(x, 'percent', 'percentage'),
+      no: pick(x, 'assignmentNumber', 'number'), project: txt(pick(x, 'projectName', 'project.nameAr', 'project.name', 'project.titleAr', 'nameAr', 'name')),
+      code: pick(x, 'codeProject', 'projectCode', 'project.code'), pno: pick(x, 'projectNumber', 'project.projectNumber', 'project.number'),
+      cur: pick(x, 'currency', 'project.currency', 'projectCurrency'), pct: pick(x, 'percent', 'percentage'),
+      status: pick(x, 'status', 'entryStatus'), locked: x.periodLocked === true,
       start: d10(pick(x, 'startDate')), end: d10(pick(x, 'endDate')), raw: x
     };
   }
@@ -185,11 +192,19 @@
       if (ws.ok) db.put('sites', listOf(ws.data).map((x) => ({ id: x.id, name: pick(x, 'nameAr', 'name', 'nameEn'), lat: +x.latitude, lon: +x.longitude, r: +x.radiusMeters || 150 })));
       // الحضور: الأيام التي لم تُزامن بعد + اليوم وأمس دائماً (لأنها تتغيّر)
       const t = dayStr();
-      let from = meta.attUntil ? addDays(meta.attUntil, -1) : addDays(t, -((opts && opts.firstDays) || 14));
-      // النسخ السابقة لم تحفظ المكان: نعيد جلب الأيام المحفوظة مرة واحدة
-      if (meta.attUntil && meta.evVer !== 2 && meta.attFrom) from = meta.attFrom < addDays(t, -60) ? addDays(t, -60) : meta.attFrom;
-      if (opts && opts.from) from = opts.from;
-      const days = []; for (let d = from; d <= t && days.length < 120; d = addDays(d, 1)) days.push(d);
+      // من تاريخ البداية في الإعدادات: الأيام غير المحفوظة فقط + اليوم وأمس
+      const start = (opts && opts.from) || settings().attStart;
+      const want = new Set();
+      const addRange = (a, b) => { for (let d = a; d <= b && want.size < 400; d = addDays(d, 1)) want.add(d); };
+      if (!meta.attUntil || !meta.attFrom) addRange(start, t);
+      else {
+        if (start < meta.attFrom) addRange(start, addDays(meta.attFrom, -1));       // الفترة الأقدم الجديدة
+        addRange(addDays(meta.attUntil, -1), t);                                     // من آخر مزامنة حتى اليوم
+        if (meta.evVer !== 2) addRange(meta.attFrom, t);                             // النسخ السابقة لم تحفظ المكان
+        if (opts && opts.from) addRange(opts.from, t);
+      }
+      const days = [...want].sort();
+      const from = days[0] || t;
       let changedDays = 0, done = 0;
       const worker = async () => { while (days.length) { const d = days.shift(); changedDays += await syncDay(d); done++; progress && progress(`الحضور ${done}/${done + days.length}`); } };
       await Promise.all([worker(), worker(), worker()]);
@@ -198,6 +213,7 @@
       st.leaves = await syncLeaves(addDays(from, -1), addDays(t, 30));
       meta.attUntil = t;
       meta.attFrom = meta.attFrom && meta.attFrom < from ? meta.attFrom : from;
+      meta.bg = !!(opts && opts.background);
       meta.lastSync = st.at; meta.last = st; meta.evVer = 2;
       db.put('meta', meta);
       return st;
@@ -210,7 +226,8 @@
   const assignments = () => Object.values(db.get('assignments', {})).map(asg);
   const events = (ds) => (db.get(monthKey(ds), {})[ds]) || null;
   const leaveOf = (eid, ds) => db.get('leaves', {})[eid + ':' + ds] || null;
-  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, weekend: [5] }, db.get('settings', {}));
+  // auto: off | open (عند الفتح) ؛ every: كل كم دقيقة؛ bg: المزامنة في الخلفية
+  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
 
   const minutesOf = (iso) => { const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso)).forEach((x) => { p[x.type] = x.value; }); return (+p.hour % 24) * 60 + +p.minute; };
   const hmToMin = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
@@ -274,6 +291,9 @@
   }
 
   window.HR = { place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+    hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),
+    forgetCreds: () => { if (B && B.erpForgetCreds) B.erpForgetCreds(); },
+    setBackground: (min) => { if (B && B.hrSetBackground) B.hrSetBackground(min | 0); },
     hasSession: () => B && B.erpSession ? B.erpSession() : !!localStorage.getItem('hrWebSession'),
     logout() { if (B && B.erpLogout) B.erpLogout(); else { webCall('POST', '/api/auth/logout', {}); localStorage.removeItem('hrWebSession'); } db.wipe(); localStorage.removeItem('hrUser'); },
     meta: () => db.get('meta', {}) };

@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>hr-sync</title></head>
+<body>
+<script src="lib/adhan.umd.min.js"></script>
+<script src="places.js"></script>
+<script src="core.js"></script>
+<script src="tracker.js"></script>
+<script src="hr-data.js"></script>
+<script>
+// تُشغَّل في الخلفية من HrSyncJob: نفس المزامنة التراكمية دون فتح التطبيق
+(async function () {
+  try { if (window.AndroidBridge) await HR.sync(null, { background: true }); } catch (e) { /* retry next time */ }
+  if (window.AndroidBridge) AndroidBridge.done();
+})();
+</script>
+</body></html>
