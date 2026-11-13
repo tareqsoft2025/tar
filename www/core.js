@@ -212,6 +212,8 @@
           .forEach((e) => push(at, `غداً: ${e.label}`, `${hh.d} ${HIJRI_MONTHS[hh.m - 1]} ${hh.y}`, { tab: 'calendar' }));
       }
     }
+    // 5) تذكيرات الأجندة
+    if (window.Agenda && window.Agenda.notifs) { try { window.Agenda.notifs(state, nowMs, push); } catch (e) {} }
     list.sort((a, b) => a.at - b.at);
     return list;
   }

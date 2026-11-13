@@ -536,7 +536,7 @@
 
   /* ---------- التنقل ---------- */
   const App = { screens: {} };
-  const PARENT = { qada: 'more', asma: 'more', fx: 'more', duas: 'more', khatma: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', jumah: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
+  const PARENT = { agenda: 'more', qada: 'more', asma: 'more', fx: 'more', duas: 'more', khatma: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', jumah: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
   const stack = [];
   let current = 'times';
   const isActive = (n) => current === n;
@@ -568,7 +568,7 @@
     showTab(tab, { push: false });
     if (PARENT[tab]) { stack.push(PARENT[tab]); }
   };
-  Object.assign(App, { $, state, store, B, icon, toast, go, showTab, goBack, refresh: () => refresh(), isActive });
+  Object.assign(App, { $, state, store, B, icon, toast, go, showTab, goBack, refresh: () => refresh(), isActive, reschedule: () => scheduleNotifications() });
   window.App = App;
 
   /* ---------- التحديث الإجباري ---------- */
