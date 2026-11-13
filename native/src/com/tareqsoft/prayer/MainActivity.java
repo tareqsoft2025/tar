@@ -262,8 +262,14 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** زر الرجوع يغلق الخريطة أو النافذة المفتوحة أولاً، ثم يرسل التطبيق للخلفية */
     @Override
-    public void onBackPressed() { moveTaskToBack(true); }
+    public void onBackPressed() {
+        if (web == null) { moveTaskToBack(true); return; }
+        web.evaluateJavascript("(window.appBack && window.appBack()) ? '1' : '0'", new android.webkit.ValueCallback<String>() {
+            public void onReceiveValue(String v) { if (v == null || !v.contains("1")) moveTaskToBack(true); }
+        });
+    }
 
     class Bridge {
         /* ----- نظام المؤسسة (قراءة فقط) ----- */

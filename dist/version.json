@@ -1,6 +1,6 @@
 {
-  "versionCode": 37,
-  "versionName": "6.6",
-  "notes": "ملف الموظف: الاتصال المباشر بالضغط على رقم الجوال، وأزرار واتساب (+970 و+972) ورسالة SMS",
+  "versionCode": 38,
+  "versionName": "6.7",
+  "notes": "خريطة الحضور داخل التطبيق: مواقع العمل ونطاقها، تسجيلات الدخول والخروج والمسار بينها، وضع القمر الصناعي، وخريطة حضور كل الموظفين لليوم",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

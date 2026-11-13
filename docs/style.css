@@ -1104,3 +1104,70 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-wanote{margin:0 4px 12px;color:var(--muted);font-size:.75rem}
 .hr-tel{display:inline-flex;align-items:center;gap:6px;color:#5B9DFF;font-weight:800}
 .hr-tel .ic{width:15px;height:15px}
+/* ===== خريطة الحضور داخل التطبيق ===== */
+.hm{position:fixed;inset:0;z-index:150;background:var(--bg);opacity:0;transform:scale(1.03);transition:opacity .25s,transform .3s var(--ease)}
+.hm.in{opacity:1;transform:none}
+.hm-map{position:absolute;inset:0;background:#0b1620}
+:root[data-theme="light"] .hm-map{background:#e8eef2}
+.hm-top{position:absolute;top:calc(10px + env(safe-area-inset-top));inset-inline:10px;z-index:1000;display:flex;align-items:center;gap:8px;padding:8px;border-radius:20px;background:color-mix(in srgb,var(--card) 82%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.hm-tt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.hm-tt b{font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-tt small{color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-btn{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex:none;background:color-mix(in srgb,var(--card) 88%,transparent);border:1px solid var(--line);color:var(--text);box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hm-btn .ic{width:20px;height:20px}
+.hm-seg{display:flex;gap:2px;padding:3px;border-radius:12px;background:color-mix(in srgb,var(--text) 8%,transparent);flex:none}
+.hm-seg button{padding:6px 10px;border-radius:10px;font-size:.75rem;font-weight:800;color:var(--muted)}
+.hm-seg button.on{background:var(--gold);color:var(--on-gold)}
+.hm-side{position:absolute;right:12px;top:calc(84px + env(safe-area-inset-top));z-index:1000;display:flex;flex-direction:column;gap:8px}
+.hm-net{position:absolute;top:calc(84px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:1000;padding:8px 14px;border-radius:12px;background:#F2716A;color:#fff;font-size:.8125rem;font-weight:700}
+.hm-bottom{position:absolute;inset-inline:0;bottom:0;z-index:1000;padding:0 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,color-mix(in srgb,var(--bg) 85%,transparent),transparent)}
+.hm-strip{display:flex;gap:8px;overflow-x:auto;padding:24px 12px 4px;scrollbar-width:none;scroll-snap-type:x mandatory}
+.hm-strip::-webkit-scrollbar{display:none}
+.hm-card{flex:none;scroll-snap-align:center;display:flex;align-items:center;gap:10px;min-width:170px;padding:10px 12px;border-radius:18px;text-align:start;background:color-mix(in srgb,var(--card) 90%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--line);border-inline-start:4px solid var(--pc);box-shadow:0 8px 24px rgba(0,0,0,.22);transition:transform .2s}
+.hm-card.on{transform:translateY(-4px);border-color:var(--pc)}
+.hm-dot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none;color:#fff;font-weight:800;font-size:.8125rem;background:var(--pc)}
+.hm-ct{display:flex;flex-direction:column;min-width:0;line-height:1.35}
+.hm-ct b{font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.hm-ct small{color:var(--muted);font-size:.75rem}
+.hm-empty{color:var(--muted);padding:12px;text-align:center;width:100%}
+/* الدبابيس */
+.hm-pin-wrap{background:none;border:0}
+.hm-pin{position:relative;width:40px;height:48px}
+.hm-pin.big{width:46px;height:56px}
+.hm-pin::before{content:"";position:absolute;left:50%;top:0;width:36px;height:36px;margin-left:-18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--pc);box-shadow:0 6px 16px rgba(0,0,0,.4),inset 0 0 0 3px rgba(255,255,255,.85)}
+.hm-pin.big::before{width:42px;height:42px;margin-left:-21px}
+.hm-pin span{position:absolute;left:0;right:0;top:8px;text-align:center;color:#fff;font:800 13px/20px "Plex",sans-serif;z-index:1}
+.hm-pin.big span{top:10px;font-size:14px}
+.hm-pin::after{content:"";position:absolute;left:50%;bottom:-2px;width:14px;height:5px;margin-left:-7px;border-radius:50%;background:rgba(0,0,0,.35);filter:blur(1px)}
+.hm-pin.pulse::after{animation:hmpulse 1.8s ease-out infinite;background:var(--pc);filter:none;opacity:.6}
+@keyframes hmpulse{0%{transform:scale(.6);opacity:.7}100%{transform:scale(4);opacity:0}}
+.hm-site-wrap{background:none;border:0}
+.hm-site{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+.hm-site i{width:14px;height:14px;border-radius:50%;background:#5B9DFF;box-shadow:0 0 0 4px rgba(91,157,255,.35),0 0 0 9px rgba(91,157,255,.15)}
+.hm-site b{white-space:nowrap;padding:3px 10px;border-radius:10px;font:800 11px/1.5 "Plex",sans-serif;color:#fff;background:rgba(32,74,140,.85);direction:rtl}
+.hm-path{animation:hmdash 1.2s linear infinite}
+@keyframes hmdash{to{stroke-dashoffset:-20}}
+/* النوافذ المنبثقة */
+.hm-popup .leaflet-popup-content-wrapper{border-radius:16px;background:var(--card);color:var(--text);box-shadow:0 12px 30px rgba(0,0,0,.35);border:1px solid var(--line)}
+.hm-popup .leaflet-popup-tip{background:var(--card)}
+.hm-popup .leaflet-popup-content{margin:12px 14px;direction:rtl;font-family:"Plex",sans-serif}
+.hm-pop{display:flex;flex-direction:column;gap:3px;min-width:170px;text-align:right}
+.hm-pop b{font-size:.9375rem}
+.hm-pt{font-size:1.25rem;font-weight:800;color:var(--gold)}
+.hm-ps{font-size:.75rem;font-weight:800;padding:2px 8px;border-radius:8px;align-self:flex-start;color:var(--muted);background:color-mix(in srgb,var(--muted) 15%,transparent)}
+.hm-ps.matched{color:var(--ok);background:color-mix(in srgb,var(--ok) 15%,transparent)}
+.hm-ps.outside{color:#F2716A;background:color-mix(in srgb,#F2716A 15%,transparent)}
+.hm-pop small{color:var(--muted);font-size:.6875rem}
+.hm .leaflet-control-zoom{margin-top:calc(84px + env(safe-area-inset-top))!important;border:0!important;box-shadow:0 4px 14px rgba(0,0,0,.25)!important;border-radius:14px;overflow:hidden}
+.hm .leaflet-control-zoom a{background:color-mix(in srgb,var(--card) 92%,transparent)!important;color:var(--text)!important;border-color:var(--line)!important;width:40px!important;height:40px!important;line-height:40px!important}
+.hm .leaflet-control-attribution{background:rgba(0,0,0,.35)!important;color:#ddd!important;font-size:9px;margin-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+.hm .leaflet-control-attribution a{color:#fff!important}
+/* زر خريطة اليوم في التفاصيل */
+.hr-mapbig{position:relative;display:flex;align-items:flex-end;width:100%;height:120px;margin-bottom:12px;padding:14px;border-radius:20px;overflow:hidden;text-align:start;border:1px solid color-mix(in srgb,#5B9DFF 35%,var(--line));background:#0f2233}
+.hr-mapart{position:absolute;inset:0;background:radial-gradient(circle at 70% 40%,rgba(91,157,255,.35) 0 14%,transparent 15%),radial-gradient(circle at 70% 40%,transparent 0 24%,rgba(91,157,255,.18) 25% 26%,transparent 27%),linear-gradient(120deg,transparent 45%,rgba(255,255,255,.06) 45% 47%,transparent 47%),linear-gradient(30deg,transparent 60%,rgba(255,255,255,.05) 60% 62%,transparent 62%),repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 22px),linear-gradient(160deg,#16314a,#0b1620)}
+.hr-mapart::after{content:"";position:absolute;left:62%;top:22%;width:20px;height:20px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#2FBF71;box-shadow:0 0 0 3px #fff,0 6px 14px rgba(0,0,0,.4)}
+.hr-mapbig>span:last-child{position:relative;display:flex;flex-direction:column;color:#fff}
+.hr-mapbig b{display:flex;align-items:center;gap:6px;font-size:1rem}
+.hr-mapbig b .ic{width:18px;height:18px}
+.hr-mapbig small{color:rgba(255,255,255,.75);font-size:.75rem}
+.hr-tools>span{display:flex;gap:4px}
