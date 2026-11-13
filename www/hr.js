@@ -1,0 +1,366 @@
+// شاشات الموارد البشرية: الدخول، لوحة اليوم، الحضور، الموظفون، العقود، التكليفات، الإعدادات
+(function () {
+  const { $, icon, toast, store } = App;
+  const B = App.B;
+  const TZ = Core.TZ;
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const F = (o) => new Intl.DateTimeFormat('ar-PS-u-nu-latn', Object.assign({ timeZone: TZ }, o));
+  const tf = F({ hour: 'numeric', minute: '2-digit', hour12: true });
+  const dF = F({ day: 'numeric', month: 'short', year: 'numeric' });
+  const dLong = F({ weekday: 'long', day: 'numeric', month: 'long' });
+  const today = () => Tracker.dayStr();
+  const addDays = Tracker.addDays;
+  const noon = (ds) => new Date(ds + 'T12:00:00Z');
+  const fd = (ds) => ds ? dF.format(noon(ds)) : '—';
+  const daysTo = (ds) => ds ? Math.round((noon(ds) - noon(today())) / 864e5) : null;
+  const ago = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `منذ ${Math.round(m / 60)} س` : `منذ ${Math.round(m / 1440)} يوم`; };
+  const initials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('');
+  const TYPE = { office: 'مكتبي', field: 'ميداني' };
+  const KIND = { contract: 'عقد', extension: 'تمديد', annex: 'ملحق', placement: 'تسكين', amendment: 'تعديل' };
+  const STATUS = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'] };
+  const LEAVE = { annual: 'سنوية', sick: 'مرضية', mission: 'مهمة عمل', task: 'مهمة', official: 'رسمية', unpaid: 'بدون راتب', leave: 'إجازة', holiday: 'عطلة', compensatory: 'تعويضية', maternity: 'أمومة' };
+  const leaveLbl = (n) => LEAVE[n] || n || 'إجازة';
+
+  let tab = store.get('hrTab', 'dash');
+  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', as: 'active', proj: 'all' }, store.get('hrF', {}));
+  f.day = today(); f.q = '';
+  const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, as: f.as });
+
+  /* ---------- الهيكل ---------- */
+  function render() {
+    const box = $('hrBody'); box.innerHTML = '';
+    $('hrSync').hidden = !HR.hasSession();
+    if (!HR.hasSession()) { renderLogin(box); return; }
+    const meta = HR.meta();
+    const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
+    box.appendChild(acc);
+    const tabs = el('div', 'chips hr-tabs');
+    [['dash', 'لوحة اليوم', 'grid'], ['att', 'الحضور', 'clock'], ['emp', 'الموظفون', 'users'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase'], ['set', 'الإعدادات', 'sliders']].forEach(([k, n, ic]) => {
+      const b = el('button', 'chip sm' + (tab === k ? ' on' : ''), `${icon(ic)}${n}`);
+      b.onclick = () => { tab = k; store.set('hrTab', k); render(); };
+      tabs.appendChild(b);
+    });
+    box.appendChild(tabs);
+    const body = el('div', 'hr-view'); box.appendChild(body);
+    if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
+    ({ dash: renderDash, att: renderAtt, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
+    const on = box.querySelector('.hr-tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }
+
+  /* ---------- تسجيل الدخول ---------- */
+  function renderLogin(box) {
+    const c = el('div', 'hr-login', `
+      <div class="hr-lhero"><span class="hr-lic">${icon('users')}</span><b>ربط حسابك بنظام المؤسسة</b><small>PEF Comprehensive System · جمعية أصدقاء البيئة الفلسطينية</small></div>
+      <form id="hrLoginF" autocomplete="on">
+        <label class="hr-f"><span>رقم الهوية</span><input id="hrUser" inputmode="numeric" autocomplete="username" required></label>
+        <label class="hr-f"><span>كلمة المرور</span><div class="hr-pw"><input id="hrPass" type="password" autocomplete="current-password" required><button type="button" id="hrEye" aria-label="إظهار">${icon('eye')}</button></div></label>
+        <div id="hrLErr" class="hr-err" hidden></div>
+        <button class="btn-gold" id="hrLBtn" type="submit">تسجيل الدخول</button>
+      </form>
+      <ul class="hr-notes">
+        <li>${icon('check')}<span>الاتصال مباشر بين جوالك ونظام المؤسسة فقط.</span></li>
+        <li>${icon('check')}<span>كلمة المرور لا تُحفظ على الجهاز؛ تبقى الجلسة فقط.</span></li>
+        <li>${icon('check')}<span>البيانات تُحفظ على جوالك وتعمل بدون إنترنت، وتُحدَّث بزر المزامنة.</span></li>
+        <li>${icon('info')}<span>التطبيق يقرأ البيانات فقط ولا يعدّل شيئاً في النظام.</span></li>
+      </ul>`);
+    box.appendChild(c);
+    $('hrUser').value = localStorage.getItem('hrUser') || '';
+    $('hrEye').onclick = () => { const p = $('hrPass'); p.type = p.type === 'password' ? 'text' : 'password'; };
+    $('hrLoginF').onsubmit = async (e) => {
+      e.preventDefault();
+      const u = $('hrUser').value.trim(), p = $('hrPass').value;
+      const err = $('hrLErr'); err.hidden = true;
+      if (!u || !p) return;
+      $('hrLBtn').disabled = true; $('hrLBtn').textContent = 'جارٍ الدخول…';
+      const r = await HR.login(u, p);
+      $('hrLBtn').disabled = false; $('hrLBtn').textContent = 'تسجيل الدخول';
+      if (!r.ok) { err.textContent = HR.errText(r); err.hidden = false; return; }
+      localStorage.setItem('hrUser', u);
+      if (!B) localStorage.setItem('hrWebSession', '1');
+      toast('تم ربط حسابك بنجاح');
+      tab = 'dash'; render(); doSync();
+    };
+  }
+
+  function renderFirst(body) {
+    body.appendChild(el('div', 'hr-empty', `<span class="hr-eic">${icon('refresh')}</span><b>جاهز للمزامنة الأولى</b><small>سنجلب الموظفين والعقود والتكليفات وحضور آخر 14 يوماً ونحفظها على جوالك. بعد ذلك تجلب كل مزامنة الجديد والمتغيّر فقط.</small>`));
+    const b = el('button', 'btn-gold', 'ابدأ المزامنة');
+    b.onclick = doSync; body.appendChild(b);
+  }
+
+  /* ---------- المزامنة ---------- */
+  async function doSync() {
+    if (HR.isSyncing()) return;
+    const btn = $('hrSync'); btn.classList.add('spin');
+    const prog = () => $('hrProg'), txt = () => $('hrSyncTxt');
+    if (prog()) prog().hidden = false;
+    try {
+      const st = await HR.sync((m) => { if (txt()) txt().textContent = 'جارٍ المزامنة: ' + m; });
+      if (!st) return;
+      const parts = [];
+      const add = (n, s) => { if (s && (s.added || s.updated || s.removed)) parts.push(`${n}: ${s.added ? '+' + s.added + ' جديد' : ''}${s.updated ? ' ' + s.updated + ' محدّث' : ''}${s.removed ? ' ' + s.removed + ' محذوف' : ''}`.trim()); };
+      add('الموظفون', st.employees); add('العقود', st.contracts); add('التكليفات', st.assignments);
+      if (st.attendance && st.attendance.changed) parts.push(`الحضور: ${st.attendance.changed} يوم محدّث`);
+      toast(parts.length ? 'تمت المزامنة — ' + parts.join('، ') : 'تمت المزامنة، لا تغييرات جديدة');
+    } catch (e) {
+      if (e.res && e.res.status === 401) { toast('انتهت الجلسة، سجّل الدخول من جديد'); HR.logout(); }
+      else toast(e.message || 'تعذّرت المزامنة');
+    } finally { btn.classList.remove('spin'); render(); }
+  }
+
+  /* ---------- مكوّنات ---------- */
+  function filterChips(parent, key, opts, counts) {
+    const row = el('div', 'chips hr-fc');
+    opts.forEach(([v, n]) => {
+      const c = counts && counts[v] != null ? `<em>${counts[v]}</em>` : '';
+      const b = el('button', 'chip sm' + (f[key] === v ? ' on' : ''), n + c);
+      b.onclick = () => { f[key] = v; saveF(); render(); };
+      row.appendChild(b);
+    });
+    parent.appendChild(row);
+  }
+  function search(parent, ph) {
+    const s = el('div', 'search hr-search', `${icon('search')}<input type="search" placeholder="${ph}" aria-label="بحث">`);
+    const i = s.querySelector('input'); i.value = f.q;
+    let h; i.oninput = () => { clearTimeout(h); h = setTimeout(() => { f.q = i.value; const pos = i.selectionStart; render(); const n = document.querySelector('.hr-search input'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }, 250); };
+    parent.appendChild(s);
+  }
+  const match = (q, ...vals) => !q || vals.some((v) => v != null && String(v).toLowerCase().includes(q.toLowerCase()));
+  const orgOk = (e) => f.org === 'all' || e.org === f.org;
+  const typeOk = (e) => f.type === 'all' || e.type === f.type;
+  function personRow(e, right, sub, tone) {
+    const r = el('button', 'hr-row');
+    r.innerHTML = `<span class="hr-ava ${tone || ''}">${esc(initials(e.name))}</span><span class="hr-rt"><b>${esc(e.name)}</b><small>${sub != null ? sub : esc([e.pos || e.dept, TYPE[e.type], e.org].filter(Boolean).join(' · '))}</small></span><span class="hr-rr">${right || ''}</span>`;
+    r.onclick = () => openEmp(e.id);
+    return r;
+  }
+  function list(parent, rows, empty, limit) {
+    if (!rows.length) { parent.appendChild(el('div', 'hr-none', empty)); return; }
+    const g = el('div', 'hr-list');
+    rows.slice(0, limit || 400).forEach((r) => g.appendChild(r));
+    parent.appendChild(g);
+    if (rows.length > (limit || 400)) parent.appendChild(el('p', 'note c', `<span>يُعرض أول ${limit || 400} من ${rows.length}. استخدم البحث أو الفلاتر.</span>`));
+  }
+  const badge = (txt, tone) => `<span class="hr-b ${tone || ''}">${txt}</span>`;
+  const remain = (ds) => { const d = daysTo(ds); if (d == null) return ''; return d < 0 ? badge(`انتهى منذ ${-d} يوم`, 'mute') : d === 0 ? badge('ينتهي اليوم', 'bad') : badge(`${d} يوم`, d <= 30 ? 'bad' : d <= 60 ? 'warn' : 'ok'); };
+  function shareList(title, lines) {
+    const text = title + '\n' + lines.join('\n');
+    if (B && B.share) B.share(text); else if (navigator.share) navigator.share({ text }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(text); toast('تم النسخ'); }
+  }
+
+  /* ---------- لوحة اليوم ---------- */
+  function renderDash(body) {
+    const t = today();
+    const rep = HR.dayReport(t);
+    const rows = rep.rows;
+    const cnt = (s) => rows.filter((r) => r.status === s).length;
+    const cons = HR.contracts().filter((c) => c.end && daysTo(c.end) >= 0 && daysTo(c.end) <= 30);
+    const asgs = HR.assignments().filter((a) => a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
+    body.appendChild(el('div', 'hr-day', `<b>${dLong.format(new Date())}</b><small>${rep.synced ? 'حسب آخر مزامنة' : 'لم يُزامن حضور اليوم بعد'}${rep.weekend ? ' · عطلة' : ''}</small>`));
+    const k = el('div', 'hr-kpis');
+    [['emp', rows.length, 'موظف نشط', '', () => { tab = 'emp'; }],
+      ['present', cnt('present') + cnt('late'), 'سجّلوا حضوراً', 'ok', () => { tab = 'att'; f.st = 'in'; }],
+      ['late', cnt('late'), 'متأخرون', 'warn', () => { tab = 'att'; f.st = 'late'; }],
+      ['absent', cnt('absent'), 'بلا تسجيل ولا إجازة', 'bad', () => { tab = 'att'; f.st = 'absent'; }],
+      ['leave', cnt('leave'), 'إجازة / مهمة', 'info', () => { tab = 'att'; f.st = 'leave'; }],
+      ['con', cons.length, 'عقود تنتهي خلال 30 يوماً', 'warn', () => { tab = 'con'; f.cs = 'soon30'; }]
+    ].forEach(([key, n, l, tone, go]) => {
+      const c = el('button', 'hr-kpi ' + tone, `<b>${n}</b><small>${l}</small>`);
+      c.onclick = () => { go(); f.day = t; f.q = ''; render(); };
+      k.appendChild(c);
+    });
+    body.appendChild(k);
+    // شريط الحالة
+    if (rows.length) {
+      const seg = ['present', 'late', 'leave', 'absent', 'noin'].map((s) => [s, cnt(s)]).filter((x) => x[1]);
+      body.appendChild(el('div', 'hr-bar', seg.map(([s, n]) => `<i class="${STATUS[s][1]}" style="flex:${n}" title="${STATUS[s][0]}"></i>`).join('')));
+    }
+    const sec = (title, arr, empty, more) => {
+      const h = el('div', 'hr-sec', `<span>${title}</span>${more ? '<button>عرض الكل</button>' : ''}`);
+      if (more) h.querySelector('button').onclick = () => { more(); f.q = ''; render(); };
+      body.appendChild(h); list(body, arr, empty, 6);
+    };
+    sec('المتأخرون اليوم', rows.filter((r) => r.status === 'late').sort((a, b) => b.lateMin - a.lateMin).map((r) => personRow(r.e, badge('+' + r.lateMin + ' د', 'warn') + `<small>${tf.format(new Date(r.firstIn))}</small>`)), 'لا يوجد متأخرون', () => { tab = 'att'; f.st = 'late'; f.day = t; });
+    sec('بلا تسجيل دوام ولا إجازة ولا مهمة', rows.filter((r) => r.status === 'absent').map((r) => personRow(r.e, r.hasAsg ? '' : badge('بلا تكليف', 'mute'), null, 'bad')), rep.synced ? 'الجميع مسجّل أو في إجازة' : 'زامن لعرض حضور اليوم', () => { tab = 'att'; f.st = 'absent'; f.day = t; });
+    sec('عقود تنتهي قريباً', cons.sort((a, b) => a.end.localeCompare(b.end)).map((c) => conRow(c)), 'لا عقود تنتهي خلال 30 يوماً', () => { tab = 'con'; f.cs = 'soon30'; });
+    sec('تكليفات تنتهي قريباً', asgs.sort((a, b) => a.end.localeCompare(b.end)).map((a) => asgRow(a)), 'لا تكليفات تنتهي خلال 30 يوماً', () => { tab = 'asg'; f.as = 'soon'; });
+  }
+
+  /* ---------- الحضور ---------- */
+  function renderAtt(body) {
+    const nav = el('div', 'hr-dnav', `<button class="icon-btn flip" data-d="-1" aria-label="اليوم السابق">${icon('chev')}</button><label><b>${f.day === today() ? 'اليوم' : dLong.format(noon(f.day))}</b><small>${fd(f.day)}</small><input type="date" value="${f.day}" max="${today()}"></label><button class="icon-btn" data-d="1" aria-label="اليوم التالي" ${f.day >= today() ? 'disabled' : ''}>${icon('chev')}</button>`);
+    nav.querySelectorAll('[data-d]').forEach((b) => b.onclick = () => { f.day = addDays(f.day, +b.dataset.d); render(); });
+    nav.querySelector('input').onchange = (e) => { if (e.target.value) { f.day = e.target.value; render(); } };
+    body.appendChild(nav);
+    const rep = HR.dayReport(f.day);
+    if (!rep.synced) {
+      const m = el('div', 'hr-empty', `<span class="hr-eic">${icon('clock')}</span><b>حضور هذا اليوم غير محفوظ على الجهاز</b><small>زامن هذا اليوم لجلب سجلاته من النظام.</small>`);
+      const b = el('button', 'btn-outline wide', `${icon('refresh')}<span>مزامنة ${fd(f.day)}</span>`);
+      b.onclick = async () => { b.disabled = true; try { await HR.sync(null, { from: f.day }); } catch (e) { toast(e.message); } render(); };
+      m.appendChild(b); body.appendChild(m); return;
+    }
+    const base = rep.rows.filter((r) => orgOk(r.e) && typeOk(r.e));
+    filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
+    filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
+    const c = (s) => base.filter((r) => s === 'in' ? r.list.length : r.status === s).length;
+    filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['noasg', 'بلا تكليف']],
+      { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), noasg: base.filter((r) => !r.hasAsg).length });
+    search(body, 'ابحث بالاسم أو الرقم أو القسم');
+    const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
+      .sort((a, b) => (b.lateMin - a.lateMin) || String(a.firstIn || 'z').localeCompare(String(b.firstIn || 'z')) || a.e.name.localeCompare(b.e.name, 'ar'));
+    const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><button>${icon('share')}مشاركة القائمة</button>`);
+    tools.querySelector('button').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
+    body.appendChild(tools);
+    list(body, rows.map((r) => {
+      const st = STATUS[r.status];
+      let right = badge(st[0], st[1]);
+      if (r.status === 'late') right = badge('+' + r.lateMin + ' د', 'warn');
+      if (r.status === 'leave') right = badge(leaveLbl(r.leave), 'info');
+      const times = r.firstIn ? `${tf.format(new Date(r.firstIn))}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}` : '';
+      return personRow(r.e, right + (times ? `<small>${times}</small>` : ''), esc([r.e.dept, TYPE[r.e.type], r.e.org].filter(Boolean).join(' · ')), st[1]);
+    }), 'لا نتائج بهذه الفلاتر');
+  }
+
+  /* ---------- الموظفون ---------- */
+  function renderEmp(body) {
+    const all = HR.employees();
+    filterChips(body, 'es', [['active', 'على رأس العمل'], ['ended', 'منتهية خدمتهم'], ['all', 'الكل']]);
+    filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']]);
+    filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
+    search(body, 'الاسم، الرقم الوظيفي، الهوية، القسم');
+    const rows = all.filter((e) => (f.es === 'all' || (f.es === 'active' ? e.active : !e.active)) && orgOk(e) && typeOk(e) && match(f.q, e.name, e.nameEn, e.empId, e.nid, e.dept, e.pos))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    body.appendChild(el('div', 'hr-tools', `<small>${rows.length} من ${all.length} موظف</small>`));
+    list(body, rows.map((e) => personRow(e, e.empId ? `<small>#${esc(e.empId)}</small>` : '')), 'لا نتائج');
+  }
+
+  /* ---------- العقود ---------- */
+  function conRow(c) {
+    const r = el('button', 'hr-row');
+    r.innerHTML = `<span class="hr-ava k-${c.kind}">${esc(KIND[c.kind].slice(0, 2))}</span><span class="hr-rt"><b>${esc(c.name)}</b><small>${badge(KIND[c.kind], 'k-' + c.kind)} ${c.no ? '#' + esc(c.no) : ''}${c.ext ? ' · تمديد ' + esc(c.ext) : ''}${c.annex ? ' · ملحق ' + esc(c.annex) : ''}</small><small>${fd(c.start)} ← ${fd(c.end)}</small></span><span class="hr-rr">${remain(c.end)}</span>`;
+    r.onclick = () => c.empId ? openEmp(c.empId, c.id) : openRaw('العقد', c.raw);
+    return r;
+  }
+  function renderCon(body) {
+    const all = HR.contracts();
+    const kc = {}; all.forEach((c) => { kc[c.kind] = (kc[c.kind] || 0) + 1; }); kc.all = all.length;
+    filterChips(body, 'ck', [['all', 'الكل'], ['contract', 'عقود'], ['extension', 'تمديد'], ['annex', 'ملاحق'], ['placement', 'تسكين'], ['amendment', 'تعديل']], kc);
+    filterChips(body, 'cs', [['active', 'سارية'], ['soon30', 'تنتهي خلال 30 يوماً'], ['soon60', 'خلال 60 يوماً'], ['ended', 'منتهية'], ['all', 'الكل']]);
+    search(body, 'الاسم أو رقم العقد');
+    const st = (c) => { const d = daysTo(c.end); return f.cs === 'all' || (f.cs === 'active' ? (d == null || d >= 0) && (!c.start || c.start <= today()) : f.cs === 'ended' ? d != null && d < 0 : d != null && d >= 0 && d <= (f.cs === 'soon30' ? 30 : 60)); };
+    const rows = all.filter((c) => (f.ck === 'all' || c.kind === f.ck) && st(c) && match(f.q, c.name, c.no, c.pos, c.dept)).sort((a, b) => String(a.end || '9').localeCompare(String(b.end || '9')));
+    const tools = el('div', 'hr-tools', `<small>${rows.length} سجل</small><button>${icon('share')}مشاركة</button>`);
+    tools.querySelector('button').onclick = () => shareList('العقود', rows.map((c, i) => `${i + 1}. ${c.name} — ${KIND[c.kind]} ${c.no || ''} — ${fd(c.start)} إلى ${fd(c.end)}`));
+    body.appendChild(tools);
+    list(body, rows.map(conRow), 'لا عقود بهذه الفلاتر');
+  }
+
+  /* ---------- التكليفات ---------- */
+  function asgRow(a) {
+    const emps = HR.db.get('employees', {});
+    const name = a.name || (emps[a.empId] && HR.emp(emps[a.empId]).name) || '—';
+    const r = el('button', 'hr-row');
+    r.innerHTML = `<span class="hr-ava info">${icon('briefcase')}</span><span class="hr-rt"><b>${esc(name)}</b><small>${esc([a.code, a.project].filter(Boolean).join(' · ') || 'مشروع')}${a.pct != null ? ' · ' + esc(a.pct) + '%' : ''}</small><small>${fd(a.start)} ← ${fd(a.end)}</small></span><span class="hr-rr">${remain(a.end)}</span>`;
+    r.onclick = () => a.empId ? openEmp(a.empId) : openRaw('التكليف', a.raw);
+    return r;
+  }
+  function renderAsg(body) {
+    const all = HR.assignments();
+    filterChips(body, 'as', [['active', 'سارية'], ['soon', 'تنتهي خلال 30 يوماً'], ['ended', 'منتهية'], ['all', 'الكل']]);
+    const projs = {}; all.forEach((a) => { const k = a.code || a.project; if (k) projs[k] = (projs[k] || 0) + 1; });
+    const top = Object.entries(projs).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    if (top.length > 1) filterChips(body, 'proj', [['all', 'كل المشاريع']].concat(top.map(([k]) => [k, k])), Object.assign({ all: all.length }, projs));
+    search(body, 'الاسم أو المشروع');
+    const t = today();
+    const st = (a) => f.as === 'all' || (f.as === 'active' ? (!a.start || a.start <= t) && (!a.end || a.end >= t) : f.as === 'ended' ? a.end && a.end < t : a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
+    const rows = all.filter((a) => st(a) && (f.proj === 'all' || (a.code || a.project) === f.proj) && match(f.q, a.name, a.project, a.code, a.no)).sort((a, b) => String(a.end || '9').localeCompare(String(b.end || '9')));
+    body.appendChild(el('div', 'hr-tools', `<small>${rows.length} تكليف</small>`));
+    list(body, rows.map(asgRow), 'لا تكليفات بهذه الفلاتر');
+  }
+
+  /* ---------- الإعدادات ---------- */
+  function renderSet(body) {
+    const s = HR.settings();
+    const meta = HR.meta();
+    const c = el('div', 'group pad hr-set', `
+      <div class="hr-sl">بداية الدوام (لحساب التأخير)</div>
+      <label class="hr-srow"><span>مكتبي</span><input type="time" id="hsOff" value="${s.office}"></label>
+      <label class="hr-srow"><span>ميداني</span><input type="time" id="hsFld" value="${s.field}"></label>
+      <label class="hr-srow"><span>فترة السماح (دقيقة)</span><input type="number" id="hsGr" min="0" max="120" value="${s.grace}"></label>
+      <div class="hr-sl">أيام العطلة الأسبوعية</div><div id="hsWk" class="chips"></div>`);
+    body.appendChild(c);
+    const save = () => { HR.db.put('settings', Object.assign(HR.settings(), { office: $('hsOff').value || '08:00', field: $('hsFld').value || '08:00', grace: Math.max(0, +$('hsGr').value || 0) })); toast('تم الحفظ'); };
+    ['hsOff', 'hsFld', 'hsGr'].forEach((id) => { $(id).onchange = save; });
+    const wk = $('hsWk');
+    ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].forEach((n, i) => {
+      const b = el('button', 'chip sm' + (s.weekend.includes(i) ? ' on' : ''), n);
+      b.onclick = () => { const w = HR.settings().weekend.slice(); const j = w.indexOf(i); if (j >= 0) w.splice(j, 1); else w.push(i); HR.db.put('settings', Object.assign(HR.settings(), { weekend: w })); render(); };
+      wk.appendChild(b);
+    });
+    const st = meta.last || {};
+    const info = el('div', 'group pad hr-set', `<div class="hr-sl">البيانات على الجهاز</div>
+      <div class="hr-srow"><span>الموظفون</span><b>${Object.keys(HR.db.get('employees', {})).length}</b></div>
+      <div class="hr-srow"><span>العقود</span><b>${Object.keys(HR.db.get('contracts', {})).length}</b></div>
+      <div class="hr-srow"><span>التكليفات</span><b>${Object.keys(HR.db.get('assignments', {})).length}</b></div>
+      <div class="hr-srow"><span>الحضور محفوظ من</span><b>${fd(meta.attFrom)}</b></div>
+      <div class="hr-srow"><span>آخر مزامنة</span><b>${meta.lastSync ? ago(meta.lastSync) : '—'}</b></div>
+      ${st.employees ? `<div class="hr-srow"><span>نتيجة آخر مزامنة</span><b>+${(st.employees.added || 0) + (st.contracts ? st.contracts.added : 0)} جديد · ${(st.employees.updated || 0) + (st.contracts ? st.contracts.updated : 0)} محدّث</b></div>` : ''}`);
+    body.appendChild(info);
+    const more = el('button', 'btn-outline wide', `${icon('cal')}<span>جلب حضور 30 يوماً سابقة</span>`);
+    more.onclick = async () => { more.disabled = true; try { await HR.sync(null, { from: addDays(meta.attFrom || today(), -30) }); toast('تم'); } catch (e) { toast(e.message); } render(); };
+    body.appendChild(more);
+    const diag = el('button', 'btn-outline wide', `${icon('copy')}<span>نسخ هيكل البيانات (أسماء الحقول فقط) للدعم</span>`);
+    diag.onclick = () => {
+      const keysOf = (o) => o ? Object.keys(o).join(', ') : '—';
+      const first = (n) => Object.values(HR.db.get(n, {}))[0];
+      const ev = (() => { for (let i = 0; i < 7; i++) { const e = HR.events(addDays(today(), -i)); if (e && e.length) return e[0]; } return null; })();
+      const txt = `employees: ${keysOf(first('employees'))}\n\ncontracts: ${keysOf(first('contracts'))}\n\nassignments: ${keysOf(first('assignments'))}\n\nevent: ${keysOf(ev)}\n\nleave natures: ${[...new Set(Object.values(HR.db.get('leaves', {})))].join(', ')}`;
+      if (B && B.copy) B.copy(txt); else if (navigator.clipboard) navigator.clipboard.writeText(txt);
+      toast('تم نسخ أسماء الحقول (بدون أي بيانات شخصية)');
+    };
+    body.appendChild(diag);
+    const out = el('button', 'btn-outline wide hr-out', `${icon('x')}<span>تسجيل الخروج وحذف البيانات من الجهاز</span>`);
+    out.onclick = () => { if (confirm('سيتم حذف كل بيانات الموارد البشرية من هذا الجهاز وتسجيل الخروج. متابعة؟')) { HR.logout(); toast('تم تسجيل الخروج'); render(); } };
+    body.appendChild(out);
+  }
+
+  /* ---------- ملف الموظف ---------- */
+  function sheet(html) { $('hrSheetBody').innerHTML = html; $('hrSheet').hidden = false; requestAnimationFrame(() => $('hrSheet').classList.add('in')); }
+  const closeSheet = () => { $('hrSheet').classList.remove('in'); setTimeout(() => { $('hrSheet').hidden = true; }, 200); };
+  function rawTable(o) {
+    const rows = Object.entries(o || {}).filter(([, v]) => v != null && v !== '' && typeof v !== 'object');
+    return `<details class="hr-raw"><summary>كل الحقول من النظام (${rows.length})</summary><table>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table></details>`;
+  }
+  function openRaw(title, o) { sheet(`<div class="hr-ph"><b>${title}</b></div>${rawTable(o)}`); }
+  function openEmp(id, focusCon) {
+    const raw = HR.db.get('employees', {})[id];
+    if (!raw) { toast('الموظف غير موجود في البيانات المحفوظة'); return; }
+    const e = HR.emp(raw);
+    const cons = HR.contracts().filter((c) => c.empId === id).sort((a, b) => String(b.start).localeCompare(String(a.start)));
+    const asgs = HR.assignments().filter((a) => a.empId === id).sort((a, b) => String(b.start).localeCompare(String(a.start)));
+    const cells = [];
+    for (let i = 13; i >= 0; i--) {
+      const ds = addDays(today(), -i);
+      const r = HR.events(ds) ? HR.dayReport(ds).rows.find((x) => x.e.id === id) : null;
+      const st = r ? STATUS[r.status] : ['غير مزامن', 'none'];
+      cells.push(`<i class="${st[1]}" title="${fd(ds)}: ${st[0]}${r && r.firstIn ? ' ' + tf.format(new Date(r.firstIn)) : ''}"><small>${+ds.slice(8)}</small></i>`);
+    }
+    const info = [['الرقم الوظيفي', e.empId], ['رقم الهوية', e.nid], ['القسم', e.dept], ['المسمى', e.pos], ['المدير المباشر', e.mgr], ['تاريخ الالتحاق', fd(e.join)], ['انتهاء الخدمة', e.term ? fd(e.term) : null], ['الجوال', e.phone ? `<a href="tel:${esc(e.phone)}">${esc(e.phone)}</a>` : null], ['البريد', e.email]].filter((x) => x[1]);
+    sheet(`
+      <div class="hr-ph"><span class="hr-ava big">${esc(initials(e.name))}</span><div><b>${esc(e.name)}</b>${e.nameEn ? `<small>${esc(e.nameEn)}</small>` : ''}<div class="hr-tags">${badge(e.org, 'info')}${badge(TYPE[e.type], 'mute')}${badge(e.active ? 'على رأس العمل' : 'منتهية الخدمة', e.active ? 'ok' : 'bad')}</div></div></div>
+      <div class="hr-info">${info.map(([k, v]) => `<div><small>${k}</small><b>${k === 'الجوال' ? v : esc(v)}</b></div>`).join('')}</div>
+      <div class="hr-sec"><span>الحضور آخر 14 يوماً</span></div><div class="hr-cal14">${cells.join('')}</div>
+      <div class="hr-sec"><span>العقود والملاحق (${cons.length})</span></div>
+      <div class="hr-tl">${cons.map((c) => `<div class="hr-tli${c.id === focusCon ? ' on' : ''}"><span class="hr-b k-${c.kind}">${KIND[c.kind]}</span><b>${c.no ? '#' + esc(c.no) : ''} ${c.ext ? 'تمديد ' + esc(c.ext) : ''} ${c.annex ? 'ملحق ' + esc(c.annex) : ''}</b><small>${fd(c.start)} ← ${fd(c.end)} ${remain(c.end)}</small>${c.scale || c.grade ? `<small>السلّم: ${esc([c.scale, c.grade, c.level].filter(Boolean).join(' / '))}</small>` : ''}${c.history.length ? `<small>${c.history.length} تغيير في السجل</small>` : ''}</div>`).join('') || '<div class="hr-none">لا عقود محفوظة</div>'}</div>
+      <div class="hr-sec"><span>التكليفات (${asgs.length})</span></div>
+      <div class="hr-tl">${asgs.map((a) => `<div class="hr-tli"><b>${esc([a.code, a.project].filter(Boolean).join(' · ') || 'مشروع')}${a.pct != null ? ' · ' + esc(a.pct) + '%' : ''}</b><small>${fd(a.start)} ← ${fd(a.end)} ${remain(a.end)}</small></div>`).join('') || '<div class="hr-none">لا تكليفات</div>'}</div>
+      ${rawTable(raw)}`);
+  }
+
+  /* ---------- الربط ---------- */
+  $('hrSync').onclick = doSync;
+  $('hrSheet').onclick = (e) => { if (e.target.hasAttribute('data-close')) closeSheet(); };
+  App.screens.hr = () => render();
+  window.hrOpenEmp = openEmp;
+})();

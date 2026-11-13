@@ -1,6 +1,6 @@
 {
-  "versionCode": 30,
-  "versionName": "5.9",
-  "notes": "الأجندة الجديدة: مهام بالتاريخ والوقت، تقويم وخريطة لليوم، خطوات فرعية ومهام مميزة، وتذكير يظهر في منتصف الشاشة",
+  "versionCode": 31,
+  "versionName": "6.0",
+  "notes": "جديد: قسم الموارد البشرية — ربط حسابك بنظام PEF ومزامنة الموظفين والعقود والتكليفات والحضور وحفظها على جوالك",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

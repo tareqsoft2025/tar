@@ -243,6 +243,40 @@ public class MainActivity extends Activity {
     public void onBackPressed() { moveTaskToBack(true); }
 
     class Bridge {
+        /* ----- نظام المؤسسة (قراءة فقط) ----- */
+        private void erpReply(final String id, final ErpClient.Res r) {
+            js("window.__erp && window.__erp(" + JSONObject.quote(id) + "," + r.status + "," + JSONObject.quote(r.body) + ")");
+        }
+
+        @JavascriptInterface
+        public void erpLogin(final String id, final String user, final String pass) {
+            new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.login(MainActivity.this, user, pass)); } }).start();
+        }
+
+        @JavascriptInterface
+        public void erpGet(final String id, final String path) {
+            new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.get(MainActivity.this, path)); } }).start();
+        }
+
+        @JavascriptInterface
+        public void erpLogout() {
+            new Thread(new Runnable() { public void run() { ErpClient.logout(MainActivity.this); } }).start();
+        }
+
+        @JavascriptInterface
+        public boolean erpSession() { return ErpClient.hasSession(MainActivity.this); }
+
+        @JavascriptInterface
+        public boolean hrPut(String name, String data) {
+            try { ErpClient.put(MainActivity.this, name, data); return true; } catch (Exception e) { return false; }
+        }
+
+        @JavascriptInterface
+        public String hrGet(String name) { return ErpClient.read(MainActivity.this, name); }
+
+        @JavascriptInterface
+        public void hrWipe() { ErpClient.wipe(MainActivity.this); }
+
         @JavascriptInterface
         public boolean canOverlay() { return OverlayService.canDraw(MainActivity.this); }
 

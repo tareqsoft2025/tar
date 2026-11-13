@@ -62,6 +62,9 @@
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
     <symbol id="i-moon-star" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/><path d="M17 3l.7 1.8 1.8.7-1.8.7L17 8l-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.6-9 9-9 9z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="i-quote" viewBox="0 0 24 24"><path d="M9 7H5v6h4v4l3-3V7zM19 7h-4v6h4v4l3-3V7z"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
@@ -147,6 +150,14 @@
   </div>
 </div>
 <div id="remPop"></div>
+<div id="hrSheet" class="qsheet ag-sheet" hidden>
+  <div class="qs-scrim" data-close></div>
+  <div class="qs-box ag-ed hr-sheet" role="dialog" aria-modal="true" aria-label="ملف الموظف">
+    <div class="wxs-grab"></div>
+    <div class="ag-edh"><button class="icon-btn" data-close aria-label="إغلاق"><svg class="ic" data-close><use href="#i-x"/></svg></button></div>
+    <div id="hrSheetBody"></div>
+  </div>
+</div>
 <div id="miniPlayer" class="mini" hidden>
   <button id="mpToggle" class="icon-btn" aria-label="تشغيل/إيقاف"><svg class="ic"><use href="#i-pause"/></svg></button>
   <div class="mp-info"><b id="mpTitle"></b><small id="mpReciter" class="muted"></small></div>
@@ -272,6 +283,7 @@
     <h1 class="page-title">المزيد</h1>
     <div class="sub">أدوات تعينك على المحافظة على صلاتك وعبادتك</div>
     <div class="hub">
+      <button class="hub-card ag-hub hr-hub" data-go="hr"><span class="hub-ic"><svg class="ic"><use href="#i-users"/></svg></span><b>الموارد البشرية</b><small>الموظفون والعقود والتكليفات والحضور من نظام PEF</small></button>
       <button class="hub-card ag-hub" data-go="agenda"><span class="hub-ic"><svg class="ic"><use href="#i-cal"/></svg></span><b>الأجندة</b><small>مهامك ومواعيدك بالتاريخ والوقت، مع تذكير في منتصف الشاشة</small></button>
       <button class="hub-card" data-go="jumah"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>يوم الجمعة</b><small>سنن وساعة الإجابة والصلاة على النبي</small></button>
       <button class="hub-card" data-go="fx"><span class="hub-ic"><svg class="ic"><use href="#i-chart"/></svg></span><b>الدولار والشيكل</b><small>سعر الصرف والتحويل</small></button>
@@ -387,6 +399,12 @@
     </div>
     <div id="rBody" class="reader"></div>
     <div class="rnav"><button id="rPrev" class="btn-outline">السورة السابقة</button><button id="rNext" class="btn-outline">السورة التالية</button></div>
+  </section>
+
+  <!-- الموارد البشرية -->
+  <section id="tab-hr" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">الموارد البشرية</h1><button id="hrSync" class="icon-btn hr-syncb" type="button" aria-label="مزامنة" hidden><svg class="ic"><use href="#i-refresh"/></svg></button></div>
+    <div id="hrBody"></div>
   </section>
 
   <!-- الأجندة -->
@@ -629,5 +647,7 @@
 <script src="agenda-core.js"></script>
 <script src="remind-ui.js"></script>
 <script src="agenda.js"></script>
+<script src="hr-data.js"></script>
+<script src="hr.js"></script>
 </body>
 </html>
