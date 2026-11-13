@@ -22,6 +22,7 @@
         </activity>
         <receiver android:name="com.tareqsoft.prayer.AlarmReceiver" android:exported="false"/>
         <receiver android:name="com.tareqsoft.prayer.TickReceiver" android:exported="false"/>
+        <receiver android:name="com.tareqsoft.prayer.UpdateChecker" android:exported="false"/>
         <service android:name="com.tareqsoft.prayer.OverlayService" android:exported="false"/>
         <receiver android:name="com.tareqsoft.prayer.RefreshReceiver" android:exported="true">
             <intent-filter>
