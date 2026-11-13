@@ -223,8 +223,9 @@
     search(body, 'ابحث بالاسم أو الرقم أو القسم');
     const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : f.st === 'outside' ? r.outside : f.st.startsWith('rq_') ? r.reqs.some((q) => q.kind === f.st.slice(3)) : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
       .sort((a, b) => (b.lateMin - a.lateMin) || String(a.firstIn || 'z').localeCompare(String(b.firstIn || 'z')) || a.e.name.localeCompare(b.e.name, 'ar'));
-    const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><button>${icon('share')}مشاركة القائمة</button>`);
-    tools.querySelector('button').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}${r.workMin ? ' [' + hrs(r.workMin) + ']' : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.outside ? ' (خارج الموقع)' : ''}${r.reqs.length ? ' — ' + r.reqs.map((q) => RQ[q.kind][0] + (q.start ? ' ' + q.start + (q.end ? '-' + q.end : '') : '')).join('، ') : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
+    const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><span><button class="hr-tmap">${icon('pin')}الخريطة</button><button class="hr-tshare">${icon('share')}مشاركة</button></span>`);
+    tools.querySelector('.hr-tmap').onclick = () => openAllMap(rows, f.day);
+    tools.querySelector('.hr-tshare').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}${r.workMin ? ' [' + hrs(r.workMin) + ']' : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.outside ? ' (خارج الموقع)' : ''}${r.reqs.length ? ' — ' + r.reqs.map((q) => RQ[q.kind][0] + (q.start ? ' ' + q.start + (q.end ? '-' + q.end : '') : '')).join('، ') : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
     body.appendChild(tools);
     list(body, rows.map((r) => {
       const st = STATUS[r.status];
@@ -737,6 +738,33 @@
     $('hrSheetBody').querySelectorAll('[data-day]').forEach((c) => { c.onclick = () => openDay(id, c.dataset.day); });
   }
 
+  /* ---------- الخريطة داخل التطبيق ---------- */
+  function evPoints(list, empName0) {
+    return list.map((x, i) => {
+      const pl = HR.place(x);
+      return { lat: pl.lat, lon: pl.lon, acc: pl.acc, st: pl.st, dist: pl.dist, kind: x.eventType === 'check_in' ? 'in' : x.eventType === 'check_out' ? 'out' : 'other',
+        label: x.eventType === 'check_in' ? 'د' : x.eventType === 'check_out' ? 'خ' : i + 1, time: tf.format(new Date(x.recordedAt)),
+        name: (x.eventType === 'check_in' ? 'دخول' : x.eventType === 'check_out' ? 'خروج' : 'تسجيل') + (empName0 ? ' — ' + empName0 : ''), place: plName(pl) };
+    });
+  }
+  function openDayMap(id, ds, focusIdx) {
+    const r = HR.dayReport(ds).rows.find((x) => x.e.id === id);
+    if (!r) return;
+    HRMap.open({ title: r.e.name, sub: `${dLong.format(noon(ds))} · ${r.list.length} تسجيل${r.workMin ? ' · ' + hrs(r.workMin) : ''}`, sites: HR.sites(), points: evPoints(r.list), focus: focusIdx, fitSites: false });
+  }
+  // خريطة اليوم لكل الموظفين: أول تسجيل دخول لكل موظف
+  function openAllMap(rows, ds) {
+    const pts = [];
+    rows.forEach((r) => {
+      const first = r.list.find((x) => x.eventType === 'check_in') || r.list[0];
+      if (!first) return;
+      const pl = HR.place(first);
+      if (pl.lat == null) return;
+      pts.push({ lat: pl.lat, lon: pl.lon, acc: null, st: pl.st, dist: pl.dist, kind: 'in', label: initials(r.e.name), time: tf.format(new Date(first.recordedAt)) + (r.lateMin ? ' · تأخير ' + r.lateMin + ' د' : ''), name: r.e.name, place: plName(pl) });
+    });
+    HRMap.open({ title: 'خريطة الحضور', sub: `${dLong.format(noon(ds))} · ${pts.length} موظف`, sites: HR.sites(), points: pts, path: false });
+  }
+
   /* ---------- تفاصيل حضور يوم ---------- */
   function openDay(id, ds) {
     const raw = HR.db.get('employees', {})[id];
@@ -745,10 +773,12 @@
     const evs = HR.events(ds);
     const r = evs ? HR.dayReport(ds).rows.find((x) => x.e.id === id) : null;
     const st = r ? STATUS[r.status] : ['غير مزامن', 'mute'];
+    let evIdx = 0;
+    const hasGeo = r && r.list.some((x) => HR.place(x).lat != null);
     const evRows = (r ? r.list : []).map((x) => {
       const pl = HR.place(x);
       const isIn = x.eventType === 'check_in';
-      const maps = pl.lat != null ? `<button class="hr-map" data-lat="${pl.lat}" data-lon="${pl.lon}" data-n="${esc(pl.name || e.name)}">${icon('nav')}الخريطة</button>` : '';
+      const maps = pl.lat != null ? `<button class="hr-map" data-i="${evIdx++}">${icon('pin')}عرض على الخريطة</button>` : (evIdx++, '');
       return `<div class="hr-ev ${isIn ? 'in' : 'out'}">
         <span class="hr-evdot"></span>
         <div class="hr-evb">
@@ -770,13 +800,12 @@
       </div>
       ${r && r.reqs.length ? `<div class="hr-sec"><span>الطلبات في هذا اليوم (${r.reqs.length})</span></div>${r.reqs.map(rqCard).join('')}` : ''}
       <div class="hr-sec"><span>سجل اليوم (${r ? r.list.length : 0})</span></div>
+      ${hasGeo ? `<button class="hr-mapbig" id="hrDayMap"><span class="hr-mapart"></span><span><b>${icon('pin')}خريطة تسجيلات اليوم</b><small>المسار بين الدخول والخروج ونطاق موقع العمل</small></span></button>` : ''}
       ${evs ? (evRows ? `<div class="hr-evs">${evRows}</div>` : '<div class="hr-none">لا يوجد تسجيل في هذا اليوم</div>') : '<div class="hr-none">هذا اليوم غير مزامن على الجهاز</div>'}
       <button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>`);
     const body = $('hrSheetBody');
-    body.querySelectorAll('.hr-map').forEach((b) => b.onclick = () => {
-      const la = +b.dataset.lat, lo = +b.dataset.lon;
-      if (B && B.openMap) B.openMap(la, lo, b.dataset.n); else window.open(`https://www.google.com/maps?q=${la},${lo}`, '_blank');
-    });
+    body.querySelectorAll('.hr-map').forEach((b) => b.onclick = () => openDayMap(id, ds, +b.dataset.i));
+    const am = $('hrDayMap'); if (am) am.onclick = () => openDayMap(id, ds);
     $('hrToEmp').onclick = () => openEmp(id);
   }
 

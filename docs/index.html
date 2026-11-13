@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>مواقيت الصلاة - فلسطين</title>
 <script>try{var t=JSON.parse(localStorage.getItem('theme'));if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="lib/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -151,6 +152,20 @@
   </div>
 </div>
 <div id="remPop"></div>
+<div id="hrMapView" class="hm" hidden>
+  <div id="hmMap" class="hm-map" dir="ltr"></div>
+  <div class="hm-top">
+    <button id="hmBack" class="hm-btn" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button>
+    <div class="hm-tt"><b id="hmTitle"></b><small id="hmSub"></small></div>
+    <div id="hmLayers" class="hm-seg"><button data-l="map" class="on">خريطة</button><button data-l="sat">قمر صناعي</button></div>
+  </div>
+  <div class="hm-side">
+    <button id="hmFit" class="hm-btn" aria-label="عرض الكل"><svg class="ic"><use href="#i-grid"/></svg></button>
+    <button id="hmGo" class="hm-btn" aria-label="فتح في تطبيق الخرائط"><svg class="ic"><use href="#i-nav"/></svg></button>
+  </div>
+  <div id="hmNet" class="hm-net" hidden>تعذّر تحميل الخريطة — تحقق من الإنترنت</div>
+  <div class="hm-bottom"><div id="hmStrip" class="hm-strip"></div></div>
+</div>
 <div id="hrSheet" class="qsheet ag-sheet" hidden>
   <div class="qs-scrim" data-close></div>
   <div class="qs-box ag-ed hr-sheet" role="dialog" aria-modal="true" aria-label="ملف الموظف">
@@ -648,6 +663,8 @@
 <script src="agenda-core.js"></script>
 <script src="remind-ui.js"></script>
 <script src="agenda.js"></script>
+<script src="lib/leaflet.js"></script>
+<script src="hr-map.js"></script>
 <script src="hr-data.js"></script>
 <script src="hr.js"></script>
 </body>
