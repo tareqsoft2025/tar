@@ -34,10 +34,10 @@
   const fmtDist = (d) => d == null ? '' : d >= 1000 ? (d / 1000).toFixed(1) + ' كم' : d + ' م';
 
   let tab = store.get('hrTab', 'dash');
-  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', ws: 'hours', wf: 'all', as: 'month', av: 'emp', am: today().slice(0, 7), proj: 'all' }, store.get('hrF', {}));
+  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', ws: 'hours', wf: 'all', as: 'month', av: 'emp', am: today().slice(0, 7), proj: 'all', grp: 'all' }, store.get('hrF', {}));
   if (!/^\d{4}-\d{2}$/.test(f.am || '')) f.am = today().slice(0, 7);
   f.day = today(); f.q = '';
-  const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, cf: f.cf, as: f.as, av: f.av });
+  const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, cf: f.cf, as: f.as, av: f.av, grp: f.grp });
 
   /* ---------- الهيكل ---------- */
   function render() {
@@ -174,6 +174,63 @@
     });
     parent.appendChild(row);
   }
+  function groupBar(body) {
+    const l = groups(); if (!l.length && !HR.employees().length) return;
+    const row = el('div', 'chips hr-fc hr-gb');
+    const all = el('button', 'chip sm' + (f.grp === 'all' ? ' on' : ''), `${icon('users')}كل الموظفين`); all.onclick = () => { f.grp = 'all'; saveF(); render(); }; row.appendChild(all);
+    l.forEach((g) => { const b = el('button', 'chip sm' + (f.grp === g.id ? ' on' : ''), `${esc(g.name)}<em>${g.ids.length}</em>`); b.onclick = () => { f.grp = g.id; saveF(); render(); }; row.appendChild(b); });
+    const add = el('button', 'chip sm hr-gadd', `${icon('plus')}مجموعة`); add.onclick = () => openGroup(null); row.appendChild(add);
+    body.appendChild(row);
+    const g = f.grp !== 'all' && l.find((x) => x.id === f.grp);
+    if (g) {
+      const t = el('div', 'hr-gtools', `<button type="button" id="gMsg" class="go">${icon('note')}رسالة للمجموعة</button><button type="button" id="gEdit">${icon('note')}تعديل</button>`);
+      body.appendChild(t);
+      $('gMsg').onclick = () => openCompose(g.ids.map((id) => ({ empId: id })), 'free');
+      $('gEdit').onclick = () => openGroup(g.id);
+    }
+  }
+  function openGroup(id) {
+    const l = groups(), cur = l.find((x) => x.id === id) || { id: 'g' + Date.now().toString(36), name: '', ids: [] };
+    const ids = new Set(cur.ids.map(String)), emps = HR.employees().filter((e) => e.active || ids.has(String(e.id))).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    const attrs = [['dept', 'القسم'], ['pos', 'المسمى'], ['mgr', 'المدير المباشر'], ['org', 'الجهة'], ['type', 'نوع الدوام']];
+    const tl = { office: 'مكتبي', field: 'ميداني' }, av = (e, k) => (k === 'type' ? tl[e.type] || e.type : e[k]) || '';
+    let q = '';
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('users')}</span><div><b>${id ? 'تعديل المجموعة' : 'مجموعة جديدة'}</b><small id="gCnt"></small></div></div>
+      <input id="gName" class="hr-in" placeholder="اسم المجموعة (مثال: موظفو خانيونس، المجال الطبي)" value="${esc(cur.name)}">
+      <div class="hr-gattr"><small>إضافة بالسمة</small><select id="gAk">${attrs.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select><select id="gAv"></select><button type="button" id="gAdd">إضافة الكل</button></div>
+      <input id="gQ" class="hr-in" type="search" placeholder="ابحث لإضافة/إزالة موظف">
+      <div id="gList" class="hr-glist"></div>
+      <div class="hr-gact"><button type="button" class="btn-primary" id="gSave">حفظ</button>${id ? `<button type="button" class="btn-outline" id="gDel">حذف المجموعة</button>` : ''}</div>`);
+    const fillAv = () => { const k = $('gAk').value, vs = [...new Set(emps.map((e) => av(e, k)).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'ar')); $('gAv').innerHTML = vs.length ? vs.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('') : '<option value="">— لا قيم —</option>'; };
+    const draw = () => {
+      $('gCnt').textContent = `${ids.size} موظف`;
+      const rows = emps.filter((e) => match(q, e.name, e.empId, e.dept, e.pos)).slice(0, 120);
+      $('gList').innerHTML = rows.map((e) => `<button type="button" class="hr-grow${ids.has(String(e.id)) ? ' on' : ''}" data-id="${esc(e.id)}"><span class="hr-chk${ids.has(String(e.id)) ? ' on' : ''}">${icon('check')}</span><b>${esc(e.name)}</b><small>${esc([e.dept, e.pos].filter(Boolean).join(' · '))}</small></button>`).join('') || '<small>لا نتائج</small>';
+      $('gList').querySelectorAll('.hr-grow').forEach((b) => { b.onclick = () => { const k = b.dataset.id; if (ids.has(k)) ids.delete(k); else ids.add(k); draw(); }; });
+    };
+    fillAv(); draw();
+    $('gAk').onchange = fillAv;
+    $('gQ').oninput = (ev) => { q = ev.target.value; draw(); };
+    $('gAdd').onclick = () => { const k = $('gAk').value, v = $('gAv').value; if (!v) return; const m = emps.filter((e) => av(e, k) === v); m.forEach((e) => ids.add(String(e.id))); draw(); toast(`أُضيف ${m.length} موظف (${v})`); };
+    $('gSave').onclick = () => {
+      const name = $('gName').value.trim(); if (!name) { toast('اكتب اسم المجموعة'); return; }
+      if (!ids.size) { toast('اختر موظفاً واحداً على الأقل'); return; }
+      const nl = groups().filter((x) => x.id !== cur.id); nl.push({ id: cur.id, name, ids: [...ids] });
+      saveGroups(nl); f.grp = cur.id; saveF(); closeSheet(); render();
+    };
+    if (id) $('gDel').onclick = () => { if (!confirm('حذف المجموعة؟ (لا يُحذف الموظفون)')) return; saveGroups(groups().filter((x) => x.id !== id)); if (f.grp === id) f.grp = 'all'; saveF(); closeSheet(); render(); };
+  }
+  // من وضع التحديد: إضافة المحدّدين إلى مجموعة
+  function addSelToGroup() {
+    if (!sel.size) { toast('اختر موظفاً واحداً على الأقل'); return; }
+    const l = groups();
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('users')}</span><div><b>إضافة ${sel.size} إلى مجموعة</b><small>اختر مجموعة أو أنشئ جديدة</small></div></div>
+      <div class="hr-glist">${l.map((g) => `<button type="button" class="hr-grow" data-g="${esc(g.id)}"><b>${esc(g.name)}</b><small>${g.ids.length} موظف</small></button>`).join('')}</div>
+      <input id="gNew" class="hr-in" placeholder="أو اسم مجموعة جديدة"><div class="hr-gact"><button type="button" class="btn-primary" id="gNewGo">إنشاء وإضافة</button></div>`);
+    const ids = [...sel.keys()].map(String), done = (g) => { selOff(); f.grp = g.id; saveF(); closeSheet(); render(); toast(`${g.name}: ${g.ids.length} موظف`); };
+    $('hrSheetBody').querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => { const nl = groups(), g = nl.find((x) => x.id === b.dataset.g); g.ids = [...new Set(g.ids.concat(ids))]; saveGroups(nl); done(g); }; });
+    $('gNewGo').onclick = () => { const n = $('gNew').value.trim(); if (!n) { toast('اكتب اسم المجموعة'); return; } const nl = groups(), g = { id: 'g' + Date.now().toString(36), name: n, ids }; nl.push(g); saveGroups(nl); done(g); };
+  }
   function search(parent, ph) {
     const s = el('div', 'search hr-search', `${icon('search')}<input type="search" placeholder="${ph}" aria-label="بحث">`);
     const i = s.querySelector('input'); i.value = f.q;
@@ -181,7 +238,13 @@
     parent.appendChild(s);
   }
   const match = (q, ...vals) => !q || vals.some((v) => v != null && String(v).toLowerCase().includes(q.toLowerCase()));
-  const orgOk = (e) => f.org === 'all' || e.org === f.org;
+  /* ---------- مجموعات الموظفين (محلية على الجهاز) ---------- */
+  const groups = () => HR.db.get('groups', []);
+  const saveGroups = (l) => { HR.db.put('groups', l); grpSet = null; };
+  let grpSet = null;
+  const grpOf = () => { if (f.grp === 'all') return null; if (!grpSet || grpSet.id !== f.grp) { const g = groups().find((x) => x.id === f.grp); grpSet = { id: f.grp, ids: new Set(g ? g.ids : []) }; if (!g) f.grp = 'all'; } return f.grp === 'all' ? null : grpSet.ids; };
+  const grpOk = (e) => { const s = grpOf(); return !s || s.has(String(e.id)); };
+  const orgOk = (e) => (f.org === 'all' || e.org === f.org) && grpOk(e);
   const typeOk = (e) => f.type === 'all' || e.type === f.type;
   function personRow(e, right, sub, tone) {
     const r = el('button', 'hr-row');
@@ -573,6 +636,7 @@
     }
     breakdown(body, rep.rows, f.day, (flt) => { f.org = flt.org; f.type = flt.type; render(); });
     const base = rep.rows.filter((r) => orgOk(r.e) && typeOk(r.e));
+    groupBar(body);
     filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
     filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
     const c = (s) => base.filter((r) => s === 'in' ? r.list.length : r.status === s).length;
@@ -610,6 +674,7 @@
   /* ---------- الموظفون ---------- */
   function renderEmp(body) {
     const all = HR.employees();
+    groupBar(body);
     filterChips(body, 'es', [['active', 'على رأس العمل'], ['ended', 'منتهية خدمتهم'], ['all', 'الكل']]);
     filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']]);
     filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
@@ -1146,10 +1211,11 @@
   function ensureSelBar() {
     let bar = $('hrSelBar');
     if (bar) return bar;
-    bar = el('div', 'hr-selbar', `<span id="selCount">0 محدد</span><button id="selAll" type="button">تحديد الكل</button><button id="selMsg" type="button" class="go">${icon('note')}رسالة</button><button id="selX" type="button" aria-label="إلغاء">${icon('x')}</button>`);
+    bar = el('div', 'hr-selbar', `<span id="selCount">0 محدد</span><button id="selAll" type="button">تحديد الكل</button><button id="selGrp" type="button">${icon('users')}مجموعة</button><button id="selMsg" type="button" class="go">${icon('note')}رسالة</button><button id="selX" type="button" aria-label="إلغاء">${icon('x')}</button>`);
     bar.id = 'hrSelBar'; bar.hidden = true;
     $('tab-hr').appendChild(bar);
     $('selX').onclick = () => { selOff(); render(); };
+    $('selGrp').onclick = addSelToGroup;
     $('selAll').onclick = () => {
       const rows = [...document.querySelectorAll('#hrBody .hr-row[data-emp]')];
       const all = rows.length && rows.every((r) => sel.has(r.dataset.emp));

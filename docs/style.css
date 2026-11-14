@@ -1601,3 +1601,25 @@ html:has(#tab-times.active){overflow:hidden}
 .mg-dtools .mg-pefb.msg{margin-inline-end:0}
 .mg-dtools .mg-pefb:first-child{margin-inline-end:0}
 .mg-dtools .mg-pefb.msg+.mg-link{margin-inline-start:auto}
+
+/* مجموعات الموظفين */
+.hr-gb .chip.hr-gadd{border-style:dashed}
+.hr-gb .chip svg{width:14px;height:14px;margin-inline-end:4px;vertical-align:-2px}
+.hr-gtools{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+.hr-gtools button{flex:1 1 130px;min-height:42px;border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+.hr-gtools button.go{background:var(--accent,#d9b56b);color:#1a1405;border-color:transparent;font-weight:700}
+.hr-gtools svg{width:16px;height:16px}
+.hr-in{width:100%;box-sizing:border-box;min-height:44px;margin:6px 0;padding:0 12px;border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit}
+.hr-gattr{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.hr-gattr small{grid-column:1/-1;opacity:.7}
+.hr-gattr select{min-width:0;min-height:42px;border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit;padding:0 8px}
+.hr-gattr button{grid-column:1/-1;min-height:42px;border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit}
+.hr-glist{max-height:36vh;overflow:auto;display:grid;gap:4px;margin:6px 0}
+.hr-grow{display:flex;align-items:center;gap:8px;text-align:start;padding:8px 10px;border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit;min-width:0}
+.hr-grow.on{border-color:var(--accent,#d9b56b)}
+.hr-grow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hr-grow small{opacity:.65;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hr-gact{display:flex;gap:8px;margin-top:10px}
+.hr-gact button{flex:1;min-height:46px}
+.hr-gact button{border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit}
+.hr-gact .btn-primary{background:var(--accent,#d9b56b);color:#1a1405;border-color:transparent;font-weight:700}
