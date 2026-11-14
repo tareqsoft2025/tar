@@ -18,7 +18,7 @@
   const initials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('');
   const TYPE = { office: 'مكتبي', field: 'ميداني' };
   const KIND = { contract: 'عقد', extension: 'تمديد', annex: 'ملحق', placement: 'تسكين', amendment: 'تعديل' };
-  const STATUS = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'] };
+  const STATUS = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'], hwork: ['دوام في عطلة', 'ok'] };
   const LEAVE = { annual: 'سنوية', sick: 'مرضية', mission: 'مهمة عمل', task: 'مهمة', official: 'رسمية', unpaid: 'بدون راتب', leave: 'إجازة', holiday: 'عطلة', compensatory: 'تعويضية', maternity: 'أمومة' };
   Object.assign(LEAVE, { emergency: 'طارئة', marriage: 'زواج', study_leave: 'دراسية', official_duty: 'مهمة رسمية', work_mission: 'مهمة عمل', personal_hourly: 'مغادرة شخصية', hajj: 'حج', bereavement: 'وفاة', paternity: 'أبوة' });
   const leaveLbl = (n) => LEAVE[String(n || '').toLowerCase()] || n || 'إجازة';
@@ -614,7 +614,7 @@
     const cnt = (s) => rows.filter((r) => r.status === s).length;
     const cons = HR.contracts().filter((c) => c.end && daysTo(c.end) >= 0 && daysTo(c.end) <= 30);
     const asgs = HR.assignments().filter((a) => a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
-    body.appendChild(el('div', 'hr-day', `<b>${dLong.format(new Date())}</b><small>${rep.synced ? 'حسب آخر مزامنة' : 'لم يُزامن حضور اليوم بعد'}${rep.weekend ? ' · عطلة' : ''}</small>`));
+    body.appendChild(el('div', 'hr-day', `<b>${dLong.format(new Date())}</b><small>${rep.synced ? 'حسب آخر مزامنة' : 'لم يُزامن حضور اليوم بعد'}${rep.weekend ? ' · عطلة' + (rows.some((r) => r.status === 'hwork') ? ` · ${rows.filter((r) => r.status === 'hwork').length} موظف داوموا` : '') : ''}</small>`));
     // بحث شامل: يفتح قائمة الفريق مفلترة
     const gs = el('form', 'hr2-search', `${icon('search')}<input id="hrGS" type="search" enterkeyhint="search" placeholder="ابحث عن موظف: اسم، رقم، هاتف، قسم…" autocomplete="off">`);
     gs.onsubmit = (ev) => { ev.preventDefault(); const v = $('hrGS').value.trim(); if (!v) return; tab = 'emp'; f.es = 'all'; f.q = v; store.set('hrTab', tab); render(); };
@@ -707,8 +707,8 @@
     filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
     filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
     const c = (s) => base.filter((r) => s === 'in' ? r.list.length : r.status === s).length;
-    filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['outside', 'خارج الموقع'], ['rq_hourly', 'مغادرة ساعية'], ['rq_mission', 'مهمة عمل'], ['rq_overtime', 'عمل إضافي'], ['rq_holiday', 'عمل في عطلة'], ['noasg', 'بلا تكليف']],
-      { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), outside: base.filter((r) => r.outside).length, rq_hourly: base.filter((r) => r.reqs.some((q) => q.kind === 'hourly')).length, rq_mission: base.filter((r) => r.reqs.some((q) => q.kind === 'mission')).length, rq_overtime: base.filter((r) => r.reqs.some((q) => q.kind === 'overtime')).length, rq_holiday: base.filter((r) => r.reqs.some((q) => q.kind === 'holiday')).length, noasg: base.filter((r) => !r.hasAsg).length });
+    filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['hwork', 'دوام في عطلة'], ['outside', 'خارج الموقع'], ['rq_hourly', 'مغادرة ساعية'], ['rq_mission', 'مهمة عمل'], ['rq_overtime', 'عمل إضافي'], ['rq_holiday', 'عمل في عطلة'], ['noasg', 'بلا تكليف']],
+      { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), hwork: c('hwork'), outside: base.filter((r) => r.outside).length, rq_hourly: base.filter((r) => r.reqs.some((q) => q.kind === 'hourly')).length, rq_mission: base.filter((r) => r.reqs.some((q) => q.kind === 'mission')).length, rq_overtime: base.filter((r) => r.reqs.some((q) => q.kind === 'overtime')).length, rq_holiday: base.filter((r) => r.reqs.some((q) => q.kind === 'holiday')).length, noasg: base.filter((r) => !r.hasAsg).length });
     search(body, 'ابحث بالاسم أو الرقم أو القسم');
     const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : f.st === 'outside' ? r.outside : f.st.startsWith('rq_') ? r.reqs.some((q) => q.kind === f.st.slice(3)) : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
       .sort((a, b) => (b.lateMin - a.lateMin) || String(a.firstIn || 'z').localeCompare(String(b.firstIn || 'z')) || a.e.name.localeCompare(b.e.name, 'ar'));
