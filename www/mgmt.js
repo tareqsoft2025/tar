@@ -291,6 +291,9 @@
       const x = el('button', 'mg-link danger', `${icon('trash')}حذف`); x.type = 'button'; x.onclick = () => confirmSheet('حذف التوجيه', `سيُحذف توجيه «${d.target_name}» نهائياً من النظام.`, 'حذف', () => run('directive_delete', { id: d.id }, 'حُذف التوجيه', true), true);
       t.appendChild(e); t.appendChild(x); side.appendChild(t);
     } else side.appendChild(el('span', 'mg-stat', esc((STC[d.status] || [d.status])[0])));
+    if (d.target_type === 'employee' && window.HR && HR.matchEmp) {
+      const pf = el('button', 'mg-pefb', `${icon('users')}ملف PEF`); pf.type = 'button'; pf.onclick = () => openPef(d, s); side.prepend(pf);
+    }
     card.appendChild(side);
     return card;
   }
@@ -376,6 +379,74 @@
   // سطر مختصر لقيم الجلسة الإضافية في رأس البطاقة
   function exLine(kind, vals) {
     return extraDefs(kind).map((f) => { const v = exFmt(f, (vals || {})[f.k]); return v ? ` · ${esc(exLabel(f))}: ${esc(v)}` : ''; }).join('');
+  }
+
+
+  /* ----- ربط التوجيه بملف الموظف في منصة PEF ----- */
+  const PST = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'] };
+  const sysEmp = (d) => { const e = d.employee_id && D.employees ? D.employees.find((x) => x.id === d.employee_id) : null; return { id: d.employee_id || 't:' + d.target_name, name: e ? e.name : d.target_name, nid: e && e.nid ? e.nid : null }; };
+  function openPef(d, s) {
+    if (!window.HR || !HR.hasSession()) { toast('سجّل الدخول لمنصة PEF من قسم الموارد البشرية أولاً'); return; }
+    if (!HR.employees().length) { toast('لم تُزامَن بيانات PEF بعد: افتح الموارد البشرية واضغط مزامنة'); return; }
+    const q = sysEmp(d), m = HR.matchEmp(q);
+    if (m.emp && m.how !== 'probable') { showPef(d, s, m); return; }
+    pickPef(d, s, q, m);
+  }
+  // لا تطابق مؤكّد: اختيار الموظف الصحيح مرة واحدة ويُحفظ الربط
+  function pickPef(d, s, q, m) {
+    const all = HR.employees().filter((e) => e.active).sort((a, z) => a.name.localeCompare(z.name, 'ar'));
+    const first = m.emp ? [m.emp] : m.cands;
+    sheet(`<h3 class="mg-sh">ربط بملف PEF<small>${esc(q.name)}</small></h3>
+      <p class="hr-omn" style="margin:0 0 8px">${m.emp ? 'تطابق مرجَّح: تأكد أنه الموظف نفسه ثم اضغط عليه لحفظ الربط.' : m.how === 'ambiguous' ? 'أكثر من موظف بهذا الاسم، اختر الصحيح.' : 'لم يُعثر على تطابق مؤكّد. اختر الموظف من منصة PEF مرة واحدة ويُحفظ الربط.'}</p>
+      ${first.length ? `<div class="ag-lbl">${m.emp ? 'المرجَّح' : 'مرشّحون'}</div><div class="mg-pick" id="pfC">${first.map((e) => `<button type="button" class="mg-opt" data-id="${esc(e.id)}"><b>${esc(e.name)}</b><small>${esc([e.dept, e.pos, e.org].filter(Boolean).join(' · '))}</small></button>`).join('')}</div>` : ''}
+      <div class="ag-lbl">بحث في موظفي PEF</div><div class="search hr-search">${icon('search')}<input id="pfQ" type="search" placeholder="الاسم أو رقم الهوية" aria-label="بحث"></div><div class="mg-pick" id="pfA"></div>`);
+    const link = (id) => { HR.linkEmp(q.id, id); const m2 = HR.matchEmp(q); if (m2.emp) showPef(d, s, m2); };
+    const draw2 = () => {
+      const v = normAr2($('pfQ').value), list = (v ? all.filter((e) => normAr2(e.name).includes(v) || String(e.nid || '').includes(v)) : []).slice(0, 25);
+      $('pfA').innerHTML = list.map((e) => `<button type="button" class="mg-opt" data-id="${esc(e.id)}"><b>${esc(e.name)}</b><small>${esc([e.dept, e.pos, e.org].filter(Boolean).join(' · '))}</small></button>`).join('') || (v ? '<div class="mg-dnone">لا نتائج</div>' : '');
+      $('pfA').querySelectorAll('.mg-opt').forEach((b) => b.onclick = () => link(b.dataset.id));
+    };
+    $('pfQ').oninput = draw2; draw2();
+    document.querySelectorAll('#pfC .mg-opt').forEach((b) => b.onclick = () => link(b.dataset.id));
+  }
+  const normAr2 = (v) => String(v || '').replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim().toLowerCase();
+
+  function showPef(d, s, m) {
+    const e = m.emp, t = Tracker.dayStr(), days = (n) => Math.round((new Date(n + 'T12:00:00Z') - new Date(t + 'T12:00:00Z')) / 864e5);
+    const cons = HR.contracts().filter((c) => c.empId === e.id && c.end).sort((a, z) => String(z.end).localeCompare(String(a.end)));
+    const con = cons.find((c) => (!c.start || c.start <= t) && c.end >= t) || cons[0];
+    const asgs = HR.assignments().filter((a) => a.empId === e.id && (!a.end || a.end >= t)).sort((a, z) => String(a.end || '9').localeCompare(String(z.end || '9')));
+    const rowOf = (ds) => HR.dayReport(ds).rows.find((r) => r.e.id === e.id);
+    const tr = rowOf(t), wk = { present: 0, late: 0, absent: 0, leave: 0, min: 0 };
+    for (let i = 0; i < 7; i++) { const ds = Tracker.addDays(t, -i), rp = HR.dayReport(ds); if (!rp.synced) continue; const r = rp.rows.find((x) => x.e.id === e.id); if (!r) continue; if (r.list.length) wk.present++; if (r.status === 'late') wk.late++; if (r.status === 'absent') wk.absent++; if (r.status === 'leave') wk.leave++; wk.min += r.workMin || 0; }
+    const bal = HR.balanceOf(e.id), an = bal && bal.annual;
+    const info = window.hrPhone ? window.hrPhone(e.phone) : null;
+    const at = actOf(d.action_type), closed = s.status === 'closed';
+    const money = (v, c) => { if (v == null || v === '') return '—'; const n = +v; return isFinite(n) ? n.toLocaleString('en', { maximumFractionDigits: 2 }) + ' ' + (c || '') : String(v); };
+    const kv = (rows) => `<div class="pf-g">${rows.filter((x) => x[1] != null && x[1] !== '').map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}</div>`;
+    const how = { nid: 'مطابقة برقم الهوية', name: 'مطابقة بالاسم', manual: 'ربط يدوي محفوظ', probable: 'مطابقة مرجَّحة بالاسم' }[m.how] || '';
+    sheet(`<div class="hr-ph"><span class="hr-ava big ok">${esc(String(e.name).trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join(''))}</span><div><b>${esc(e.name)}</b><small>${esc([e.dept, e.pos].filter(Boolean).join(' · '))}</small><div class="hr-tags"><span class="hr-b info">${esc(e.org)}</span><span class="hr-b mute">${e.type === 'field' ? 'ميداني' : 'مكتبي'}</span><span class="hr-b ${e.active ? 'ok' : 'bad'}">${e.active ? 'على رأس العمل' : 'منتهية خدمته'}</span></div></div></div>
+      <div class="pf-dir" style="--tc:${TONE[at.tone] || TONE.slate}"><span class="mg-seal">${esc(at.label)}</span><span>${esc(d.details || d.project || '')}</span></div>
+      <div class="hr-sec"><span>العقد</span>${con ? `<small>${con.end >= t ? 'ينتهي بعد ' + days(con.end) + ' يوم' : 'منتهٍ منذ ' + (-days(con.end)) + ' يوم'}</small>` : ''}</div>
+      ${con ? kv([['البداية', fd(con.start)], ['النهاية', fd(con.end)], ['الراتب', con.salary != null ? money(con.salary, con.cur) : ''], ['المسمى', esc(con.pos || '')]]) : '<div class="hr-none">لا عقد محفوظ لهذا الموظف</div>'}
+      <div class="hr-sec"><span>التكليفات الجارية</span><small>${asgs.length}</small></div>
+      ${asgs.length ? asgs.slice(0, 4).map((a) => `<div class="pf-r"><b>${esc(a.project || a.code || 'مشروع')}</b><small>${a.pct != null && a.pct !== '' ? esc(a.pct) + '% · ' : ''}${fd(a.start)} ← ${a.end ? fd(a.end) : '—'}</small></div>`).join('') : '<div class="hr-none">لا تكليفات جارية</div>'}
+      <div class="hr-sec"><span>الحضور</span></div>
+      ${kv([['اليوم', tr ? `<span class="hr-b ${(PST[tr.status] || ['', 'mute'])[1]}">${(PST[tr.status] || [tr.status])[0]}</span>${tr.firstIn ? ' ' + new Intl.DateTimeFormat('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: Core.TZ }).format(new Date(tr.firstIn)) : ''}` : '—'], ['آخر 7 أيام', `حضور ${wk.present} · تأخر ${wk.late} · بلا تسجيل ${wk.absent}`], ['ساعات الأسبوع', wk.min ? Math.floor(wk.min / 60) + ':' + String(wk.min % 60).padStart(2, '0') + ' س' : '']])}
+      <div class="hr-sec"><span>الأرصدة</span></div>
+      ${an ? kv([['السنوية', (an.rem != null ? Number(an.rem).toLocaleString('en', { maximumFractionDigits: 2 }) : '—') + ' يوم'], ['المرضية', bal.sickFull && bal.sickFull.rem != null ? Number(bal.sickFull.rem).toLocaleString('en', { maximumFractionDigits: 2 }) + ' يوم' : '']]) : '<div class="hr-none">لم يُجلب رصيد هذا الموظف بعد (من الموارد البشرية ← التقارير ← الأرصدة)</div>'}
+      <div class="hr-sec"><span>تنفيذ التوجيه</span><small>${esc(how)}</small></div>
+      <div class="pf-act">
+        ${info && info.dial ? `<button type="button" id="pfCall">${icon('phone')}اتصال</button>` : ''}${info && info.wa && info.wa.length ? `<button type="button" id="pfWa">${icon('chat')}واتساب</button>` : ''}<button type="button" id="pfMsg">${icon('note')}راسل</button><button type="button" id="pfFull">${icon('users')}الملف الكامل</button>
+      </div>
+      ${canEdit() && !closed ? `<div class="pf-st">${D.statuses.map((st) => `<button type="button" class="${d.status === st.k ? 'on' : ''}" data-s="${esc(st.k)}" style="--c:${(STC[st.k] || [0, '#8FA2B2'])[1]}">${esc(st.label)}</button>`).join('')}</div>` : `<p class="hr-omn">حالة التوجيه: ${esc((STC[d.status] || [d.status])[0])}</p>`}
+      <button class="btn-outline wide" id="pfUn" type="button">تغيير الربط</button>`);
+    if ($('pfCall')) $('pfCall').onclick = () => window.hrDial(info.dial);
+    if ($('pfWa')) $('pfWa').onclick = () => window.hrWa(info.wa[0].num);
+    $('pfMsg').onclick = () => { closeSheet(); setTimeout(() => window.hrCompose([{ empId: e.id }], at.endOnly ? 'assignment' : 'free'), 250); };
+    $('pfFull').onclick = () => { closeSheet(); App.go('hr'); setTimeout(() => window.hrOpenEmp(e.id), 350); };
+    $('pfUn').onclick = () => { HR.linkEmp(sysEmp(d).id, null); pickPef(d, s, sysEmp(d), { emp: null, cands: HR.matchEmp(Object.assign({}, sysEmp(d), { id: 'x' })).cands || [] }); };
+    document.querySelectorAll('.pf-st button').forEach((b) => b.onclick = () => { if (d.status !== b.dataset.s) { setStatus(d, b.dataset.s); closeSheet(); } });
   }
 
   /* ----- نوافذ ----- */

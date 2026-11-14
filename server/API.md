@@ -40,6 +40,10 @@ JSON دائماً: `{"ok":true,...}` أو `{"ok":false,"error":"رسالة عر�
 - مفاتيح مصفوفة الأنواع: `label, tone, icon`؛ والحالات: `label`.
 - قيم `status` المستعملة: `new`, `in_progress`, `done`؛ والجلسة: `open`, `closed`.
 
+## ربط الموظف بمنصة PEF
+- `employees[]` في `bootstrap` يحمل الآن `nid` (رقم الهوية) إن وُجد في جدول `employees` عمود بأحد الأسماء: `national_id, id_number, nid, identity_number, identity_no, id_no, national_no, national_number, idno`، وإلا `null`.
+- التطبيق يطابق به موظف التوجيه مع موظف منصة PEF (الأولوية: ربط يدوي محفوظ ← الهوية ← الاسم الكامل ← اسم مرجَّح بتأكيد المستخدم).
+
 ## الوحدات والسلة (لأي مستخدم مسجَّل دخوله)
 - `GET ?a=modules` ← `modules[{key,label,icon,enabled,badge}]`: الوحدات التي يعرضها التطبيق في شريطه (`mgmt` و`basket` حالياً). وحدة جديدة تظهر في التطبيق دون تحديثه، وغير المعروفة تُعرض برسالة «غير مدعومة في هذا الإصدار».
 - `GET ?a=basket` ← `items[]` (`id, basket_id, source, source_ref, title, subject, details, due_date, status, result_note, done_at, basket_title, basket_note, sent_at, from`) و`statuses[{k,label}]`.

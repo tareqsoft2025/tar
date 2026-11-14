@@ -1,6 +1,6 @@
 {
-  "versionCode": 61,
-  "versionName": "8.15",
-  "notes": "إرسال الرسائل النصية من داخل التطبيق مع تأكيد وسجل",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-61.apk"
+  "versionCode": 62,
+  "versionName": "8.16",
+  "notes": "ربط التوجيه بملف الموظف في PEF: عقده وتكليفاته وحضوره وأرصدته وتنفيذ التوجيه من مكان واحد",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-62.apk"
 }
