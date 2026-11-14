@@ -1,6 +1,6 @@
 {
-  "versionCode": 46,
-  "versionName": "8.0",
-  "notes": "تصميم الموارد البشرية الجديد: خمسة أقسام، لوحة اليوم، بطاقات يحتاج انتباهك، بحث شامل",
+  "versionCode": 47,
+  "versionName": "8.1",
+  "notes": "الموافقة على الطلبات من التطبيق (إجازات، مغادرات، مهام عمل)",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

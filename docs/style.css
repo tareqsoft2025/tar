@@ -1358,3 +1358,9 @@ html:has(#tab-times.active){overflow:hidden}
 .hr2-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .hr2-tile{display:grid;justify-items:center;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 2px;color:var(--text);font:inherit;font-size:.74rem;cursor:pointer}
 .hr2-tile svg{width:21px;height:21px;color:var(--gold);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.hr2-bal{display:flex;justify-content:space-between;gap:8px;background:color-mix(in srgb,var(--gold) 10%,transparent);border-radius:12px;padding:9px 12px;font-size:.84rem;margin:8px 0}
+.hr2-dec{display:grid;gap:8px;margin:10px 0}
+.hr2-dec textarea{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--text);font:inherit;padding:10px;resize:none}
+.hr2-decb{display:grid;grid-template-columns:1.4fr 1fr;gap:8px}
+.hr2-decb button{text-align:center;justify-content:center;display:flex;align-items:center;padding:12px 8px}
