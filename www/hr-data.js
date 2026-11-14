@@ -624,7 +624,29 @@
     return gap > 0 && gap < 20 ? gap : 20;
   }
 
-  window.HR = { pollHint, notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  /* ---------- ربط موظف النظام المساعد بملفه في منصة PEF ---------- */
+  const normAr = (v) => String(v || '').replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[^ء-ي0-9a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const digitsOf = (v) => String(v || '').replace(/\D/g, '');
+  // الأولوية: ربط يدوي محفوظ ← رقم الهوية ← الاسم الكامل المطابق ← اسم مرجَّح (الأول والأخير) ← مرشّحون للاختيار
+  function matchEmp(q) {
+    const links = db.get('empLinks', {}), all = employees();
+    if (q.id != null && links[q.id]) { const e = all.find((x) => x.id === String(links[q.id])); if (e) return { emp: e, how: 'manual', cands: [] }; }
+    if (q.nid && digitsOf(q.nid).length >= 8) { const e = all.find((x) => digitsOf(x.nid) === digitsOf(q.nid)); if (e) return { emp: e, how: 'nid', cands: [] }; }
+    const n = normAr(q.name);
+    if (!n) return { emp: null, how: null, cands: [] };
+    const tk = n.split(' ');
+    const score = (x) => { const t2 = normAr(x.name).split(' '); return tk.filter((t) => t2.includes(t)).length / Math.max(tk.length, t2.length); };
+    const eq = all.filter((x) => normAr(x.name) === n);
+    if (eq.length === 1) return { emp: eq[0], how: 'name', cands: [] };
+    if (eq.length > 1) return { emp: null, how: 'ambiguous', cands: eq.slice(0, 5) };
+    const cands = all.map((x) => ({ x, s: score(x) })).filter((o) => o.s >= 0.5).sort((a, b) => b.s - a.s).slice(0, 5).map((o) => o.x);
+    const strong = all.filter((x) => { const t2 = normAr(x.name).split(' '); return tk.length >= 2 && t2[0] === tk[0] && t2[t2.length - 1] === tk[tk.length - 1] && score(x) >= 0.6; });
+    if (strong.length === 1) return { emp: strong[0], how: 'probable', cands };
+    return { emp: null, how: null, cands };
+  }
+  const linkEmp = (sysId, pefId) => { const l = db.get('empLinks', {}); if (pefId == null) delete l[sysId]; else l[sysId] = String(pefId); db.put('empLinks', l); };
+
+  window.HR = { matchEmp, linkEmp, pollHint, notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     setWatch: (min) => { if (B && B.hrWatch) B.hrWatch(min | 0); },
     watchState: () => { try { return B && B.hrWatchState ? JSON.parse(B.hrWatchState()) : { min: 0, last: 0, ok: true }; } catch (e) { return { min: 0, last: 0, ok: true }; } },
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),

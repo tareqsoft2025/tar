@@ -229,9 +229,15 @@ if ($a === 'bootstrap') {
         ];
     }
 
+    // رقم الهوية (إن وُجد عمود له في employees) يُرسل في «nid» لربط التوجيه بملف الموظف في منصة PEF بدقة
+    $empCols = api_columns($pdo, 'employees');
+    $nidCol = null;
+    foreach (['national_id', 'id_number', 'nid', 'identity_number', 'identity_no', 'id_no', 'national_no', 'national_number', 'idno'] as $cn) {
+        if (isset($empCols[$cn])) { $nidCol = $cn; break; }
+    }
     $employees = [];
-    foreach ($pdo->query("SELECT id, name_ar, job_title FROM employees WHERE name_ar IS NOT NULL AND name_ar <> '' ORDER BY name_ar") as $e) {
-        $employees[] = ['id' => (int) $e['id'], 'name' => $e['name_ar'], 'title' => $e['job_title']];
+    foreach ($pdo->query("SELECT id, name_ar, job_title" . ($nidCol ? ", `" . $nidCol . "` AS nid" : "") . " FROM employees WHERE name_ar IS NOT NULL AND name_ar <> '' ORDER BY name_ar") as $e) {
+        $employees[] = ['id' => (int) $e['id'], 'name' => $e['name_ar'], 'title' => $e['job_title'], 'nid' => $nidCol ? (string) ($e['nid'] ?? '') : null];
     }
     $cands = [];
     foreach ($pdo->query("SELECT rc.id, rc.candidate_name, rc.decision, r.job_title FROM recruitment_candidates rc

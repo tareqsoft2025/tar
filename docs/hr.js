@@ -1643,4 +1643,5 @@
   App.screens.hr = () => { render(); if (window.OfflineMap && HR.hasSession()) OfflineMap.ensure(); if (due() || (HR.hasSession() && HR.settings().auto === 'open' && HR.meta().lastSync && Date.now() - HR.meta().lastSync > 5 * 60000)) doSync(true); };
   if (HR.hasSession()) applyBg();
   window.hrOpenEmp = openEmp; window.hrOpenDay = openDay;
+  window.hrPhone = phoneInfo; window.hrCompose = openCompose;
 })();

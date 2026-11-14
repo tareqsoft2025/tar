@@ -1533,3 +1533,16 @@ html:has(#tab-times.active){overflow:hidden}
 .sm-lr{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 12px;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
 .sm-lr b{font-size:.88rem}.sm-lr small{color:var(--muted);font-size:.72rem;display:block}.sm-lt{display:grid;justify-items:end;gap:2px}
 .sm-lr p{grid-column:1/-1;margin:4px 0 0;color:var(--muted);font-size:.78rem;line-height:1.5;white-space:pre-wrap;max-height:4.5em;overflow:hidden}
+
+/* ---- ربط التوجيه بملف PEF ---- */
+.mg-pefb{display:flex;gap:5px;align-items:center;background:color-mix(in srgb,var(--gold) 14%,transparent);border:1px solid color-mix(in srgb,var(--gold) 35%,var(--line));color:var(--gold);border-radius:10px;padding:6px 11px;font:inherit;font-size:.76rem;font-weight:800;cursor:pointer}
+.mg-pefb svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2}
+.pf-dir{display:flex;gap:8px;align-items:center;background:color-mix(in srgb,var(--tc) 8%,var(--card));border:1px solid var(--line);border-inline-start:4px solid var(--tc);border-radius:12px;padding:8px 10px;margin:8px 0;font-size:.82rem}
+.pf-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.pf-g div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:grid;gap:2px}.pf-g small{color:var(--muted);font-size:.7rem}.pf-g b{font-size:.86rem}
+.pf-r{display:flex;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:5px}.pf-r b{font-size:.86rem}.pf-r small{color:var(--muted);font-size:.74rem}
+.pf-act{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-bottom:8px}
+.pf-act button{display:grid;justify-items:center;gap:4px;padding:10px 4px;background:var(--card);border:1px solid var(--line);border-radius:14px;color:var(--text);font:inherit;font-size:.76rem;font-weight:700;cursor:pointer}
+.pf-act svg{width:19px;height:19px;color:var(--gold);fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.pf-st{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:8px}
+.pf-st button{flex:1;font:inherit;font-size:.78rem;padding:8px 4px;border-radius:9px;background:transparent;border:0;color:var(--muted);cursor:pointer}.pf-st button.on{background:color-mix(in srgb,var(--c) 22%,transparent);color:var(--c);font-weight:800}
