@@ -4,3 +4,4 @@ android/
 !dist/prayer.apk
 native/build/
 native/.tools/
+!dist/*.apk
