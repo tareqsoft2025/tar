@@ -9,9 +9,11 @@
 <script>
 // تُشغَّل في الخلفية من HrSyncJob: نفس المزامنة التراكمية دون فتح التطبيق
 (async function () {
+  let ok = true;
   try {
     if (window.AndroidBridge) {
-      const st = await HR.sync(null, { background: true });
+      const quick = location.hash === '#quick';
+      const st = await HR.sync(null, quick ? { quick: true, background: true } : { background: true });
       const ev = st ? HR.alertFilter(st.fresh) : [];
       if (ev.length && AndroidBridge.attAlert) {
         const tf = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: Core.TZ });
@@ -21,8 +23,8 @@
         AndroidBridge.attAlert(JSON.stringify({ type: 'att', events: ev }), title, body);
       }
     }
-  } catch (e) { /* retry next time */ }
-  if (window.AndroidBridge) AndroidBridge.done();
+  } catch (e) { ok = false; /* retry next time */ }
+  if (window.AndroidBridge) AndroidBridge.done(ok);
 })();
 </script>
 </body></html>

@@ -127,6 +127,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        visible = true;
         if (web != null) checkUpdate();
         maybeSendTest();
         poll.removeCallbacks(pollTick);
@@ -136,6 +137,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        visible = false;
         poll.removeCallbacks(pollTick);
     }
 
@@ -145,6 +147,7 @@ public class MainActivity extends Activity {
     private final Runnable pollTick = new Runnable() {
         public void run() { checkUpdate(); poll.postDelayed(this, POLL_MS); }
     };
+    static volatile boolean visible = false;
     private volatile boolean pendingInstall = false;
     private volatile int latestCode = 0;
 
@@ -323,6 +326,14 @@ public class MainActivity extends Activity {
         /** المزامنة التلقائية في الخلفية: كل عدد دقائق، أو 0 للإيقاف */
         @JavascriptInterface
         public void hrSetBackground(int minutes) { HrSyncJob.arm(MainActivity.this, minutes); }
+        @JavascriptInterface public void hrWatch(int minutes) { HrWatchService.set(MainActivity.this, minutes); }
+        @JavascriptInterface public String hrWatchState() { return HrWatchService.state(MainActivity.this); }
+        @JavascriptInterface public boolean batteryOk() { return HrWatchService.batteryOk(MainActivity.this); }
+        @JavascriptInterface public void batteryAsk() {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 23) startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:" + getPackageName())));
+            } catch (Exception e) { try { startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)); } catch (Exception e2) { /* ignore */ } }
+        }
 
         @JavascriptInterface
         public void erpGet(final String id, final String path) {
@@ -336,6 +347,9 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean erpSession() { return ErpClient.hasSession(MainActivity.this); }
+
+        @JavascriptInterface
+        public String netInfo() { return ErpClient.netInfo(MainActivity.this); }
 
         @JavascriptInterface
         public boolean hrPut(String name, String data) {
