@@ -34,7 +34,7 @@
   const fmtDist = (d) => d == null ? '' : d >= 1000 ? (d / 1000).toFixed(1) + ' كم' : d + ' م';
 
   let tab = store.get('hrTab', 'dash');
-  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', as: 'month', av: 'emp', am: today().slice(0, 7), proj: 'all' }, store.get('hrF', {}));
+  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', ws: 'hours', wf: 'all', as: 'month', av: 'emp', am: today().slice(0, 7), proj: 'all' }, store.get('hrF', {}));
   if (!/^\d{4}-\d{2}$/.test(f.am || '')) f.am = today().slice(0, 7);
   f.day = today(); f.q = '';
   const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, cf: f.cf, as: f.as, av: f.av });
@@ -48,7 +48,7 @@
     const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
     box.appendChild(acc);
     const tabs = el('div', 'chips hr-tabs');
-    [['dash', 'لوحة اليوم', 'grid'], ['att', 'الحضور', 'clock'], ['lv', 'الإجازات', 'cal'], ['emp', 'الموظفون', 'users'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase'], ['set', 'الإعدادات', 'sliders']].forEach(([k, n, ic]) => {
+    [['dash', 'لوحة اليوم', 'grid'], ['att', 'الحضور', 'clock'], ['wk', 'ساعات الأسبوع', 'chart'], ['lv', 'الإجازات', 'cal'], ['emp', 'الموظفون', 'users'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase'], ['set', 'الإعدادات', 'sliders']].forEach(([k, n, ic]) => {
       const b = el('button', 'chip sm' + (tab === k ? ' on' : ''), `${icon(ic)}${n}`);
       b.onclick = () => { tab = k; store.set('hrTab', k); render(); };
       tabs.appendChild(b);
@@ -56,7 +56,7 @@
     box.appendChild(tabs);
     const body = el('div', 'hr-view'); box.appendChild(body);
     if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
-    ({ dash: renderDash, att: renderAtt, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
+    ({ dash: renderDash, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
     const on = box.querySelector('.hr-tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   }
 
@@ -561,6 +561,126 @@
     }), 'لا طلبات بهذه الفلاتر');
   }
 
+  /* ---------- ساعات الأسبوع ---------- */
+  const wdN = F({ weekday: 'narrow' });
+  const wdS = F({ weekday: 'long' });
+  const weekStart = (ds) => addDays(ds, -((Tracker.dowOf(ds) + 1) % 7)); // الأسبوع يبدأ السبت
+  const hh = (m) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+  let wkCache = null;
+  // تجميع الأسبوع لكل موظف: مجموع الساعات، المطلوب حتى اليوم، أيام الحضور، التأخير، نسيان الخروج
+  function weekData(ws) {
+    const t = today(), cfg = HR.settings(), key = `${ws}|${HR.meta().lastSync}|${cfg.dayHours}|${cfg.weekend}|${cfg.office}|${cfg.field}|${cfg.grace}`;
+    if (wkCache && wkCache.key === key) return wkCache.data;
+    const days = []; for (let i = 0; i < 7; i++) days.push(addDays(ws, i));
+    const by = {}; let synced = 0;
+    days.forEach((ds) => {
+      if (ds > t) return;
+      const rep = HR.dayReport(ds);
+      if (rep.synced) synced++;
+      rep.rows.forEach((r) => {
+        const o = by[r.e.id] = by[r.e.id] || { e: r.e, days: {}, total: 0, expected: 0, present: 0, late: 0, noOut: 0, outside: 0, leave: 0 };
+        o.days[ds] = { r, synced: rep.synced, weekend: rep.weekend };
+        if (!rep.synced) return;
+        if (r.workMin) o.total += r.workMin;
+        if (r.list.length) o.present++;
+        if (r.lateMin > 0) o.late++;
+        if (r.outside) o.outside++;
+        if (r.status === 'leave') o.leave++;
+        if (r.openShift && !r.live && r.list.length) o.noOut++;
+        if (!rep.weekend && r.status !== 'leave') o.expected += (cfg.dayHours || 8) * 60;
+      });
+    });
+    const data = { days, rows: Object.values(by), synced };
+    wkCache = { key, data };
+    return data;
+  }
+  const wkTone = (o) => !o.expected ? (o.total ? 'ok' : 'mute') : o.total >= o.expected * 0.995 ? 'ok' : o.total >= o.expected * 0.8 ? 'warn' : 'bad';
+  function weekNav(body) {
+    const ws = f.wk || weekStart(today()), we = addDays(ws, 6), cur = ws === weekStart(today());
+    const nav = el('div', 'hr-dnav', `<button class="icon-btn flip" data-w="-7" aria-label="الأسبوع السابق">${icon('chev')}</button><label><b>${cur ? 'هذا الأسبوع' : 'من ' + fd(ws)}</b><small>${fd(ws)} ← ${fd(we)}</small><input type="date" value="${ws}" max="${today()}"></label><button class="icon-btn" data-w="7" aria-label="الأسبوع التالي" ${addDays(ws, 7) > today() ? 'disabled' : ''}>${icon('chev')}</button>`);
+    nav.querySelectorAll('[data-w]').forEach((b) => b.onclick = () => { f.wk = addDays(ws, +b.dataset.w); render(); });
+    nav.querySelector('input').onchange = (e) => { if (e.target.value) { f.wk = weekStart(e.target.value); render(); } };
+    body.appendChild(nav);
+    return ws;
+  }
+  function renderWeek(body) {
+    const ws = weekNav(body);
+    const D = weekData(ws), cfg = HR.settings();
+    if (!D.synced) {
+      const m = el('div', 'hr-empty', `<span class="hr-eic">${icon('chart')}</span><b>حضور هذا الأسبوع غير محفوظ على الجهاز</b><small>زامن الأيام لعرض ساعات العمل.</small>`);
+      const b = el('button', 'btn-outline wide', `${icon('refresh')}<span>مزامنة هذا الأسبوع</span>`);
+      b.onclick = async () => { b.disabled = true; try { await HR.sync(null, { from: ws }); } catch (e) { toast(e.message); } render(); };
+      m.appendChild(b); body.appendChild(m); return;
+    }
+    const base = D.rows.filter((o) => orgOk(o.e) && typeOk(o.e));
+    filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
+    filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
+    const cnt = { all: base.length, under: base.filter((o) => o.expected && o.total < o.expected * 0.8).length, over: base.filter((o) => o.expected && o.total > o.expected * 1.05).length, none: base.filter((o) => !o.total).length, noout: base.filter((o) => o.noOut).length };
+    if (!['all', 'under', 'over', 'none', 'noout'].includes(f.wf)) f.wf = 'all';
+    filterChips(body, 'wf', [['all', 'كل الموظفين'], ['under', 'أقل من المطلوب'], ['over', 'أكثر من المطلوب'], ['none', 'بلا ساعات'], ['noout', 'نسوا الخروج']], cnt);
+    filterChips(body, 'ws', [['hours', 'الأكثر ساعات'], ['low', 'الأقل ساعات'], ['diff', 'الأكثر نقصاً'], ['name', 'الاسم']]);
+    search(body, 'ابحث بالاسم أو الرقم أو القسم');
+    const flt = { all: () => true, under: (o) => o.expected && o.total < o.expected * 0.8, over: (o) => o.expected && o.total > o.expected * 1.05, none: (o) => !o.total, noout: (o) => o.noOut };
+    const sorters = { hours: (a, b) => b.total - a.total, low: (a, b) => a.total - b.total, diff: (a, b) => (a.total - a.expected) - (b.total - b.expected), name: (a, b) => a.e.name.localeCompare(b.e.name, 'ar') };
+    const rows = base.filter((o) => flt[f.wf](o) && match(f.q, o.e.name, o.e.empId, o.e.dept, o.e.nid)).sort((a, b) => sorters[f.ws](a, b) || a.e.name.localeCompare(b.e.name, 'ar'));
+    const sumT = rows.reduce((t, o) => t + o.total, 0), sumE = rows.reduce((t, o) => t + o.expected, 0);
+    body.appendChild(el('div', 'hr-wsum', `<div><small>الموظفون</small><b>${rows.length}</b></div><div><small>مجموع الساعات</small><b>${hh(sumT)}</b></div><div><small>متوسط الموظف</small><b>${rows.length ? hh(sumT / rows.length) : '—'}</b></div><div><small>من المطلوب</small><b class="${sumE && sumT < sumE * 0.8 ? 'bad' : ''}">${sumE ? Math.round(sumT / sumE * 100) + '%' : '—'}</b></div>`));
+    const tools = el('div', 'hr-tools', `<small>${fd(ws)} ← ${fd(addDays(ws, 6))} · المطلوب ${cfg.dayHours} س يومياً</small><button>${icon('share')}مشاركة</button>`);
+    tools.querySelector('button').onclick = () => shareList(`ساعات العمل من ${fd(ws)} إلى ${fd(addDays(ws, 6))}`, rows.map((o, i) => `${i + 1}. ${o.e.name} — ${hh(o.total)} س${o.expected ? ' من ' + hh(o.expected) : ''} · ${o.present} أيام${o.late ? ' · تأخير ' + o.late : ''}${o.noOut ? ' · بلا خروج ' + o.noOut : ''}`));
+    body.appendChild(tools);
+    const maxDay = Math.max(1, (cfg.dayHours || 8) * 60 * 1.25);
+    list(body, rows.map((o) => {
+      const tone = wkTone(o);
+      const bars = D.days.map((ds) => {
+        const c = o.days[ds], m = c && c.synced ? c.r.workMin : 0;
+        const cls = !c ? 'x' : !c.synced ? 'x' : c.r.status === 'leave' ? 'lv' : c.weekend && !m ? 'off' : m ? (c.r.lateMin > 0 ? 'late' : 'ok') : 'no';
+        return `<span title="${fd(ds)}"><i class="${cls}" style="height:${m ? Math.max(12, Math.min(100, m / maxDay * 100)) : 10}%"></i><em>${wdN.format(noon(ds))}</em></span>`;
+      }).join('');
+      const r = el('button', 'hr-row hr-crow');
+      r.innerHTML = `<span class="hr-ava ${tone}">${esc(initials(o.e.name))}</span><span class="hr-rt"><b>${esc(o.e.name)}</b><small>${esc([o.e.dept, TYPE[o.e.type], o.e.org].filter(Boolean).join(' · '))}</small><span class="hr-wbars">${bars}</span>
+        <span class="hr-flags">${o.late ? badge('تأخير ' + o.late, 'warn') : ''}${o.noOut ? badge('بلا خروج ' + o.noOut, 'bad') : ''}${o.outside ? badge('خارج الموقع ' + o.outside, 'bad') : ''}${o.leave ? badge('إجازة ' + o.leave, 'info') : ''}</span></span>
+        <span class="hr-rr"><b class="hr-pt ${tone}">${hh(o.total)}</b><small>${o.expected ? 'من ' + hh(o.expected) : 'ساعة'}</small>${o.expected && o.total !== o.expected ? `<small class="hr-df ${o.total > o.expected ? 'up' : 'dn'}">${o.total > o.expected ? 'زيادة' : 'نقص'} ${hh(Math.abs(o.total - o.expected))}</small>` : ''}</span>`;
+      r.onclick = () => openWeek(o.e.id, ws);
+      return r;
+    }), 'لا موظفين بهذه الفلاتر', 300);
+  }
+  function openWeek(empId, ws) {
+    const D = weekData(ws), o = D.rows.find((x) => x.e.id === empId);
+    if (!o) return;
+    const cfg = HR.settings(), e = o.e, tone = wkTone(o), t = today();
+    const maxDay = Math.max(1, (cfg.dayHours || 8) * 60 * 1.25);
+    const chart = D.days.map((ds) => {
+      const c = o.days[ds], m = c && c.synced ? c.r.workMin : 0, fut = ds > t;
+      const cls = fut || !c || !c.synced ? 'x' : c.r.status === 'leave' ? 'lv' : m ? (c.r.lateMin > 0 ? 'late' : 'ok') : 'no';
+      return `<button class="hr-wc" data-day="${ds}" ${fut ? 'disabled' : ''}><span class="hr-wcb"><i class="${cls}" style="height:${m ? Math.max(8, Math.min(100, m / maxDay * 100)) : 0}%"></i><u style="bottom:${Math.min(100, (cfg.dayHours || 8) * 60 / maxDay * 100)}%"></u></span><b>${m ? hh(m) : '—'}</b><small>${wdN.format(noon(ds))}</small></button>`;
+    }).join('');
+    const rowsHtml = D.days.map((ds) => {
+      const c = o.days[ds], fut = ds > t;
+      if (fut) return `<div class="hr-wd fut"><div class="hr-wdh"><b>${wdS.format(noon(ds))}</b><small>${fd(ds)}</small></div><span class="hr-b mute">لم يأتِ بعد</span></div>`;
+      if (!c) return `<div class="hr-wd"><div class="hr-wdh"><b>${wdS.format(noon(ds))}</b><small>${fd(ds)}</small></div><span class="hr-b mute">غير نشط</span></div>`;
+      if (!c.synced) return `<button class="hr-wd" data-day="${ds}"><div class="hr-wdh"><b>${wdS.format(noon(ds))}</b><small>${fd(ds)}</small></div><span class="hr-b mute">غير مزامن</span></button>`;
+      const r = c.r, st = STATUS[r.status];
+      const times = r.firstIn ? `${tf.format(new Date(r.firstIn))}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : r.live ? ' ← الآن' : ' ← بلا خروج'}` : '';
+      const rq = r.reqs.map(rqChip).join('');
+      return `<button class="hr-wd" data-day="${ds}"><div class="hr-wdh"><b>${wdS.format(noon(ds))}</b><small>${fd(ds)}</small></div>
+        <div class="hr-wdm"><span class="hr-wdt">${times || '—'}</span><span class="hr-flags">${badge(r.status === 'late' ? 'متأخر +' + r.lateMin + ' د' : st[0], st[1])}${r.outside ? badge('خارج الموقع', 'bad') : ''}${r.openShift && !r.live && r.list.length ? badge('بلا خروج', 'bad') : ''}${rq}</span></div>
+        <b class="hr-wdh2 ${r.workMin ? '' : 'z'}">${r.workMin ? hh(r.workMin) : '—'}</b></button>`;
+    }).join('');
+    sheet(`<div class="hr-ph"><span class="hr-ava big ${tone}">${esc(initials(e.name))}</span><div><b>${esc(e.name)}</b><small>${fd(ws)} ← ${fd(addDays(ws, 6))}</small><div class="hr-tags">${badge(e.org, 'info')}${badge(TYPE[e.type], 'mute')}</div></div></div>
+      <div class="hr-dsum">
+        <div><small>مجموع الساعات</small><b class="hr-pt ${tone}">${hh(o.total)}</b></div>
+        <div><small>المطلوب حتى اليوم</small><b>${o.expected ? hh(o.expected) : '—'}</b></div>
+        <div><small>الفرق</small><b class="${o.total >= o.expected ? 'okc' : 'warn'}">${o.expected ? (o.total >= o.expected ? 'زيادة ' : 'نقص ') + hh(Math.abs(o.total - o.expected)) : '—'}</b></div>
+        <div><small>أيام الحضور</small><b>${o.present}${o.present ? ` <em>معدل ${hh(o.total / o.present)}</em>` : ''}</b></div>
+      </div>
+      <div class="hr-sec"><span>الساعات يومياً</span><small>الخط = ${cfg.dayHours} س</small></div><div class="hr-wchart">${chart}</div>
+      <div class="hr-sec"><span>تفاصيل الأيام</span><small>اضغط يوماً لعرض سجله</small></div><div class="hr-wds">${rowsHtml}</div>
+      <button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>`);
+    const body = $('hrSheetBody');
+    body.querySelectorAll('[data-day]').forEach((b) => { b.onclick = () => openDay(empId, b.dataset.day); });
+    $('hrToEmp').onclick = () => openEmp(empId);
+  }
+
   /* ---------- الإعدادات ---------- */
   function renderSet(body) {
     const s = HR.settings();
@@ -599,10 +719,11 @@
       <label class="hr-srow"><span>مكتبي</span><input type="time" id="hsOff" value="${s.office}"></label>
       <label class="hr-srow"><span>ميداني</span><input type="time" id="hsFld" value="${s.field}"></label>
       <label class="hr-srow"><span>فترة السماح (دقيقة)</span><input type="number" id="hsGr" min="0" max="120" value="${s.grace}"></label>
+      <label class="hr-srow"><span>ساعات الدوام اليومية (لحساب المطلوب أسبوعياً)</span><input type="number" id="hsDh" min="1" max="16" step="0.5" value="${s.dayHours}"></label>
       <div class="hr-sl">أيام العطلة الأسبوعية</div><div id="hsWk" class="chips"></div>`);
     body.appendChild(c);
-    const save = () => { HR.db.put('settings', Object.assign(HR.settings(), { office: $('hsOff').value || '08:00', field: $('hsFld').value || '08:00', grace: Math.max(0, +$('hsGr').value || 0) })); toast('تم الحفظ'); };
-    ['hsOff', 'hsFld', 'hsGr'].forEach((id) => { $(id).onchange = save; });
+    const save = () => { HR.db.put('settings', Object.assign(HR.settings(), { office: $('hsOff').value || '08:00', field: $('hsFld').value || '08:00', grace: Math.max(0, +$('hsGr').value || 0), dayHours: Math.min(16, Math.max(1, +$('hsDh').value || 8)) })); toast('تم الحفظ'); };
+    ['hsOff', 'hsFld', 'hsGr', 'hsDh'].forEach((id) => { $(id).onchange = save; });
     const wk = $('hsWk');
     ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].forEach((n, i) => {
       const b = el('button', 'chip sm' + (s.weekend.includes(i) ? ' on' : ''), n);
