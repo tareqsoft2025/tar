@@ -51,6 +51,7 @@
       const s = JSON.stringify(v);
       try { if (B && B.hrPut) B.hrPut(name, s); else localStorage.setItem('hr_' + name, s); } catch (e) { /* full */ }
     },
+    reload() { Object.keys(mem).forEach((k) => delete mem[k]); },
     wipe() {
       Object.keys(mem).forEach((k) => delete mem[k]);
       try { if (B && B.hrWipe) B.hrWipe(); else Object.keys(localStorage).filter((k) => k.startsWith('hr_')).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
@@ -156,36 +157,56 @@
   function tzOff(ms) { const p = {}; offFmt.formatToParts(new Date(ms)).forEach((x) => { p[x.type] = x.value; }); return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000; }
   function localMidnight(ds) { const [y, m, d] = ds.split('-').map(Number); const g = Date.UTC(y, m - 1, d); return g - tzOff(g - tzOff(g)); }
   const dayRange = (ds) => ({ from: new Date(localMidnight(ds)).toISOString(), to: new Date(localMidnight(addDays(ds, 1)) - 1).toISOString() });
-  async function syncDay(ds, fresh) {
-    const rg = dayRange(ds);
-    const r = await get('/api/hr/attendance/events?from=' + encodeURIComponent(rg.from) + '&to=' + encodeURIComponent(rg.to) + '&limit=500');
-    if (!r.ok) throw Object.assign(new Error(errText(r)), { res: r });
-    const m = db.get(monthKey(ds), {});
-    const num = (v) => v == null || v === '' || !isFinite(+v) ? null : +v;
-    const evs = listOf(r.data).map((e) => ({
+  const numOr = (v) => v == null || v === '' || !isFinite(+v) ? null : +v;
+  function mapEvents(list) {
+    return list.map((e) => ({
       id: e.id, employeeId: String(e.employeeId != null ? e.employeeId : pick(e, 'employee.id', 'empId')), eventType: String(e.eventType || e.type || '').toLowerCase().replace('checkin', 'check_in').replace('checkout', 'check_out'), recordedAt: e.recordedAt, hiddenAt: e.hiddenAt || null,
       source: e.source || null, kind: e.kind || null, mode: e.registrationMode || null,
-      lat: num(pick(e, 'latitude', 'lat', 'location.latitude')), lon: num(pick(e, 'longitude', 'lng', 'lon', 'location.longitude')), acc: num(pick(e, 'accuracy', 'accuracyMeters')),
+      lat: numOr(pick(e, 'latitude', 'lat', 'location.latitude')), lon: numOr(pick(e, 'longitude', 'lng', 'lon', 'location.longitude')), acc: numOr(pick(e, 'accuracy', 'accuracyMeters')),
       siteId: pick(e, 'workSiteId', 'siteId'), match: e.workSiteMatchStatus || null, siteName: pick(e, 'matchedSiteNameAr', 'workSiteNameAr', 'workSite.nameAr', 'siteName'),
-      dist: num(pick(e, 'distanceMeters', 'distance')), device: typeof e.deviceInfo === 'string' ? e.deviceInfo.slice(0, 120) : e.deviceInfo ? JSON.stringify(e.deviceInfo).slice(0, 120) : null,
+      dist: numOr(pick(e, 'distanceMeters', 'distance')), device: typeof e.deviceInfo === 'string' ? e.deviceInfo.slice(0, 120) : e.deviceInfo ? JSON.stringify(e.deviceInfo).slice(0, 120) : null,
       note: pick(e, 'note', 'reason', 'changeReason'), by: pick(e, 'createdByUserName')
     }));
-    // تسجيلات جديدة لم تكن محفوظة من قبل (اليوم وأمس فقط): للتنبيه المنبثق
-    if (fresh) {
-      const t = dayStr();
-      if (ds === t || ds === addDays(t, -1)) {
-        const seen = m[ds] ? new Set(m[ds].map((e) => e.id)) : null;
-        evs.forEach((e) => {
-          if (e.hiddenAt || !e.recordedAt) return;
-          const age = Date.now() - Date.parse(e.recordedAt);
-          if (age > 36 * 3600e3 || age < -3600e3) return;
-          if (seen ? !seen.has(e.id) : age < 3 * 3600e3) fresh.push(Object.assign({ ds }, e));
-        });
-      }
-    }
+  }
+  // تسجيلات جديدة لم تكن محفوظة من قبل (اليوم وأمس فقط): للتنبيه المنبثق
+  function collectFresh(ds, evs, seen, fresh) {
+    if (!fresh) return;
+    const t = dayStr();
+    if (ds !== t && ds !== addDays(t, -1)) return;
+    evs.forEach((e) => {
+      if (e.hiddenAt || !e.recordedAt) return;
+      const age = Date.now() - Date.parse(e.recordedAt);
+      if (age > 36 * 3600e3 || age < -3600e3) return;
+      if (seen ? !seen.has(e.id) : age < 3 * 3600e3) fresh.push(Object.assign({ ds }, e));
+    });
+  }
+  const evPath = (from, to) => '/api/hr/attendance/events?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) + '&limit=500';
+  async function syncDay(ds, fresh) {
+    const rg = dayRange(ds);
+    const r = await get(evPath(rg.from, rg.to));
+    if (!r.ok) throw Object.assign(new Error(errText(r)), { res: r });
+    const m = db.get(monthKey(ds), {});
+    const evs = mapEvents(listOf(r.data));
+    collectFresh(ds, evs, m[ds] ? new Set(m[ds].map((e) => e.id)) : null, fresh);
     const before = JSON.stringify(m[ds] || []), after = JSON.stringify(evs);
     m[ds] = evs; db.put(monthKey(ds), m);
     return before === after ? 0 : 1;
+  }
+  // جلب تراكمي: فقط ما بعد آخر تسجيل محفوظ (طلب صغير جداً يناسب الإنترنت الضعيف)
+  async function syncDayInc(ds, fresh) {
+    const m = db.get(monthKey(ds), {}), prev = m[ds];
+    if (!prev || !prev.length) return syncDay(ds, fresh);
+    const rg = dayRange(ds), lastTs = Math.max(...prev.map((e) => Date.parse(e.recordedAt) || 0));
+    const from = new Date(Math.max(Date.parse(rg.from), lastTs - 5 * 60e3)).toISOString();
+    const r = await get(evPath(from, rg.to));
+    if (!r.ok) throw Object.assign(new Error(errText(r)), { res: r });
+    const have = new Set(prev.map((e) => e.id));
+    const add = mapEvents(listOf(r.data)).filter((e) => !have.has(e.id));
+    if (!add.length) return 0;
+    collectFresh(ds, add, have, fresh);
+    m[ds] = prev.concat(add).sort((a, b) => String(a.recordedAt).localeCompare(String(b.recordedAt)));
+    db.put(monthKey(ds), m);
+    return 1;
   }
   async function syncLeaves(from, to) {
     const r = await get('/api/hr/attendance/leave-map?from=' + from + '&to=' + to);
@@ -200,66 +221,103 @@
   }
 
   let syncing = false;
+  const netInfo = () => { try { return B && B.netInfo ? JSON.parse(B.netInfo()) : { online: navigator.onLine !== false, kbps: 0, wifi: false, metered: false }; } catch (e) { return { online: true, kbps: 0, wifi: false, metered: false }; } };
+  // اتصال ضعيف (2G/EDGE): أقل من ~1 ميغابت/ث على بيانات الجوال
+  const isSlow = () => { const n = netInfo(); return !!(n.online && !n.wifi && n.kbps > 0 && n.kbps < 1000); };
+  /**
+   * أوضاع المزامنة:
+   *  quick: حضور اليوم فقط وتراكمياً (طلب صغير، لخدمة المراقبة كل بضع دقائق)
+   *  light: الحضور منذ آخر مزامنة + الإجازات القريبة، والبيانات الكبيرة (موظفون/عقود/تكليفات/طلبات/أرصدة) كل 6 ساعات (12 على الاتصال الضعيف)
+   *  full : كل شيء (زر المزامنة اليدوي)
+   * وكل قسم يُحفظ فور اكتماله، وفشل قسم (ضعف الاتصال) لا يُسقط الباقي.
+   */
   async function sync(progress, opts) {
     if (syncing) return null;
+    opts = opts || {};
     syncing = true;
+    db.reload(); // قراءة أحدث ما كتبته خدمة المراقبة (تعمل في WebView مستقل)
+    const mode = opts.quick ? 'quick' : opts.full ? 'full' : 'light';
     const meta = db.get('meta', {});
-    const st = { at: Date.now() };
+    const slow = isSlow();
+    const st = { at: Date.now(), mode, slow, errors: [], ok: 0 };
+    const stage = async (name, fn) => {
+      try { const r = await fn(); st.ok++; return r; }
+      catch (e) { if (e && e.res && e.res.status === 401) throw e; st.errors.push(name); return undefined; }
+    };
     try {
-      progress && progress('الموظفون…');
-      st.employees = merge('employees', await pagedAll('/api/hr/employees?pageSize=500&status=all&sortBy=empId&sortDir=asc', progress, 'الموظفون'));
-      progress && progress('العقود…');
-      st.contracts = merge('contracts', await pagedAll('/api/hr/contracts?pageSize=100&sortBy=employeeName&sortDir=asc', progress, 'العقود'));
-      progress && progress('التكليفات…');
-      progress && progress('المشاريع…');
-      try {
-        const projs = await pagedAll('/api/projects/lookup?pageSize=50', progress, 'المشاريع');
-        if (projs.length) { st.projects = merge('projects', projs); projIdx = null; }
-      } catch (e) { /* قد لا يملك الحساب صلاحية المشاريع */ }
-      const ar = await get('/api/hr/assignments');
-      if (ar.ok) st.assignments = merge('assignments', listOf(ar.data && ar.data.data ? ar.data.data : ar.data));
-      const es = await get('/api/hr/assignments/ending-soon');
-      if (es.ok) db.put('asgEnding', listOf(es.data && es.data.data ? es.data.data : es.data).map((x) => idOf(x)));
-      const ws = await get('/api/hr/attendance/work-sites?all=1');
-      if (ws.ok) db.put('sites', listOf(ws.data).map((x) => ({ id: x.id, name: pick(x, 'nameAr', 'name', 'nameEn'), lat: +x.latitude, lon: +x.longitude, r: +x.radiusMeters || 150 })));
-      // الحضور: الأيام التي لم تُزامن بعد + اليوم وأمس دائماً (لأنها تتغيّر)
       const t = dayStr();
-      // من تاريخ البداية في الإعدادات: الأيام غير المحفوظة فقط + اليوم وأمس
-      const start = (opts && opts.from) || settings().attStart;
-      const want = new Set();
-      const addRange = (a, b) => { for (let d = a; d <= b && want.size < 400; d = addDays(d, 1)) want.add(d); };
-      if (!meta.attUntil || !meta.attFrom) addRange(start, t);
-      else {
-        if (start < meta.attFrom) addRange(start, addDays(meta.attFrom, -1));       // الفترة الأقدم الجديدة
-        addRange(addDays(meta.attUntil, -1), t);                                     // من آخر مزامنة حتى اليوم
-        if (meta.evVer !== 3) addRange(meta.attFrom < start ? meta.attFrom : start, t); // إعادة جلب: النسخ السابقة أرسلت التاريخ بصيغة خاطئة
-        if (opts && opts.from) addRange(opts.from, t);
+      const haveEmps = Object.keys(db.get('employees', {})).length > 0;
+      const heavyDue = mode === 'full' || !haveEmps || (mode === 'light' && (!meta.heavyAt || Date.now() - meta.heavyAt > (slow ? 12 : 6) * 3600e3));
+      if (mode !== 'quick' && heavyDue) {
+        progress && progress('الموظفون…');
+        await stage('employees', async () => { st.employees = merge('employees', await pagedAll('/api/hr/employees?pageSize=150&status=all&sortBy=empId&sortDir=asc', progress, 'الموظفون')); });
+        progress && progress('العقود…');
+        await stage('contracts', async () => { st.contracts = merge('contracts', await pagedAll('/api/hr/contracts?pageSize=100&sortBy=employeeName&sortDir=asc', progress, 'العقود')); });
+        progress && progress('المشاريع والتكليفات…');
+        try { const projs = await pagedAll('/api/projects/lookup?pageSize=50', progress, 'المشاريع'); if (projs.length) { st.projects = merge('projects', projs); projIdx = null; } } catch (e) { /* قد لا يملك الحساب صلاحية المشاريع */ }
+        await stage('assignments', async () => {
+          const ar = await get('/api/hr/assignments');
+          if (!ar.ok) throw new Error('assignments');
+          st.assignments = merge('assignments', listOf(ar.data && ar.data.data ? ar.data.data : ar.data));
+          const es = await get('/api/hr/assignments/ending-soon');
+          if (es.ok) db.put('asgEnding', listOf(es.data && es.data.data ? es.data.data : es.data).map((x) => idOf(x)));
+        });
+        await stage('sites', async () => {
+          const ws = await get('/api/hr/attendance/work-sites?all=1');
+          if (!ws.ok) throw new Error('sites');
+          db.put('sites', listOf(ws.data).map((x) => ({ id: x.id, name: pick(x, 'nameAr', 'name', 'nameEn'), lat: +x.latitude, lon: +x.longitude, r: +x.radiusMeters || 150 })));
+        });
       }
-      const days = [...want].sort();
+      // الحضور
+      const start = opts.from || settings().attStart;
+      const days = []; const want = new Set();
+      const addRange = (a, b) => { for (let d = a; d <= b && want.size < 400; d = addDays(d, 1)) want.add(d); };
+      if (mode === 'quick') { want.add(t); if (new Date().getHours() < 3) want.add(addDays(t, -1)); }
+      else if (!meta.attUntil || !meta.attFrom) addRange(start, t);
+      else {
+        if (start < meta.attFrom) addRange(start, addDays(meta.attFrom, -1));
+        addRange(addDays(meta.attUntil, -1), t);
+        if (meta.evVer !== 3) addRange(meta.attFrom < start ? meta.attFrom : start, t);
+        if (opts.from) addRange(opts.from, t);
+      }
+      days.push(...[...want].sort());
       const from = days[0] || t;
       let changedDays = 0, done = 0;
       const freshRaw = [];
-      const worker = async () => { while (days.length) { const d = days.shift(); changedDays += await syncDay(d, freshRaw); done++; progress && progress(`الحضور ${done}/${done + days.length}`); } };
-      await Promise.all([worker(), worker(), worker()]);
+      // اليوم الحالي: تراكمي (تسجيلات جديدة فقط) إلا كل 45 دقيقة أو في الوضع الكامل لالتقاط التعديلات
+      const fullToday = mode === 'full' || !meta.todayFullAt || Date.now() - meta.todayFullAt > 45 * 60e3;
+      const total = days.length;
+      const worker = async () => {
+        while (days.length) {
+          const d = days.shift();
+          try { changedDays += (d === t && !fullToday) ? await syncDayInc(d, meta.lastSync ? freshRaw : null) : await syncDay(d, meta.lastSync ? freshRaw : null); if (d === t && fullToday) meta.todayFullAt = Date.now(); }
+          catch (e) { if (e && e.res && e.res.status === 401) throw e; st.errors.push('att:' + d); }
+          done++; progress && progress(`الحضور ${done}/${total}`);
+        }
+      };
+      await Promise.all(Array.from({ length: slow ? 1 : 2 }, worker));
+      if (done && st.errors.filter((x) => x.startsWith('att:')).length < total) st.ok++;
       st.attendance = { days: done, changed: changedDays };
-      // لا تنبيهات في أول مزامنة (كل شيء "جديد" حينها)
       st.fresh = meta.lastSync ? summarizeFresh(freshRaw) : [];
-      progress && progress('الإجازات والمهام…');
-      st.leaves = await syncLeaves(addDays(from, -1), addDays(t, 30));
-      // طلبات الإجازات والمغادرات والمهام والعمل الإضافي والعمل في العطلة
-      st.requests = {};
-      for (const [k, path] of REQ_SRC) {
-        progress && progress('الطلبات: ' + REQ_LABEL[k] + '…');
-        const r = await get(path);
-        if (r.ok) { st.requests[k] = merge('req_' + k, listOf(r.data)); reqCache = null; }
+      if (mode !== 'quick') {
+        progress && progress('الإجازات والمهام…');
+        await stage('leaves', async () => { st.leaves = await syncLeaves(addDays(mode === 'full' ? from : t, -1), addDays(t, mode === 'full' ? 30 : 3)); });
+        if (heavyDue) {
+          st.requests = {};
+          for (const [k, path] of REQ_SRC) {
+            progress && progress('الطلبات: ' + REQ_LABEL[k] + '…');
+            await stage('req:' + k, async () => { const r = await get(path); if (!r.ok) throw new Error(k); st.requests[k] = merge('req_' + k, listOf(r.data)); reqCache = null; });
+          }
+          const bm = db.get('balMeta', {});
+          if (opts.balances || !bm.at || Date.now() - bm.at > (slow ? 12 : 6) * 3600e3) await stage('balances', async () => { st.balances = await syncBalances(progress); });
+        }
       }
-      // أرصدة الإجازات: كل 6 ساعات (أو عند الطلب)
-      const bm = db.get('balMeta', {});
-      if ((opts && opts.balances) || !bm.at || Date.now() - bm.at > 6 * 3600e3) st.balances = await syncBalances(progress);
-      meta.attUntil = t;
-      meta.attFrom = meta.attFrom && meta.attFrom < from ? meta.attFrom : from;
-      meta.bg = !!(opts && opts.background);
+      if (!st.ok) throw Object.assign(new Error('تعذّر الاتصال بالنظام، تحقق من الإنترنت'), { res: { status: 0 } });
+      if (heavyDue && !st.errors.some((x) => x === 'employees' || x === 'contracts')) meta.heavyAt = Date.now();
+      if (mode !== 'quick' || !meta.attUntil) { meta.attUntil = t; meta.attFrom = meta.attFrom && meta.attFrom < from ? meta.attFrom : from; }
+      meta.bg = !!opts.background;
       meta.lastSync = st.at; meta.last = st; meta.evVer = 3;
+      if (mode === 'quick') meta.lastQuick = st.at;
       db.put('meta', meta);
       return st;
     } finally { syncing = false; }
@@ -437,7 +495,9 @@
     };
   }
 
-  window.HR = { alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  window.HR = { netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+    setWatch: (min) => { if (B && B.hrWatch) B.hrWatch(min | 0); },
+    watchState: () => { try { return B && B.hrWatchState ? JSON.parse(B.hrWatchState()) : { min: 0, last: 0, ok: true }; } catch (e) { return { min: 0, last: 0, ok: true }; } },
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),
     forgetCreds: () => { if (B && B.erpForgetCreds) B.erpForgetCreds(); },
     setBackground: (min) => { if (B && B.hrSetBackground) B.hrSetBackground(min | 0); },

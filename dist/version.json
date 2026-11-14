@@ -1,6 +1,6 @@
 {
-  "versionCode": 43,
-  "versionName": "7.2",
-  "notes": "نافذة منبثقة في منتصف الشاشة عند حضور أو انصراف أي موظف (داخل التطبيق وفوق التطبيقات عند المزامنة في الخلفية) مع التحكم من الإعدادات",
+  "versionCode": 44,
+  "versionName": "7.3",
+  "notes": "متابعة الحضور والتطبيق مغلق، وكفاءة على الإنترنت الضعيف (2G)",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

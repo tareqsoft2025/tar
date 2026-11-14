@@ -33,7 +33,12 @@
     },
     remove() { if (B0 && B0.mapDelete) { B0.mapDelete(); this.pm = null; this.emit(); } },
     // تنزيل تلقائي مرة واحدة عند توفر الإنترنت (إن لم تكن الخريطة محمّلة)
-    ensure() { if (B0 && !this.have() && !this.downloading && this.wanted() && navigator.onLine !== false) return this.download(); return false; }
+    ensure() {
+      if (!B0 || this.have() || this.downloading || !this.wanted() || navigator.onLine === false) return false;
+      // ملف كبير: التنزيل التلقائي على Wi‑Fi أو الشبكات غير المقيّدة فقط؛ اليدوي متاح دائماً
+      try { const n = B0.netInfo ? JSON.parse(B0.netInfo()) : null; if (n && (!n.online || n.metered)) return false; } catch (e) { /* proceed */ }
+      return this.download();
+    }
   };
   window.mapProgress = (pct) => { if (!OFF.downloading) return; OFF.pct = pct; OFF.emit(); };
   window.mapDone = (ok, msg) => {

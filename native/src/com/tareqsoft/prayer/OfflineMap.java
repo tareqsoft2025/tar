@@ -80,22 +80,56 @@ final class OfflineMap {
             downloading = true;
         }
         File tmp = new File(file(c).getParentFile(), NAME + ".part");
+        File tagf = new File(file(c).getParentFile(), NAME + ".part.etag");
         try {
-            HttpURLConnection con = UpdateChecker.open(url, 15000);
-            int total = con.getContentLength();
-            InputStream in = con.getInputStream();
-            FileOutputStream out = new FileOutputStream(tmp);
-            byte[] buf = new byte[32768];
-            long done = 0;
-            int n, last = -1;
-            try {
-                while ((n = in.read(buf)) > 0) {
-                    out.write(buf, 0, n);
-                    done += n;
-                    int pct = total > 0 ? (int) (done * 100 / total) : 0;
-                    if (p != null && pct != last) { last = pct; p.on(pct); }
-                }
-            } finally { out.close(); in.close(); }
+            // تنزيل قابل للاستكمال: عند انقطاع الاتصال (2G) نكمل من حيث توقف بدل البدء من الصفر
+            long total = -1, done = tmp.exists() ? tmp.length() : 0;
+            String etag = null;
+            try { if (tagf.exists()) { java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(tagf)); etag = br.readLine(); br.close(); } } catch (Exception e) { etag = null; }
+            if (etag == null && done > 0) { tmp.delete(); done = 0; }
+            int last = -1, fails = 0;
+            while (total < 0 || done < total) {
+                HttpURLConnection con = null;
+                try {
+                    con = (HttpURLConnection) new java.net.URL(url).openConnection();
+                    con.setConnectTimeout(25000);
+                    con.setReadTimeout(60000);
+                    con.setRequestProperty("Accept-Encoding", "identity");
+                    if (done > 0) { con.setRequestProperty("Range", "bytes=" + done + "-"); if (etag != null) con.setRequestProperty("If-Range", etag); }
+                    int code = con.getResponseCode();
+                    if (code == 416) { tmp.delete(); tagf.delete(); done = 0; total = -1; etag = null; if (++fails > 40) return "فشل التنزيل، حاول مجدداً"; continue; }
+                    if (code != 200 && code != 206) throw new java.io.IOException("http " + code);
+                    if (code == 200 && done > 0) { done = 0; tmp.delete(); } // الخادم تجاهل Range أو تغيّر الملف
+                    String tag = con.getHeaderField("ETag");
+                    if (code == 200) {
+                        total = con.getContentLengthLong();
+                        etag = tag;
+                        if (etag != null) { java.io.FileWriter fw = new java.io.FileWriter(tagf); fw.write(etag); fw.close(); }
+                    } else {
+                        String cr = con.getHeaderField("Content-Range"); // bytes a-b/total
+                        if (cr != null && cr.indexOf('/') > 0) total = Long.parseLong(cr.substring(cr.indexOf('/') + 1).trim());
+                    }
+                    InputStream in = con.getInputStream();
+                    FileOutputStream out = new FileOutputStream(tmp, done > 0);
+                    byte[] buf = new byte[32768];
+                    int n;
+                    try {
+                        while ((n = in.read(buf)) > 0) {
+                            out.write(buf, 0, n);
+                            done += n;
+                            fails = 0;
+                            int pct = total > 0 ? (int) (done * 100 / total) : 0;
+                            if (p != null && pct != last) { last = pct; p.on(pct); }
+                        }
+                    } finally { out.close(); in.close(); }
+                    if (total < 0) total = done;
+                } catch (Exception e) {
+                    if (++fails > 40) return "فشل التنزيل، تحقق من الإنترنت وحاول مجدداً (سيُستكمل من حيث توقف)";
+                    done = tmp.exists() ? tmp.length() : 0;
+                    try { Thread.sleep(Math.min(30000, 2000L * fails)); } catch (InterruptedException ie) { return "أُلغي التنزيل"; }
+                } finally { if (con != null) con.disconnect(); }
+            }
+            tagf.delete();
             if (done < MIN_SIZE || (total > 0 && done != total)) { tmp.delete(); return "التنزيل غير مكتمل، حاول مجدداً"; }
             RandomAccessFile chk = new RandomAccessFile(tmp, "r");
             byte[] magic = new byte[7];

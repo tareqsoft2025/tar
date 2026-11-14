@@ -78,8 +78,8 @@ final class ErpClient {
         try {
             con = (HttpURLConnection) new URL(BASE + path).openConnection();
             con.setRequestMethod(method);
-            con.setConnectTimeout(15000);
-            con.setReadTimeout(60000);
+            con.setConnectTimeout(25000);   // إنترنت 2G: اتصال أبطأ
+            con.setReadTimeout(120000);
             con.setUseCaches(false);
             con.setInstanceFollowRedirects(false);
             con.setRequestProperty("Accept", "application/json");
@@ -105,15 +105,52 @@ final class ErpClient {
         } finally { if (con != null) con.disconnect(); }
     }
 
+    private static boolean transient_(Res r) { return r.status == 0 || r.status == 408 || r.status == 429 || r.status == 502 || r.status == 503 || r.status == 504; }
+
+    /** طلب GET مع إعادة محاولة بانتظار متزايد عند ضعف الاتصال (انقطاع، مهلة، 5xx). */
+    static Res getRetry(Context c, String path) {
+        long[] wait = { 1500, 4000, 9000 };
+        Res r = request(c, "GET", path, null);
+        for (int i = 0; i < wait.length && transient_(r); i++) {
+            try { Thread.sleep(wait[i]); } catch (InterruptedException e) { break; }
+            r = request(c, "GET", path, null);
+        }
+        return r;
+    }
+
+    /** حالة الاتصال: {online, kbps, wifi, metered} لتكييف المزامنة مع الإنترنت الضعيف. */
+    static String netInfo(Context c) {
+        JSONObject o = new JSONObject();
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            boolean online = false, wifi = false; int kbps = 0;
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                android.net.Network n = cm.getActiveNetwork();
+                android.net.NetworkCapabilities nc = n == null ? null : cm.getNetworkCapabilities(n);
+                if (nc != null) {
+                    online = nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+                    kbps = nc.getLinkDownstreamBandwidthKbps();
+                    wifi = nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) || nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET);
+                }
+            } else {
+                android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
+                online = ni != null && ni.isConnected();
+                wifi = ni != null && ni.getType() == android.net.ConnectivityManager.TYPE_WIFI;
+            }
+            o.put("online", online); o.put("kbps", kbps); o.put("wifi", wifi); o.put("metered", cm.isActiveNetworkMetered());
+        } catch (Exception e) { try { o.put("online", true); o.put("kbps", 0); o.put("wifi", false); o.put("metered", true); } catch (Exception x) { /* ignore */ } }
+        return o.toString();
+    }
+
     /** GET with one automatic session refresh on 401. */
     static Res get(Context c, String path) {
-        Res r = request(c, "GET", path, null);
+        Res r = getRetry(c, path);
         if (r.status == 401) {
             Res f = request(c, "POST", "/api/auth/refresh", "{}");
-            if (f.status >= 200 && f.status < 300) r = request(c, "GET", path, null);
+            if (f.status >= 200 && f.status < 300) r = getRetry(c, path);
             if (r.status == 401) {
                 String[] cr = loadCreds(c);
-                if (cr != null && login(c, cr[0], cr[1], true).status / 100 == 2) r = request(c, "GET", path, null);
+                if (cr != null && login(c, cr[0], cr[1], true).status / 100 == 2) r = getRetry(c, path);
             }
         }
         return r;

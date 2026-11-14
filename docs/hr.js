@@ -114,13 +114,15 @@
     const prog = () => $('hrProg'), txt = () => $('hrSyncTxt');
     if (prog()) prog().hidden = false;
     try {
-      const st = await HR.sync((m) => { if (txt()) txt().textContent = 'جارٍ المزامنة: ' + m; });
+      const st = await HR.sync((m) => { if (txt()) txt().textContent = 'جارٍ المزامنة: ' + m; }, { full: !silent });
       if (!st) return;
       const parts = [];
       const add = (n, s) => { if (s && (s.added || s.updated || s.removed)) parts.push(`${n}: ${s.added ? '+' + s.added + ' جديد' : ''}${s.updated ? ' ' + s.updated + ' محدّث' : ''}${s.removed ? ' ' + s.removed + ' محذوف' : ''}`.trim()); };
       add('الموظفون', st.employees); add('العقود', st.contracts); add('التكليفات', st.assignments);
       if (st.attendance && st.attendance.changed) parts.push(`الحضور: ${st.attendance.changed} يوم محدّث`);
-      if (!silent || parts.length) toast(parts.length ? 'تمت المزامنة — ' + parts.join('، ') : 'تمت المزامنة، لا تغييرات جديدة');
+      const bad = st.errors && st.errors.length;
+      if (bad) toast('تمت المزامنة جزئياً بسبب ضعف الاتصال (' + bad + ' قسم متبقٍ) — سيُستكمل تلقائياً' + (parts.length ? ' — ' + parts.join('، ') : ''));
+      else if (!silent || parts.length) toast(parts.length ? 'تمت المزامنة — ' + parts.join('، ') : 'تمت المزامنة، لا تغييرات جديدة');
       if (st.fresh && st.fresh.length) showAttPopup(st.fresh);
     } catch (e) {
       if (e.res && e.res.status === 401) { toast('انتهت الجلسة، سجّل الدخول من جديد'); HR.logout(); }
@@ -902,6 +904,16 @@
       put({ attStart: e.target.value });
       if (meta.attFrom && e.target.value < meta.attFrom) { toast('جارٍ جلب السجلات الأقدم…'); await doSync(); }
     };
+    // المتابعة في الخلفية (تعمل والتطبيق مغلق)
+    const wst = HR.watchState();
+    const wc = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('refresh')}المتابعة الفورية والتطبيق مغلق</div>
+      <p class="hr-omn" style="margin:0 0 8px">خدمة خفيفة تفحص تسجيلات الحضور الجديدة كل بضع دقائق وتعرض النافذة في منتصف الشاشة حتى لو كان التطبيق مغلقاً. تستهلك بيانات قليلة جداً (طلب صغير لتسجيلات اليوم الجديدة فقط) فتناسب الإنترنت الضعيف.</p>
+      <div id="hsWatch" class="chips"></div>
+      <div class="hr-srow"><span>آخر فحص</span><b id="hsWLast">${wst.last ? new Date(wst.last).toLocaleTimeString('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit' }) + (wst.ok ? '' : ' (تعذّر)') : '—'}</b></div>
+      ${B && B.batteryOk && !B.batteryOk() ? `<button class="btn-outline wide" id="wBat" type="button">${icon('bell')}<span>استثناء التطبيق من توفير البطارية (مهم)</span></button><p class="hr-omn" style="margin:4px 0 0">بدونه قد يوقف أندرويد المتابعة عند تعطيل الشاشة لفترة طويلة.</p>` : ''}`);
+    body.appendChild(wc);
+    chipSet('hsWatch', [[0, 'إيقاف'], [1, 'كل دقيقة'], [2, 'كل 2 د'], [5, 'كل 5 د'], [10, 'كل 10 د'], [15, 'كل 15 د']], wst.min || 0, (v) => { HR.setWatch(v); toast(v ? 'بدأت المتابعة في الخلفية (إشعار دائم صغير)' : 'أُوقفت المتابعة في الخلفية'); });
+    if ($('wBat')) $('wBat').onclick = () => B.batteryAsk();
     // إشعارات الحضور المنبثقة
     const al = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('bell')}إشعارات الحضور المنبثقة</div>
       <p class="hr-omn" style="margin:0 0 8px">تظهر نافذة في منتصف الشاشة عند وصول تسجيل حضور أو انصراف جديد بعد كل مزامنة، حتى لو كنت في شاشة أخرى من التطبيق، وفوق التطبيقات عند المزامنة في الخلفية.</p>
@@ -1184,7 +1196,7 @@
   const due = () => { const s = HR.settings(); const m = HR.meta(); return HR.hasSession() && m.lastSync && s.auto !== 'off' && Date.now() - m.lastSync >= s.every * 60000; };
   function applyBg() { const s = HR.settings(); HR.setBackground(HR.hasSession() && s.bg && s.auto !== 'off' ? s.every : 0); }
   setInterval(() => { if (!document.hidden && due()) doSync(true); }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && due()) doSync(true); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { HR.db.reload(); if (due()) doSync(true); } });
   $('hrSheet').onclick = (e) => { if (e.target.hasAttribute('data-close')) closeSheet(); };
   App.screens.hr = () => { render(); if (window.OfflineMap && HR.hasSession()) OfflineMap.ensure(); if (due() || (HR.hasSession() && HR.settings().auto === 'open' && HR.meta().lastSync && Date.now() - HR.meta().lastSync > 5 * 60000)) doSync(true); };
   if (HR.hasSession()) applyBg();
