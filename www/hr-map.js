@@ -5,6 +5,59 @@
   let map = null, base = null, layer = null, mode = 'map', markers = [];
 
   const light = () => document.documentElement.getAttribute('data-theme') === 'light';
+  /* ---------- الخريطة دون إنترنت (قطاع غزة) ---------- */
+  const B0 = window.AndroidBridge || null;
+  const OFF = {
+    bbox: [34.17, 31.20, 34.60, 31.62], // غرب، جنوب، شرق، شمال
+    url: 'https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/maps/gaza.pmtiles',
+    pm: null, downloading: false, pct: 0, fns: [],
+    info() { try { return B0 && B0.mapInfo ? JSON.parse(B0.mapInfo()) : { have: !!window.__offlineSource, size: 0 }; } catch (e) { return { have: false, size: 0 }; } },
+    have() { return !!this.info().have; },
+    inside(p) { return p.lon >= this.bbox[0] && p.lon <= this.bbox[2] && p.lat >= this.bbox[1] && p.lat <= this.bbox[3]; },
+    usable(pts) { return !!window.protomapsL && !!window.pmtiles && this.have() && pts.every((p) => this.inside(p)); },
+    source() {
+      if (B0 && B0.mapRead) return { getKey: () => 'gaza-offline', getBytes: (offset, length) => new Promise((res, rej) => {
+        try { const b64 = B0.mapRead(offset, length); if (!b64) return rej(new Error('read')); const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); res({ data: u.buffer }); } catch (e) { rej(e); } }) };
+      return window.__offlineSource || null;
+    },
+    getPM() { if (!this.pm) this.pm = new pmtiles.PMTiles(this.source()); return this.pm; },
+    onChange(fn) { this.fns.push(fn); },
+    emit() { this.fns.forEach((f) => { try { f(this.state()); } catch (e) { /* ignore */ } }); },
+    state() { const i = this.info(); return { have: !!i.have, size: i.size || 0, downloading: this.downloading, pct: this.pct, native: !!(B0 && B0.mapDownload) }; },
+    wanted() { try { return !window.HR || HR.settings().mapAuto !== false; } catch (e) { return true; } },
+    download() {
+      if (!B0 || !B0.mapDownload || this.downloading) return false;
+      this.downloading = true; this.pct = 0; this.emit();
+      B0.mapDownload(this.url);
+      return true;
+    },
+    remove() { if (B0 && B0.mapDelete) { B0.mapDelete(); this.pm = null; this.emit(); } },
+    // تنزيل تلقائي مرة واحدة عند توفر الإنترنت (إن لم تكن الخريطة محمّلة)
+    ensure() { if (B0 && !this.have() && !this.downloading && this.wanted() && navigator.onLine !== false) return this.download(); return false; }
+  };
+  window.mapProgress = (pct) => { if (!OFF.downloading) return; OFF.pct = pct; OFF.emit(); };
+  window.mapDone = (ok, msg) => {
+    OFF.downloading = false; OFF.pct = ok ? 100 : 0; OFF.pm = null; OFF.emit();
+    if (window.toast) window.toast(ok ? 'تم حفظ خريطة غزة، تعمل الآن دون إنترنت' : msg || 'تعذّر تنزيل الخريطة');
+    if (ok && map && !document.getElementById('hrMapView').hidden && mode === 'map') tiles();
+  };
+  window.OfflineMap = OFF;
+  let viewPts = [];
+  const dlPill = () => document.getElementById('hmDl');
+  function pill(txt, auto) {
+    const e = dlPill(); if (!e) return;
+    if (!txt) { e.hidden = true; return; }
+    e.textContent = txt; e.hidden = false; clearTimeout(pill.t);
+    if (auto) pill.t = setTimeout(() => { e.hidden = true; }, auto);
+  }
+  OFF.onChange((st) => { if (st.downloading) pill(`جارٍ تنزيل خريطة غزة للعمل دون إنترنت… ${st.pct}%`); else { const e = dlPill(); if (e && !e.hidden && e.textContent.startsWith('جارٍ')) pill(null); } });
+  function vectorLayer() {
+    base = protomapsL.leafletLayer({ url: OFF.getPM(), flavor: light() ? 'light' : 'dark', lang: 'ar', maxDataZoom: 15, maxZoom: 20, attribution: '© OpenStreetMap · Protomaps' }).addTo(map);
+    document.getElementById('hmMap').dataset.mode = 'offline';
+    const n = document.getElementById('hmNet'); if (n) n.hidden = true;
+    pill('✓ خريطة غزة محفوظة على الجهاز وتعمل دون إنترنت', 3500);
+  }
+
   // خرائط Esri (بلا مفتاح): رمادية فاتحة/داكنة حسب الثيم، الشوارع، والقمر الصناعي مع الأسماء والطرق.
   // (خرائط CARTO صارت تتطلب مفتاحاً، وOpenStreetMap يرفض طلبات WebView)
   const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
@@ -19,6 +72,13 @@
   let overs = [];
   function tiles(step) {
     step = step || 0;
+    clearTimeout(tiles.t);
+    // داخل قطاع غزة وفي وضع "خريطة": نستخدم الخريطة المحلية (تعمل بدون إنترنت)
+    if (mode === 'map' && OFF.usable(viewPts)) {
+      if (base) map.removeLayer(base);
+      overs.forEach((o) => map.removeLayer(o)); overs = [];
+      try { vectorLayer(); return; } catch (e) { /* ننتقل إلى الخرائط عبر الإنترنت */ }
+    }
     const m = (MODES[mode] || MODES.map)(), list = m.base, prov = list[Math.min(step, list.length - 1)];
     if (base) map.removeLayer(base);
     overs.forEach((o) => map.removeLayer(o)); overs = [];
@@ -33,7 +93,11 @@
       if (!loaded && errors >= 4 && step + 1 < list.length) { clearTimeout(tiles.t); tiles(step + 1); }
     });
     clearTimeout(tiles.t);
-    tiles.t = setTimeout(() => { if (!loaded) { if (step + 1 < list.length) tiles(step + 1); else if (n) n.hidden = false; } }, 6000);
+    tiles.t = setTimeout(() => {
+      if (loaded) return;
+      if (OFF.usable(viewPts) && mode !== 'map') { mode = 'map'; document.querySelectorAll('#hmLayers button').forEach((x) => x.classList.toggle('on', x.dataset.l === 'map')); if (window.toast) window.toast('لا يوجد إنترنت، تم التحويل إلى الخريطة المحفوظة'); tiles(); return; }
+      if (step + 1 < list.length) tiles(step + 1); else if (n) n.hidden = false;
+    }, 6000);
   }
   function pin(color, label, pulse, big) {
     return L.divIcon({
@@ -69,6 +133,8 @@
       L.control.zoom({ position: 'topleft' }).addTo(map);
       map.attributionControl.setPrefix('');
     }
+    viewPts = (opts.points || []).concat(opts.sites || []).filter((p) => isFinite(p.lat) && isFinite(p.lon));
+    OFF.ensure();
     tiles();
     if (layer) map.removeLayer(layer);
     layer = L.layerGroup().addTo(map);

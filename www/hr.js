@@ -714,6 +714,31 @@
       acc.appendChild(fg);
     }
     body.appendChild(acc);
+    // الخريطة دون إنترنت
+    const OM = window.OfflineMap;
+    if (OM) {
+      const mb = (n) => (n / 1048576).toFixed(1) + ' م.ب';
+      const om = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('pin')}الخريطة دون إنترنت</div>
+        <div class="hr-srow"><span>خريطة قطاع غزة<small>OpenStreetMap · Protomaps · نحو 11 م.ب</small></span><b id="omSt"></b></div>
+        <div class="hr-pbar ok" id="omBarW" hidden><i id="omBar" style="width:0"></i></div>
+        <div class="hr-omb"><button class="btn-outline" id="omDl">${icon('down')}<span>تنزيل الآن</span></button><button class="btn-outline hr-out" id="omRm">${icon('x')}<span>حذف</span></button></div>
+        <label class="hr-srow"><span>تنزيل تلقائي عند توفر الإنترنت<small>لتعمل الخريطة دون إنترنت تلقائياً</small></span><input type="checkbox" id="omAuto" class="hr-tog" ${s.mapAuto === false ? '' : 'checked'}></label>
+        <p class="hr-omn">تُستخدم الخريطة المحفوظة تلقائياً لمواقع الحضور داخل قطاع غزة، بدون إنترنت. خارج غزة تُعرض الخرائط عبر الإنترنت.</p>`);
+      body.appendChild(om);
+      const draw = (st) => {
+        if (!$('omSt')) return;
+        st = st || OM.state();
+        $('omSt').textContent = !st.native ? 'متاحة في تطبيق أندرويد' : st.downloading ? `جارٍ التنزيل ${st.pct}%` : st.have ? `محفوظة · ${mb(st.size)}` : 'غير محمّلة';
+        $('omSt').className = st.have ? 'omok' : '';
+        $('omBarW').hidden = !st.downloading; $('omBar').style.width = st.pct + '%';
+        $('omDl').hidden = !st.native || st.have; $('omDl').disabled = st.downloading;
+        $('omRm').hidden = !st.have;
+      };
+      omDraw = draw; draw();
+      $('omDl').onclick = () => { if (!OM.download()) toast('تعذّر بدء التنزيل'); };
+      $('omRm').onclick = () => { if (confirm('حذف الخريطة المحفوظة من الجهاز؟')) { OM.remove(); toast('تم حذف الخريطة'); draw(); } };
+      $('omAuto').onchange = (e) => { put({ mapAuto: e.target.checked }); if (e.target.checked) OM.ensure(); };
+    }
     const c = el('div', 'group pad hr-set', `
       <div class="hr-sl">بداية الدوام (لحساب التأخير)</div>
       <label class="hr-srow"><span>مكتبي</span><input type="time" id="hsOff" value="${s.office}"></label>
@@ -931,6 +956,8 @@
   }
 
   /* ---------- الربط ---------- */
+  let omDraw = null;
+  if (window.OfflineMap) OfflineMap.onChange((st) => { if (omDraw) omDraw(st); });
   $('hrSync').onclick = () => doSync();
   // المزامنة التلقائية: عند فتح القسم وأثناء استخدامه حسب الإعدادات، وفي الخلفية عبر أندرويد
   const due = () => { const s = HR.settings(); const m = HR.meta(); return HR.hasSession() && m.lastSync && s.auto !== 'off' && Date.now() - m.lastSync >= s.every * 60000; };
@@ -938,7 +965,7 @@
   setInterval(() => { if (!document.hidden && App.isActive('hr') && due()) doSync(true); }, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && App.isActive('hr') && due()) doSync(true); });
   $('hrSheet').onclick = (e) => { if (e.target.hasAttribute('data-close')) closeSheet(); };
-  App.screens.hr = () => { render(); if (due() || (HR.hasSession() && HR.settings().auto === 'open' && HR.meta().lastSync && Date.now() - HR.meta().lastSync > 5 * 60000)) doSync(true); };
+  App.screens.hr = () => { render(); if (window.OfflineMap && HR.hasSession()) OfflineMap.ensure(); if (due() || (HR.hasSession() && HR.settings().auto === 'open' && HR.meta().lastSync && Date.now() - HR.meta().lastSync > 5 * 60000)) doSync(true); };
   if (HR.hasSession()) applyBg();
   window.hrOpenEmp = openEmp; window.hrOpenDay = openDay;
 })();
