@@ -50,7 +50,7 @@
     const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
     box.appendChild(acc);
     // خمسة أقسام ثابتة، وتحتها شرائح فرعية لقسم التقارير
-    const secOf = () => tab === 'dash' ? 'today' : tab === 'emp' ? 'team' : tab === 'set' ? 'more' : (tab === 'lv' && f.lv === 'req') ? 'req' : 'rep';
+    const secOf = () => tab === 'dash' ? 'today' : tab === 'emp' ? 'team' : (tab === 'set' || tab === 'rev') ? 'more' : (tab === 'lv' && f.lv === 'req') ? 'req' : 'rep';
     const pend = pendingReqs().length;
     const nav = el('div', 'hr2-nav');
     [['today', 'اليوم', 'grid', () => { tab = 'dash'; }], ['team', 'الفريق', 'users', () => { tab = 'emp'; }], ['req', 'الطلبات', 'inbox', () => { tab = 'lv'; f.lv = 'req'; }],
@@ -72,8 +72,9 @@
       box.appendChild(sub);
     }
     const body = el('div', 'hr-view'); box.appendChild(body);
+    if (tab !== 'rev') revOpen = 0;
     if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
-    ({ dash: renderDash, sites: renderSites, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
+    ({ dash: renderDash, sites: renderSites, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet, rev: renderRev }[tab] || renderDash)(body);
     const on = box.querySelector('.hr-tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
     // زر "تحديد" في شريط أدوات القائمة
     const ts = body.querySelectorAll('.hr-tools');
@@ -1329,7 +1330,7 @@
 
   /* --- نافذة الإرسال --- */
   let cmp = null;
-  function openCompose(items, tplId) {
+  function openCompose(items, tplId, opts) {
     const seen = new Set(), emps = HR.db.get('employees', {}), recs = [];
     items.forEach((it) => {
       if (seen.has(it.empId) || !emps[it.empId]) return; seen.add(it.empId);
@@ -1338,7 +1339,7 @@
     });
     if (!recs.length) { toast('لا يوجد موظفون للإرسال'); return; }
     const t = templates().find((x) => x.id === tplId) || templates()[0];
-    cmp = { recs, tplId: t.id, text: t.text, ch: store.get('hrMsgCh', 'sms'), done: {}, newName: false, reason: '' };
+    cmp = { recs, tplId: t.id, text: t.text, ch: store.get('hrMsgCh', 'sms'), done: {}, newName: false, reason: (opts && opts.reason) || '' };
     drawCompose();
   }
   const waNum = (r) => (r.wa[r.cc] || r.wa[0] || {}).num || '';
@@ -1498,6 +1499,7 @@
     // الملخص الصباحي
     const dg = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('bell')}الملخص الصباحي</div>
       <p class="hr-omn" style="margin:0 0 8px">إشعار واحد كل يوم عمل يلخّص: المتأخرين، وغير المسجلين، والطلبات المعلّقة، والعقود والتكليفات التي تنتهي هذا الأسبوع. يصل حتى والتطبيق مغلق (مع تفعيل المتابعة الخلفية).</p>
+      <button type="button" class="btn-outline wide" id="rvOpen">${icon('alert')}<span>المراجعة الشهرية السرية</span></button>
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
       <label class="hr-srow"><span>السماح بإضافة/تعديل سجلات الحضور من التطبيق</span><input type="checkbox" id="atOn" class="hr-tog" ${s.attEdit === false ? '' : 'checked'}></label>
@@ -1508,6 +1510,7 @@
     body.appendChild(dg);
     $('wkRep').onclick = () => openWeekly('prev');
     $('wnLog').onclick = openWarnLog;
+    $('rvOpen').onclick = () => { tab = 'rev'; store.set('hrTab', 'set'); revFlt = 'need'; render(); };
     $('atOn').onchange = (e) => { put({ attEdit: e.target.checked }); toast(e.target.checked ? 'فُعّل تعديل الحضور' : 'أُوقف تعديل الحضور'); };
     $('atLog').onclick = openAttLog;
     $('dgOn').onchange = (e) => { put({ digestOn: e.target.checked }); toast(e.target.checked ? 'فُعّل الملخص الصباحي' : 'أُوقف الملخص الصباحي'); };
@@ -1784,6 +1787,132 @@
   }
 
 
+
+
+  /* ---------- المراجعة الشهرية السرية ---------- */
+  let revOpen = 0, revFlt = 'need', revYm = null, revQ = '', revCache = null;
+  const REV_TTL = 3 * 60e3;
+  const wdSh = F({ weekday: 'short' }), mLbl = F({ month: 'long', year: 'numeric' });
+  async function pinHash(pin) { try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('hr-rev|' + pin)); return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join(''); } catch (e) { return 'p:' + btoa(pin); } }
+  const hasPin = () => !!store.get('hrRevPin', '');
+  const durS = (m) => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)}س${m % 60 ? ' ' + (m % 60) + 'د' : ''}` : `${m}د`; };
+  const hhmm = (iso) => (iso ? tf.format(new Date(iso)) : '—');
+  function renderLock(body) {
+    const set = hasPin();
+    const box = el('div', 'hr-lock', `<span class="hr-lic">${icon('alert')}</span><b>المراجعة الشهرية السرية</b>
+      <small>${set ? 'أدخل الرمز لفتح الشاشة' : 'يمكنك حماية هذه الشاشة برمز (٤–٦ أرقام) أو المتابعة بدونه'}</small>
+      <input id="rvPin" class="hr-in hr-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="${set ? 'الرمز' : 'رمز جديد (اختياري)'}">
+      <div id="rvErr" class="hr-err" hidden></div>
+      <button class="btn-gold" id="rvGo" type="button">${set ? 'فتح' : 'تعيين الرمز والفتح'}</button>
+      ${set ? '' : '<button class="btn-outline wide" id="rvSkip" type="button">متابعة بدون رمز</button>'}`);
+    body.appendChild(box);
+    const open = () => { revOpen = Date.now() + REV_TTL; render(); };
+    const bad = (m) => { const e = $('rvErr'); e.textContent = m; e.hidden = false; };
+    $('rvGo').onclick = async () => {
+      const v = $('rvPin').value.trim();
+      if (set) { if ((await pinHash(v)) === store.get('hrRevPin', '')) open(); else { bad('الرمز غير صحيح'); $('rvPin').value = ''; } return; }
+      if (!/^\d{4,6}$/.test(v)) { bad('اكتب ٤ إلى ٦ أرقام'); return; }
+      store.set('hrRevPin', await pinHash(v)); toast('تم تعيين الرمز'); open();
+    };
+    if (!set) $('rvSkip').onclick = open;
+    $('rvPin').onkeydown = (ev) => { if (ev.key === 'Enter') $('rvGo').click(); };
+    setTimeout(() => { try { $('rvPin').focus(); } catch (e) { /* ignore */ } }, 80);
+  }
+  function renderRev(body) {
+    if (Date.now() > revOpen) { renderLock(body); return; }
+    revOpen = Date.now() + REV_TTL;
+    const ym0 = today().slice(0, 7); revYm = revYm || ym0;
+    const key = revYm + '|' + (HR.meta().lastSync || 0) + '|' + f.org + f.type + f.grp;
+    if (!revCache || revCache.key !== key) revCache = { key, M: HRReview.month(revYm, (e) => orgOk(e) && typeOk(e)) };
+    const M = revCache.M;
+    const shift = (n) => { const [y, m] = revYm.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); revYm = d.toISOString().slice(0, 7); render(); };
+    const head = el('div', 'hr-dnav', `<button class="icon-btn flip" data-d="-1" aria-label="الشهر السابق">${icon('chev')}</button><label><b>${mLbl.format(new Date(revYm + '-15T12:00:00Z'))}</b><small>${M.workDays} يوم دوام مزامَن</small></label><button class="icon-btn" data-d="1" aria-label="الشهر التالي" ${revYm >= ym0 ? 'disabled' : ''}>${icon('chev')}</button>`);
+    head.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => shift(+b.dataset.d); });
+    body.appendChild(head);
+    body.appendChild(el('div', 'hr-rvtop', `<button type="button" id="rvLock">${icon('alert')}قفل الآن</button><button type="button" id="rvPinCh">${hasPin() ? 'تغيير الرمز / إزالته' : 'تعيين رمز'}</button><button type="button" id="rvShare">${icon('note')}مشاركة</button>`));
+    $('rvLock').onclick = () => { revOpen = 0; render(); };
+    $('rvPinCh').onclick = () => { store.set('hrRevPin', ''); revOpen = 0; toast(hasPin() ? '' : 'أدخل رمزاً جديداً أو تابع بدونه'); render(); };
+    $('rvShare').onclick = () => { const t = revSummaryText(M); const B = window.AndroidBridge; if (B && B.share) B.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
+    groupBar(body);
+    const T = M.tot;
+    body.appendChild(el('div', 'hr-rvsum', `<div class="${T.need ? 'bad' : ''}"><b>${T.need}</b><small>تحتاج قراراً</small></div><div><b>${T.absent}</b><small>يوم بلا تسجيل ولا إجازة</small></div><div><b>${T.late}</b><small>تأخر (${durS(T.lateMin)})</small></div><div><b>${T.holiday}</b><small>عمل في عطلة</small></div>`));
+    if (M.unsynced.length) {
+      const w = el('div', 'hr-warnbox', `${icon('alert')}<span>${M.unsynced.length} يوم دوام غير مزامن في هذا الشهر، والأرقام ناقصة بقدرها.</span>`);
+      const b = el('button', 'btn-outline', 'مزامنة الشهر'); b.type = 'button';
+      b.onclick = async () => { b.disabled = true; b.textContent = 'جارٍ المزامنة…'; try { await HR.sync('full'); } catch (e) { toast(e.message || 'تعذّرت المزامنة'); } revCache = null; render(); };
+      w.appendChild(b); body.appendChild(w);
+    }
+    const cnt = { need: 0, abs: 0, late: 0, per: 0, mis: 0, hol: 0 };
+    M.list.forEach((E) => { if (E.c.need) cnt.need++; if (E.c.absent) cnt.abs++; if (E.c.late) cnt.late++; if (E.c.personalN) cnt.per++; if (E.c.missionN) cnt.mis++; if (E.c.holidayN) cnt.hol++; });
+    const fr = el('div', 'chips hr-fc');
+    [['need', 'تحتاج قراراً'], ['all', 'الكل'], ['abs', 'غياب'], ['late', 'تأخر'], ['per', 'مغادرات شخصية'], ['mis', 'مهام عمل'], ['hol', 'عمل بعطلة']].forEach(([k, n]) => {
+      const b = el('button', 'chip sm' + (revFlt === k ? ' on' : ''), `${n}${k !== 'all' ? `<em>${cnt[k]}</em>` : `<em>${M.list.length}</em>`}`); b.onclick = () => { revFlt = k; render(); }; fr.appendChild(b);
+    });
+    body.appendChild(fr);
+    const sb = el('div', 'search hr-search', `${icon('search')}<input type="search" placeholder="ابحث باسم الموظف" aria-label="بحث">`); const si = sb.querySelector('input'); si.value = revQ;
+    si.oninput = () => { revQ = si.value; drawRows(); }; body.appendChild(sb);
+    const holder = el('div', 'hr-rvlist'); body.appendChild(holder);
+    const pass = (E) => revFlt === 'all' || (revFlt === 'need' ? E.c.need : revFlt === 'abs' ? E.c.absent : revFlt === 'late' ? E.c.late : revFlt === 'per' ? E.c.personalN : revFlt === 'mis' ? E.c.missionN : E.c.holidayN);
+    function drawRows() {
+      const rows = M.list.filter((E) => pass(E) && match(revQ, E.e.name, E.e.empId, E.e.dept));
+      holder.innerHTML = '';
+      if (!rows.length) { holder.appendChild(el('div', 'hr-none', revFlt === 'need' ? 'لا موظف يحتاج قراراً هذا الشهر 👌' : 'لا نتائج')); return; }
+      rows.forEach((E) => {
+        const c = E.c, chips = [c.absent ? badge(`${c.absent} غياب`, 'bad') : '', c.late ? badge(`${c.late} تأخر · ${durS(c.lateMin)}`, 'warn') : '', c.personalN ? badge(`مغادرة شخصية ${durS(c.personalMin)}`, 'info') : '', c.missionN ? badge(`${c.missionN} مهمة`, 'ok') : '', c.holidayN ? badge(`${c.holidayN} عمل بعطلة`, 'ok') : '', c.noOut >= 2 ? badge(`${c.noOut} بلا خروج`, 'warn') : ''].join('');
+        const strip = M.days.map((d) => { const r = E.d[d.ds]; const st = !d.synced ? 'u' : r && r.holidayWork ? 'h' : d.weekend ? 'w' : !r ? 'u' : r.status === 'absent' ? 'a' : r.status === 'late' ? 'l' : r.status === 'leave' ? 'v' : 'p'; return `<i class="rv-${st}" title="${d.ds}"></i>`; }).join('');
+        const row = el('button', 'hr-rvrow' + (c.need ? ' need' : ''), `<span class="hr-ava">${esc(initials(E.e.name))}</span><span class="hr-rt"><b>${esc(E.e.name)}</b><small>${esc([E.e.dept, E.e.pos].filter(Boolean).join(' · '))}</small><span class="hr-flags">${chips || badge('منتظم', 'ok')}</span><span class="rv-strip">${strip}</span></span>`);
+        row.type = 'button'; row.onclick = () => openRevEmp(E.e.id);
+        holder.appendChild(row);
+      });
+    }
+    drawRows();
+  }
+  function revSummaryText(M) {
+    const L = [`*المراجعة الشهرية — ${mLbl.format(new Date(M.ym + '-15T12:00:00Z'))}*`, `${M.tot.need} موظف يحتاج قراراً · غياب ${M.tot.absent} يوم · تأخر ${M.tot.late} (${durS(M.tot.lateMin)}) · عمل بعطلة ${M.tot.holiday}`, ''];
+    M.list.filter((E) => E.c.need).slice(0, 15).forEach((E, i) => { const c = E.c; L.push(`${i + 1}. ${E.e.name}: ${[c.absent ? c.absent + ' غياب' : '', c.late ? c.late + ' تأخر (' + durS(c.lateMin) + ')' : '', c.personalMin ? 'مغادرة ' + durS(c.personalMin) : '', c.noOut >= 2 ? c.noOut + ' بلا خروج' : ''].filter(Boolean).join(' · ')}`); });
+    if (M.unsynced.length) L.push('', `ملاحظة: ${M.unsynced.length} يوم غير مزامن.`);
+    return L.join('\n');
+  }
+  // جملة قرار سريعة تلخّص الموظف
+  function revVerdict(c) {
+    const p = [];
+    if (c.absent) p.push(`غاب ${c.absent} ${c.absent === 1 ? 'يوماً' : c.absent === 2 ? 'يومين' : c.absent <= 10 ? 'أيام' : 'يوماً'} بلا تسجيل ولا إجازة`);
+    if (c.late) p.push(`تأخر ${c.late} مرة (${durS(c.lateMin)})`);
+    if (c.personalMin) p.push(`غادر لأمور شخصية ${durS(c.personalMin)}`);
+    if (c.noOut >= 2) p.push(`${c.noOut} أيام بلا تسجيل خروج`);
+    if (c.holidayN) p.push(`عمل ${c.holidayN} يوم عطلة`);
+    return p.length ? p.join(' · ') : 'التزام كامل هذا الشهر';
+  }
+  function openRevEmp(id) {
+    const M = revCache && revCache.M, E = M && M.list.find((x) => String(x.e.id) === String(id)); if (!E) return;
+    const c = E.c; let flt = 'all';
+    const days = M.days.filter((d) => E.d[d.ds] || !d.synced).slice().reverse();
+    const dRow = (d) => {
+      const r = E.d[d.ds];
+      if (!d.synced) return `<div class="rv-d u"><b>${fd(d.ds)}</b><small>${wdSh.format(new Date(d.ds + 'T12:00:00Z'))}</small><span>غير مزامن</span></div>`;
+      const st = r.holidayWork ? ['عمل بعطلة', 'ok'] : r.weekend ? ['عطلة', 'mute'] : (STATUS[r.status] || ['—', 'mute']);
+      const tm = r.n ? `${hhmm(r.firstIn)} ← ${r.lastOut ? hhmm(r.lastOut) : (r.live ? 'مستمر' : 'بلا خروج')}${r.workMin ? ' · ' + durS(r.workMin) : ''}` : '';
+      const rq = [...r.personal.map((q) => `<span class="hr-b info">مغادرة شخصية ${durS(HRReview.durMin(q)) === '0د' ? '' : durS(HRReview.durMin(q))}${q.planned ? ' · ' + esc(q.planned) : ''}</span>`), ...r.mission.map((q) => `<span class="hr-b ok">مهمة${q.project ? ': ' + esc(q.project) : ''}</span>`), ...r.ot.map(() => '<span class="hr-b ok">عمل إضافي</span>'), ...r.hol.map(() => '<span class="hr-b ok">طلب عمل بعطلة</span>')].join('');
+      return `<button type="button" class="rv-d ${r.status}${r.weekend ? ' we' : ''}" data-day="${d.ds}"><b>${fd(d.ds)}</b><small>${wdSh.format(new Date(d.ds + 'T12:00:00Z'))}</small><span>${badge(st[0] + (r.lateMin && !r.weekend ? ' ' + r.lateMin + 'د' : ''), st[1])}${tm ? `<em>${tm}</em>` : ''}${rq ? `<span class="hr-flags">${rq}</span>` : ''}</span></button>`;
+    };
+    const keep = (d) => { if (flt === 'all') return true; const r = E.d[d.ds]; if (!r) return false; return flt === 'abs' ? r.status === 'absent' && !r.weekend : flt === 'late' ? r.status === 'late' && !r.weekend : flt === 'per' ? r.personal.length > 0 : flt === 'mis' ? r.mission.length > 0 : flt === 'hol' ? r.holidayWork : true; };
+    const paint = () => {
+      $('rvDays').innerHTML = days.filter(keep).map(dRow).join('') || '<div class="hr-none">لا أيام بهذا التصنيف</div>';
+      document.querySelectorAll('#rvFc button').forEach((b) => b.classList.toggle('on', b.dataset.f === flt));
+      $('rvDays').querySelectorAll('[data-day]').forEach((b) => { b.onclick = () => openDay(id, b.dataset.day); });
+    };
+    sheet(`<div class="hr-ph"><span class="hr-ava big ${c.need ? 'warn' : 'ok'}">${esc(initials(E.e.name))}</span><div><b>${esc(E.e.name)}</b><small>${mLbl.format(new Date(M.ym + '-15T12:00:00Z'))} · ${esc([E.e.dept, E.e.pos].filter(Boolean).join(' · '))}</small></div></div>
+      <div class="hr-verdict ${c.need ? 'bad' : 'ok'}">${esc(revVerdict(c))}</div>
+      <div class="hr-dsum"><div><small>حضور</small><b>${c.present}</b></div><div><small>غياب</small><b class="${c.absent ? 'warn' : ''}">${c.absent}</b></div><div><small>تأخر</small><b>${c.late}</b></div><div><small>ساعات العمل</small><b>${c.workMin ? hrs(c.workMin) : '—'}</b></div></div>
+      <div class="hr-gtools"><button type="button" id="rvLate">${icon('note')}رسالة تأخر</button><button type="button" id="rvAbs">${icon('note')}رسالة غياب</button><button type="button" id="rvWarn" class="go">${icon('alert')}إنذار</button></div>
+      <div class="chips hr-fc" id="rvFc">${[['all', 'كل الأيام'], ['abs', 'غياب'], ['late', 'تأخر'], ['per', 'مغادرات شخصية'], ['mis', 'مهام عمل'], ['hol', 'عمل بعطلة']].map(([k, n]) => `<button class="chip sm${k === 'all' ? ' on' : ''}" data-f="${k}">${n}</button>`).join('')}</div>
+      <div id="rvDays" class="rv-days"></div>`);
+    document.querySelectorAll('#rvFc button').forEach((b) => { b.onclick = () => { flt = b.dataset.f; paint(); }; });
+    $('rvLate').onclick = () => openCompose([{ empId: E.e.id }], 'late');
+    $('rvAbs').onclick = () => openCompose([{ empId: E.e.id }], 'absent');
+    $('rvWarn').onclick = () => { const w = []; if (c.late) w.push(`التأخر عن الدوام ${c.late} مرة (${durS(c.lateMin)}) خلال ${mLbl.format(new Date(M.ym + '-15T12:00:00Z'))}`); if (c.absent) w.push(`الغياب ${c.absent} يوم بلا تسجيل ولا إجازة`); if (c.noOut >= 2) w.push('عدم تسجيل الخروج'); const lv = Math.min(3, 1 + warnLog().filter((x) => String(x.empId) === String(E.e.id)).length); openCompose([{ empId: E.e.id }], 'warn' + lv, { reason: w.join(' و') }); };
+    paint();
+  }
 
   /* ---------- سجل الإنذارات الرسمية ---------- */
   const warnLog = () => HR.db.get('warnLog', []);
