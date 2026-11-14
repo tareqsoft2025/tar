@@ -1,6 +1,6 @@
 {
-  "versionCode": 53,
-  "versionName": "8.7",
-  "notes": "تصميم أنيق جديد لنافذة تسجيل الحضور",
+  "versionCode": 54,
+  "versionName": "8.8",
+  "notes": "إصلاح تحميل شاشة تنبيهات الإدارة (كان الطلب يُرسل خطأً كـ POST)",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

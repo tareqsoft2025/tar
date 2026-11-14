@@ -142,6 +142,8 @@ final class MgmtClient {
     static ErpClient.Res call(Context c, String method, String query, String json) {
         String path = API + (query == null || query.isEmpty() ? "" : "?" + query);
         boolean get = "GET".equals(method);
+        // لا جسم لطلبات GET: وجود جسم فارغ يجعل HttpURLConnection يرسلها POST فيرفضها الخادم
+        if (get || json == null || json.isEmpty()) json = null;
         Raw r = send(c, method, path, json, get);
         if (unauth(r)) {
             String[] cr = loadCreds(c);
