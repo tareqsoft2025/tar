@@ -1,6 +1,6 @@
 {
-  "versionCode": 52,
-  "versionName": "8.6",
-  "notes": "نافذة الحضور المنبثقة لا تُغلق تلقائياً، تُغلق بزر إغلاق",
+  "versionCode": 53,
+  "versionName": "8.7",
+  "notes": "تصميم أنيق جديد لنافذة تسجيل الحضور",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

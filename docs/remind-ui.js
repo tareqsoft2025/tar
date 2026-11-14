@@ -97,16 +97,16 @@
     const last = ev[ev.length - 1], many = ev.length > 1;
     const color = many ? (ev.some((x) => x.st === 'outside') ? '#F2716A' : ev.some((x) => x.late > 0) ? '#F0A64B' : '#2FBF71') : accentOf(last);
     const body = many
-      ? `<div class="ap-top"><span class="ap-pill"><i></i>تحديث الحضور</span><span class="ap-time">${tf.format(new Date(last.ts))}</span></div>
+      ? `<div class="ap-body"><div class="ap-top"><span class="ap-pill"><i></i>تحديث الحضور</span><span class="ap-time">${tf.format(new Date(last.ts))}</span></div>
          <div class="ap-count"><b>${ev.length}</b><span>تسجيلات جديدة</span></div>
-         <ul class="ap-list">${ev.slice(-6).reverse().map((v) => `<li style="--ac:${accentOf(v)}"><span class="ap-mini">${v.kind === 'in' ? ARR_IN : ARR_OUT}</span><div><b>${esc(v.name)}</b><small>${v.kind === 'in' ? 'دخول' : 'خروج'} ${tf.format(new Date(v.ts))}${v.late > 0 ? ' · متأخر ' + v.late + ' د' : ''}${v.st === 'outside' ? ' · خارج الموقع' : ''}</small></div></li>`).join('')}${ev.length > 6 ? `<li class="more">و${ev.length - 6} آخرين</li>` : ''}</ul>`
-      : `<div class="ap-top"><span class="ap-pill"><i></i>${last.kind === 'in' ? 'حضور جديد' : 'انصراف جديد'}</span><span class="ap-time">الآن</span></div>
+         <ul class="ap-list">${ev.slice(-6).reverse().map((v) => `<li style="--ac:${accentOf(v)}"><span class="ap-mini">${v.kind === 'in' ? ARR_IN : ARR_OUT}</span><div><b>${esc(v.name)}</b><small>${v.kind === 'in' ? 'دخول' : 'خروج'} ${tf.format(new Date(v.ts))}${v.late > 0 ? ' · متأخر ' + v.late + ' د' : ''}${v.st === 'outside' ? ' · خارج الموقع' : ''}</small></div></li>`).join('')}${ev.length > 6 ? `<li class="more">و${ev.length - 6} آخرين</li>` : ''}</ul></div>`
+      : `<div class="ap-body"><div class="ap-top"><span class="ap-pill"><i></i>${last.kind === 'in' ? 'حضور جديد' : 'انصراف جديد'}</span><span class="ap-time">الآن</span></div>
          <div class="ap-av"><span class="ap-ring"></span><span class="ap-ring r2"></span><span class="ap-ini">${esc(INI(last.name))}</span><span class="ap-kind">${last.kind === 'in' ? ARR_IN : ARR_OUT}</span></div>
          <h2 class="rp-title" id="rpT">${esc(last.name)}</h2>
          <div class="ap-sub">${esc([last.dept, last.org, TYPE_AR[last.type]].filter(Boolean).join(' · '))}</div>
          <div class="ap-what"><span>${last.kind === 'in' ? 'سجّل دخوله' : 'سجّل انصرافه'}</span><b>${tf.format(new Date(last.ts))}</b></div>
          <div class="ap-chips">${chipsOf(last)}</div>
-         ${last.place ? `<div class="ap-place">${PIN}<span>${esc(last.place)}</span></div>` : ''}`;
+         ${last.place ? `<div class="ap-place">${PIN}<span>${esc(last.place)}</span></div>` : ''}</div>`;
     host.innerHTML = `<div class="rp ap" role="alertdialog" aria-modal="true" style="--rc:${color}">
       <div class="rp-scrim"></div>
       <div class="rp-card ap-card">
