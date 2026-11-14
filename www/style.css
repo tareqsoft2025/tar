@@ -1597,3 +1597,7 @@ html:has(#tab-times.active){overflow:hidden}
 .wa-act{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;margin-top:4px}.wa-act button{padding:11px 6px;font-size:.84rem;border-radius:14px}
 .wa-act .hot{border-color:var(--gold);color:var(--gold);font-weight:800}
 .wa-skip{background:transparent;border:0;color:var(--muted);font:inherit;font-size:.76rem;padding:4px;cursor:pointer}
+
+.mg-dtools .mg-pefb.msg{margin-inline-end:0}
+.mg-dtools .mg-pefb:first-child{margin-inline-end:0}
+.mg-dtools .mg-pefb.msg+.mg-link{margin-inline-start:auto}

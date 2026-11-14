@@ -1,6 +1,6 @@
 {
-  "versionCode": 64,
-  "versionName": "8.18",
-  "notes": "واتساب: تبديل تلقائي بين +970 و+972 وحفظ الرقم الصحيح لكل موظف",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-64.apk"
+  "versionCode": 65,
+  "versionName": "8.19",
+  "notes": "مراسلة المعنيين بالتوجيهات (SMS/واتساب) من النظام المساعد HR",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-65.apk"
 }

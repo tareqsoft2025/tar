@@ -247,6 +247,7 @@
     const tools = el('div', 'mg-tools');
     const tb = (ic, label, fn, cls) => { const b = el('button', 'mg-tbtn' + (cls ? ' ' + cls : ''), `${icon(ic)}<span>${label}</span>`); b.type = 'button'; b.onclick = fn; tools.appendChild(b); };
     tb('share', 'تقرير الجلسة', () => shareReport(s));
+    if (s.directives.some((x) => x.target_type === 'employee') && window.hrCompose) tb('note', 'مراسلة المعنيين', () => messageSession(s));
     if (canEdit()) {
       if (!closed) { tb('note', 'تعديل', () => sessionSheet(s)); tb('lock', 'إقفال', () => confirmSheet('إقفال الجلسة', `ستصير الجلسة «${s.title}» للقراءة فقط${c.new + c.in_progress ? ` (فيها ${c.new + c.in_progress} توجيه لم يُنجز)` : ''}. يمكنك إعادة فتحها لاحقاً.`, 'إقفال الجلسة', () => run('session_close', { id: s.id }, 'أُقفلت الجلسة'))); }
       else tb('unlock', 'إعادة فتح', () => run('session_reopen', { id: s.id }, 'أُعيد فتح الجلسة'));
@@ -293,7 +294,8 @@
     } else side.appendChild(el('span', 'mg-stat', esc((STC[d.status] || [d.status])[0])));
     if (d.target_type === 'employee' && window.HR && HR.matchEmp) {
       const pf = el('button', 'mg-pefb', `${icon('users')}ملف PEF`); pf.type = 'button'; pf.onclick = () => openPef(d, s);
-      const row = side.querySelector('.mg-dtools'); if (row) row.prepend(pf); else side.appendChild(pf);
+      const mb = el('button', 'mg-pefb msg', `${icon('note')}رسالة`); mb.type = 'button'; mb.onclick = () => messageDirective(d, s);
+      const row = side.querySelector('.mg-dtools'); if (row) { row.prepend(mb); row.prepend(pf); } else { side.appendChild(pf); side.appendChild(mb); }
     }
     card.appendChild(side);
     return card;
@@ -383,6 +385,33 @@
   }
 
 
+
+  /* ----- مراسلة المعنيّ بالتوجيه (واتساب/SMS من التطبيق) ----- */
+  const dirTokens = (d) => { const at = actOf(d.action_type); return { label: at.label, details: d.details || '', start: at.endOnly ? '' : fd(d.start_date), end: fd(d.end_date), project: d.project || '' }; };
+  const dirTpl = (d) => (actOf(d.action_type).endOnly ? 'assignment' : 'directive');
+  // يعيد الموظف المطابق في PEF أو يفتح نافذة الربط أولاً ثم يتابع
+  function withPef(d, s, then) {
+    if (!window.HR || !HR.hasSession()) { toast('سجّل الدخول لمنصة PEF من قسم الموارد البشرية أولاً'); return; }
+    if (!HR.employees().length) { toast('لم تُزامَن بيانات PEF بعد: افتح الموارد البشرية واضغط مزامنة'); return; }
+    const q = sysEmp(d), m = HR.matchEmp(q);
+    if (m.emp && m.how !== 'probable') then(m); else pickPef(d, s, q, m, then);
+  }
+  function messageDirective(d, s) {
+    withPef(d, s, (m) => { closeSheet(); setTimeout(() => window.hrCompose([{ empId: m.emp.id, dir: dirTokens(d) }], dirTpl(d)), 250); });
+  }
+  // مراسلة كل المعنيين بتوجيهات الجلسة (من ربطوا بملف PEF) برسالة واحدة مخصّصة لكل موظف
+  function messageSession(s) {
+    if (!window.HR || !HR.hasSession() || !HR.employees().length) { toast('سجّل الدخول لمنصة PEF وزامنها من الموارد البشرية أولاً'); return; }
+    const items = [], skipped = [];
+    s.directives.filter((d) => d.target_type === 'employee').forEach((d) => {
+      const m = HR.matchEmp(sysEmp(d));
+      if (m.emp && m.how !== 'probable') items.push({ empId: m.emp.id, dir: dirTokens(d) }); else skipped.push(d.target_name);
+    });
+    if (!items.length) { toast(skipped.length ? 'لا موظف مربوط بملف PEF: افتح «ملف PEF» لأحدهم أولاً لربطه' : 'لا توجيهات لموظفين في هذه الجلسة'); return; }
+    if (skipped.length) toast(`تخطّي ${skipped.length} غير مربوطين بـ PEF (افتح «ملف PEF» لربطهم)`);
+    window.hrCompose(items, 'directive');
+  }
+
   /* ----- ربط التوجيه بملف الموظف في منصة PEF ----- */
   const PST = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'] };
   const sysEmp = (d) => { const e = d.employee_id && D.employees ? D.employees.find((x) => x.id === d.employee_id) : null; return { id: d.employee_id || 't:' + d.target_name, name: e ? e.name : d.target_name, nid: e && e.nid ? e.nid : null }; };
@@ -394,14 +423,14 @@
     pickPef(d, s, q, m);
   }
   // لا تطابق مؤكّد: اختيار الموظف الصحيح مرة واحدة ويُحفظ الربط
-  function pickPef(d, s, q, m) {
+  function pickPef(d, s, q, m, then) {
     const all = HR.employees().filter((e) => e.active).sort((a, z) => a.name.localeCompare(z.name, 'ar'));
     const first = m.emp ? [m.emp] : m.cands;
     sheet(`<h3 class="mg-sh">ربط بملف PEF<small>${esc(q.name)}</small></h3>
       <p class="hr-omn" style="margin:0 0 8px">${m.emp ? 'تطابق مرجَّح: تأكد أنه الموظف نفسه ثم اضغط عليه لحفظ الربط.' : m.how === 'ambiguous' ? 'أكثر من موظف بهذا الاسم، اختر الصحيح.' : 'لم يُعثر على تطابق مؤكّد. اختر الموظف من منصة PEF مرة واحدة ويُحفظ الربط.'}</p>
       ${first.length ? `<div class="ag-lbl">${m.emp ? 'المرجَّح' : 'مرشّحون'}</div><div class="mg-pick" id="pfC">${first.map((e) => `<button type="button" class="mg-opt" data-id="${esc(e.id)}"><b>${esc(e.name)}</b><small>${esc([e.dept, e.pos, e.org].filter(Boolean).join(' · '))}</small></button>`).join('')}</div>` : ''}
       <div class="ag-lbl">بحث في موظفي PEF</div><div class="search hr-search">${icon('search')}<input id="pfQ" type="search" placeholder="الاسم أو رقم الهوية" aria-label="بحث"></div><div class="mg-pick" id="pfA"></div>`);
-    const link = (id) => { HR.linkEmp(q.id, id); const m2 = HR.matchEmp(q); if (m2.emp) showPef(d, s, m2); };
+    const link = (id) => { HR.linkEmp(q.id, id); const m2 = HR.matchEmp(q); if (m2.emp) { if (then) then(m2); else showPef(d, s, m2); } };
     const draw2 = () => {
       const v = normAr2($('pfQ').value), list = (v ? all.filter((e) => normAr2(e.name).includes(v) || String(e.nid || '').includes(v)) : []).slice(0, 25);
       $('pfA').innerHTML = list.map((e) => `<button type="button" class="mg-opt" data-id="${esc(e.id)}"><b>${esc(e.name)}</b><small>${esc([e.dept, e.pos, e.org].filter(Boolean).join(' · '))}</small></button>`).join('') || (v ? '<div class="mg-dnone">لا نتائج</div>' : '');
@@ -444,7 +473,7 @@
       <button class="btn-outline wide" id="pfUn" type="button">تغيير الربط</button>`);
     if ($('pfCall')) $('pfCall').onclick = () => window.hrDial(info.dial);
     if ($('pfWa')) $('pfWa').onclick = () => window.hrWaOpen(e.id, e.name, e.phone, '');
-    $('pfMsg').onclick = () => { closeSheet(); setTimeout(() => window.hrCompose([{ empId: e.id }], at.endOnly ? 'assignment' : 'free'), 250); };
+    $('pfMsg').onclick = () => { closeSheet(); setTimeout(() => window.hrCompose([{ empId: e.id, dir: dirTokens(d) }], dirTpl(d)), 250); };
     $('pfFull').onclick = () => { closeSheet(); App.go('hr'); setTimeout(() => window.hrOpenEmp(e.id), 350); };
     $('pfUn').onclick = () => { HR.linkEmp(sysEmp(d).id, null); pickPef(d, s, sysEmp(d), { emp: null, cands: HR.matchEmp(Object.assign({}, sysEmp(d), { id: 'x' })).cands || [] }); };
     document.querySelectorAll('.pf-st button').forEach((b) => b.onclick = () => { if (d.status !== b.dataset.s) { setStatus(d, b.dataset.s); closeSheet(); } });
