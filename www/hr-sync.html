@@ -24,6 +24,11 @@
       }
     }
   } catch (e) { ok = false; /* retry next time */ }
+  // الملخص الصباحي مرة يومياً حتى والتطبيق مغلق (يُحفظ أيضاً في مركز الإشعارات)
+  try {
+    const d = window.AndroidBridge && AndroidBridge.digestNotify ? HR.maybeDigest() : null;
+    if (d) AndroidBridge.digestNotify(d.title, d.body, d.first || 'inbox');
+  } catch (e) { /* ignore */ }
   if (window.AndroidBridge) AndroidBridge.done(ok);
 })();
 </script>

@@ -101,6 +101,29 @@ public class ReminderActivity extends Activity {
         }
     }
 
+    /** الملخص الصباحي: إشعار عادي بأولوية عالية، يفتح الموارد البشرية عند القسم المعنيّ (go). */
+    static void fireDigest(Context c, String title, String body, String go) {
+        Intent show = new Intent(c, MainActivity.class).putExtra("tab", "hr").putExtra("go", go == null || go.isEmpty() ? "inbox" : go)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
+        PendingIntent pi = PendingIntent.getActivity(c, 7600, show, f | PendingIntent.FLAG_UPDATE_CURRENT);
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        Notification.Builder nb;
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel ch = new NotificationChannel("hr_digest", "الملخص الصباحي", NotificationManager.IMPORTANCE_HIGH);
+            nm.createNotificationChannel(ch);
+            nb = new Notification.Builder(c, "hr_digest");
+        } else {
+            nb = new Notification.Builder(c).setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+        }
+        nb.setContentTitle(title).setContentText(body)
+          .setStyle(new Notification.BigTextStyle().bigText(body))
+          .setSmallIcon(android.R.drawable.ic_dialog_info)
+          .setContentIntent(pi)
+          .setAutoCancel(true);
+        nm.notify(5600, nb.build());
+    }
+
     static int nid(String data) {
         try { JSONObject o = new JSONObject(data); if ("att".equals(o.optString("type"))) return 5500; return 4000 + Math.abs((o.optString("tid") + o.optString("ds")).hashCode() % 1000); }
         catch (Exception e) { return 4000; }

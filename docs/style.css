@@ -1459,3 +1459,30 @@ html:has(#tab-times.active){overflow:hidden}
 .mg-bdg.ok{background:color-mix(in srgb,#4FD08B 18%,transparent);color:#4FD08B}.mg-bdg.warn{background:color-mix(in srgb,#F0A64B 18%,transparent);color:#F0A64B}.mg-bdg.bad{background:color-mix(in srgb,#F2716A 18%,transparent);color:#F2716A}
 .mg-types{display:grid;gap:8px}.mg-type{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}.mg-type.off{opacity:.55}.mg-type small{color:var(--muted);font-size:.74rem}
 #mgSheetBody{padding:2px 16px 28px;max-height:78vh;overflow:auto}
+
+/* ---- مركز الإشعارات والملخص الصباحي ---- */
+.hr-bell{position:relative}
+.hr-bellb{position:absolute;top:2px;inset-inline-start:2px;min-width:17px;height:17px;border-radius:9px;background:#F2716A;color:#fff;font-style:normal;font-size:.62rem;font-weight:800;display:grid;place-items:center;padding:0 4px}
+.nt-f{margin:8px 0}
+.nt-bar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.nt-bar button{padding:8px;font-size:.78rem}
+.nt-list{display:grid;gap:6px}
+.nt-day{margin:8px 2px 2px;color:var(--muted);font-size:.74rem;font-weight:800}
+.nt{display:flex;align-items:stretch;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.nt.unread{border-color:color-mix(in srgb,var(--gold) 55%,var(--line));background:color-mix(in srgb,var(--gold) 6%,var(--card))}
+.nt.done{opacity:.55}
+.nt-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 12px;background:transparent;border:0;color:var(--text);font:inherit;text-align:start;cursor:pointer}
+.nt-ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:none;background:color-mix(in srgb,var(--muted) 15%,transparent);color:var(--muted)}
+.nt-ic svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.nt-ic.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}.nt-ic.info{background:color-mix(in srgb,#5B9DFF 16%,transparent);color:#5B9DFF}.nt-ic.warn{background:color-mix(in srgb,#F0A64B 16%,transparent);color:#F0A64B}.nt-ic.bad{background:color-mix(in srgb,#F2716A 16%,transparent);color:#F2716A}
+.nt-t{min-width:0;flex:1;display:grid}.nt-t b{font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nt-t small{color:var(--muted);font-size:.74rem}
+.nt-main time{color:var(--muted);font-size:.7rem;flex:none}
+.nt-done{width:44px;background:transparent;border:0;border-inline-start:1px solid var(--line);color:var(--muted);cursor:pointer}
+.nt-done svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4}
+.nt.done .nt-done{color:var(--ok)}
+.dg-row{display:flex;gap:8px;align-items:stretch;margin-bottom:8px}
+.dg-go{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;color:var(--text);font:inherit;text-align:start;cursor:pointer}
+.dg-go svg{width:19px;height:19px;color:var(--gold);fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.dg-go b{font-size:1.1rem}
+.dg-msg{display:flex;gap:5px;align-items:center;padding:0 12px;border-radius:14px;background:color-mix(in srgb,var(--gold) 14%,transparent);border:1px solid color-mix(in srgb,var(--gold) 35%,var(--line));color:var(--gold);font:inherit;font-size:.78rem;font-weight:800;cursor:pointer}
+.dg-msg svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2}
+.hr-tremind{display:inline-flex;gap:5px;align-items:center;color:var(--gold);font-weight:800}

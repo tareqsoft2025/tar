@@ -43,6 +43,8 @@
   function render() {
     const box = $('hrBody'); box.innerHTML = '';
     $('hrSync').hidden = !HR.hasSession();
+    $('hrBell').hidden = !HR.hasSession();
+    updateBell();
     if (!HR.hasSession()) { renderLogin(box); return; }
     const meta = HR.meta();
     const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
@@ -139,10 +141,11 @@
       if (bad) toast('تمت المزامنة جزئياً بسبب ضعف الاتصال (' + bad + ' قسم متبقٍ) — سيُستكمل تلقائياً' + (parts.length ? ' — ' + parts.join('، ') : ''));
       else if (!silent || parts.length) toast(parts.length ? 'تمت المزامنة — ' + parts.join('، ') : 'تمت المزامنة، لا تغييرات جديدة');
       if (st.fresh && st.fresh.length) showAttPopup(st.fresh);
+      const dg = HR.maybeDigest(); if (dg) toast('ملخص اليوم: ' + dg.body);
     } catch (e) {
       if (e.res && e.res.status === 401) { toast('انتهت الجلسة، سجّل الدخول من جديد'); HR.logout(); }
       else if (!silent) toast(e.message || 'تعذّرت المزامنة');
-    } finally { btn.classList.remove('spin'); if (App.isActive('hr')) render(); }
+    } finally { btn.classList.remove('spin'); updateBell(); if (App.isActive('hr')) render(); }
   }
 
   // نافذة منتصف الشاشة عند وصول تسجيل حضور/انصراف جديد
@@ -221,10 +224,81 @@
     body.appendChild(box);
   }
 
-  const PENDING = ['pending', 'submitted', 'manager_approved', 'new'];
-  function pendingReqs() {
-    try { const lim = addDays(today(), -30); return HR.requests().filter((q) => PENDING.includes(q.status) && (q.to || q.from || '') >= lim); } catch (e) { return []; }
+  const pendingReqs = () => { try { return HR.pendingReqs(); } catch (e) { return []; } };
+
+
+  /* ---------- مركز الإشعارات ---------- */
+  const NT = { att: ['clock', 'ok'], req: ['inbox', 'info'], digest: ['bell', 'warn'] };
+  function updateBell() {
+    const n = $('hrBellN'); if (!n) return;
+    let c = 0; try { c = HR.unreadCount(); } catch (e) { c = 0; }
+    n.hidden = !c; n.textContent = c > 99 ? '99+' : String(c);
   }
+  let ntFilter = 'all';
+  function openInbox() {
+    const list = HR.notices();
+    const shown = list.filter((n) => ntFilter === 'unread' ? !n.read : ntFilter === 'todo' ? !n.done : true);
+    const dayName = (ms) => { const d = new Date(ms).toISOString().slice(0, 10), t = today(); return d === t ? 'اليوم' : d === addDays(t, -1) ? 'أمس' : fd(d); };
+    let last = '';
+    const rows = shown.map((n) => {
+      const g = dayName(n.at), head = g !== last ? `<div class="nt-day">${g}</div>` : ''; last = g;
+      const [ic, tone] = NT[n.type] || ['bell', 'mute'];
+      return `${head}<div class="nt${n.read ? '' : ' unread'}${n.done ? ' done' : ''}" data-id="${esc(n.id)}"><button type="button" class="nt-main" data-open="${esc(n.id)}"><span class="nt-ic ${n.data && n.data.bad ? 'bad' : tone}">${icon(ic)}</span><span class="nt-t"><b>${esc(n.title)}</b><small>${esc(n.body || '')}</small></span><time>${tf.format(new Date(n.at))}</time></button><button type="button" class="nt-done" data-done="${esc(n.id)}" aria-label="${n.done ? 'إلغاء تم التصرف' : 'تم التصرف'}">${icon('check')}</button></div>`;
+    }).join('');
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('bell')}</span><div><b>مركز الإشعارات</b><small>${list.length ? list.filter((n) => !n.read).length + ' غير مقروء من ' + list.length : 'لا إشعارات بعد'}</small></div></div>
+      <div class="chips nt-f" id="ntF"></div>
+      <div class="nt-bar"><button type="button" id="ntAll" class="btn-outline">تعليم الكل كمقروء</button><button type="button" id="ntClr" class="btn-outline">مسح ما تمّ التصرف فيه</button></div>
+      <div class="nt-list">${rows || '<div class="hr-none">لا توجد إشعارات في هذا العرض</div>'}</div>`);
+    const fb = $('ntF');
+    [['all', 'الكل'], ['unread', 'غير المقروء'], ['todo', 'لم يُتصرف فيه']].forEach(([k, n]) => { const c = el('button', 'chip sm' + (ntFilter === k ? ' on' : ''), n); c.type = 'button'; c.onclick = () => { ntFilter = k; openInbox(); }; fb.appendChild(c); });
+    $('ntAll').onclick = () => { HR.markAllRead(); updateBell(); openInbox(); };
+    $('ntClr').onclick = () => { HR.clearDone(); openInbox(); };
+    document.querySelectorAll('#hrSheetBody [data-open]').forEach((b) => b.onclick = () => { const n = HR.notices().find((x) => x.id === b.dataset.open); if (n) noticeGo(n); });
+    document.querySelectorAll('#hrSheetBody [data-done]').forEach((b) => b.onclick = () => { const n = HR.notices().find((x) => x.id === b.dataset.done); if (!n) return; HR.patchNotice(n.id, { done: !n.done, read: true }); updateBell(); openInbox(); });
+  }
+  function noticeGo(n) {
+    HR.patchNotice(n.id, { read: true }); updateBell();
+    const d = n.data || {};
+    if (n.type === 'att' && d.empId) { openDay(d.empId, d.ds || today()); return; }
+    if (n.type === 'req') {
+      const q = d.reqId ? HR.requests().find((x) => x.id === d.reqId) : null;
+      if (q) { openReq(q); return; }
+      closeSheet(); window.hrGo('req'); return;
+    }
+    if (n.type === 'digest') { openDigest(); return; }
+    closeSheet();
+  }
+  // الملخص بأرقام اليوم الحالية، وكل سطر ينقل إلى شاشته، مع تذكير جماعي للمتأخرين وغير المسجلين
+  function openDigest() {
+    const d = HR.digest();
+    if (!d) { toast('لم يُزامن حضور اليوم بعد'); closeSheet(); return; }
+    const row = (key, ic, label, n, remind) => n ? `<div class="dg-row"><button type="button" class="dg-go" data-go="${key}">${icon(ic)}<span><b>${n}</b> ${label}</span></button>${remind ? `<button type="button" class="dg-msg" data-msg="${remind}">${icon('note')}راسلهم</button>` : ''}</div>` : '';
+    const html = row('late', 'clock', 'متأخرون اليوم', d.counts.late, 'late') + row('absent', 'alert', 'بلا تسجيل ولا إجازة', d.counts.absent, 'absent') + row('req', 'inbox', 'طلبات قيد الاعتماد', d.counts.req) + row('con', 'note', 'عقود تنتهي خلال أسبوع', d.counts.con) + row('asg', 'briefcase', 'تكليفات تنتهي خلال أسبوع', d.counts.asg);
+    sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('bell')}</span><div><b>ملخص اليوم</b><small>${esc(dLong.format(new Date()))}</small></div></div>${html || `<div class="hr2-ok">${icon('check')}<span>كل شيء على ما يرام اليوم</span></div>`}<button class="btn-outline wide" id="dgBack">${icon('bell')}<span>مركز الإشعارات</span></button>`);
+    document.querySelectorAll('#hrSheetBody [data-go]').forEach((b) => b.onclick = () => { closeSheet(); window.hrGo(b.dataset.go); });
+    document.querySelectorAll('#hrSheetBody [data-msg]').forEach((b) => b.onclick = () => remindGroup(b.dataset.msg));
+    $('dgBack').onclick = () => openInbox();
+  }
+  // تذكير جماعي للمتأخرين أو غير المسجلين اليوم بقالب جاهز (يفتح نافذة الإرسال)
+  function remindGroup(kind) {
+    const rows = HR.dayReport(today()).rows.filter((r) => r.status === kind);
+    if (!rows.length) { toast('لا يوجد موظفون لإرسال تذكير لهم'); return; }
+    closeSheet();
+    setTimeout(() => openCompose(rows.map((r) => ({ empId: r.e.id })), kind), 250);
+  }
+  // وجهات الانتقال (من الإشعارات والملخص الصباحي): late / absent / req / con / asg / inbox
+  window.hrGo = (key) => {
+    if (!HR.hasSession()) return;
+    if (!App.isActive('hr')) App.go('hr');
+    selOff(); f.q = ''; f.day = today(); f.org = 'all'; f.type = 'all';
+    if (key === 'late' || key === 'absent') { tab = 'att'; f.st = key; }
+    else if (key === 'req') { tab = 'lv'; f.lv = 'req'; f.rs = 'pending'; f.rk = 'all'; f.am = today().slice(0, 7); }
+    else if (key === 'con') { tab = 'con'; f.cs = 'soon30'; }
+    else if (key === 'asg') { tab = 'asg'; f.as = 'soon'; }
+    else if (key === 'inbox') { render(); openInbox(); return; }
+    store.set('hrTab', tab); render();
+  };
+
   /* ---------- لوحة اليوم ---------- */
   function renderDash(body) {
     const t = today();
@@ -320,6 +394,11 @@
     const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : f.st === 'outside' ? r.outside : f.st.startsWith('rq_') ? r.reqs.some((q) => q.kind === f.st.slice(3)) : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
       .sort((a, b) => (b.lateMin - a.lateMin) || String(a.firstIn || 'z').localeCompare(String(b.firstIn || 'z')) || a.e.name.localeCompare(b.e.name, 'ar'));
     const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><span><button class="hr-tmap">${icon('pin')}الخريطة</button><button class="hr-tshare">${icon('share')}مشاركة</button></span>`);
+    if ((f.st === 'late' || f.st === 'absent') && f.day === today() && rows.length) {
+      const rb = el('button', 'hr-tremind', `${icon('note')}تذكير جماعي (${rows.length})`); rb.type = 'button';
+      rb.onclick = () => openCompose(rows.map((r) => ({ empId: r.e.id })), f.st);
+      tools.querySelector('span').prepend(rb);
+    }
     tools.querySelector('.hr-tmap').onclick = () => openAllMap(rows, f.day);
     tools.querySelector('.hr-tshare').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}${r.workMin ? ' [' + hrs(r.workMin) + ']' : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.outside ? ' (خارج الموقع)' : ''}${r.reqs.length ? ' — ' + r.reqs.map((q) => RQ[q.kind][0] + (q.start ? ' ' + q.start + (q.end ? '-' + q.end : '') : '')).join('، ') : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
     body.appendChild(tools);
@@ -841,9 +920,11 @@
   const TPL = [
     { id: 'contract', name: 'إنهاء العقد', kind: 'contract', text: 'عزيزي الموظف {الاسم}\nنعلمكم بانتهاء العقد الخاص بكم يوم {اليوم} الموافق {التاريخ}.' },
     { id: 'assignment', name: 'انتهاء التكليف', kind: 'assignment', text: 'عزيزي الموظف {الاسم}\nنعلمكم بانتهاء التكليف الخاص بكم يوم {اليوم} الموافق {التاريخ}، ويعتبر هذا إشعاراً رسمياً من الموارد البشرية.' },
+    { id: 'late', name: 'تذكير بالتأخر', kind: 'custom', text: 'عزيزي الموظف {الاسم}\nنلفت انتباهكم إلى تأخركم عن الدوام اليوم {يوم_اليوم} {تاريخ_اليوم} ({دقائق_التأخير} دقيقة). نرجو الالتزام بمواعيد الدوام.' },
+    { id: 'absent', name: 'عدم تسجيل الحضور', kind: 'custom', text: 'عزيزي الموظف {الاسم}\nلم يُسجَّل حضوركم اليوم {يوم_اليوم} {تاريخ_اليوم}. نرجو تسجيل الحضور أو إفادتنا بسبب الغياب.' },
     { id: 'free', name: 'رسالة حرة', kind: 'custom', text: 'عزيزي الموظف {الاسم}\n' }
   ];
-  const TOKENS = ['الاسم', 'اليوم', 'التاريخ', 'نهاية_العقد', 'نهاية_التكليف', 'المشروع', 'المسمى', 'رقم_العقد'];
+  const TOKENS = ['الاسم', 'اليوم', 'التاريخ', 'نهاية_العقد', 'نهاية_التكليف', 'المشروع', 'المسمى', 'رقم_العقد', 'تاريخ_اليوم', 'يوم_اليوم', 'وقت_الدخول', 'دقائق_التأخير'];
   const tplStore = () => Object.assign({ over: {}, custom: [] }, HR.db.get('msgTpl', {}));
   const templates = () => { const st = tplStore(); return TPL.map((t) => Object.assign({}, t, { text: st.over[t.id] != null ? st.over[t.id] : t.text, edited: st.over[t.id] != null })).concat(st.custom.map((c) => ({ id: c.id, name: c.name, kind: 'custom', text: c.text, custom: true }))); };
   const todayS = () => today();
@@ -858,10 +939,16 @@
     const act = l.filter((a) => a.end >= todayS()).sort((a, b) => a.end.localeCompare(b.end));
     return act[0] || l.sort((a, b) => b.end.localeCompare(a.end))[0] || null;
   }
+  let trCache = null;
+  function todayRow(id) {
+    const key = todayS() + '|' + (HR.meta().lastSync || 0);
+    if (!trCache || trCache.key !== key) { const m = {}; HR.dayReport(todayS()).rows.forEach((r) => { m[r.e.id] = r; }); trCache = { key, m }; }
+    return trCache.m[id];
+  }
   function tokenMap(rec, kind) {
     const e = rec.e, c = rec.con || bestContract(e.id), a = rec.asg || bestAsg(e.id);
     const date = kind === 'assignment' ? (a && a.end) : kind === 'contract' ? (c && c.end) : ((c && c.end) || (a && a.end));
-    return { date, t: { 'الاسم': e.name, 'اليوم': date ? wdS.format(noon(date)) : '—', 'التاريخ': date ? fd(date) : '—', 'نهاية_العقد': c && c.end ? fd(c.end) : '—', 'نهاية_التكليف': a && a.end ? fd(a.end) : '—', 'المشروع': (a && (a.project || a.code)) || '—', 'المسمى': (c && c.pos) || e.pos || '—', 'رقم_العقد': (c && c.no) || '—' } };
+    return { date, t: { 'الاسم': e.name, 'اليوم': date ? wdS.format(noon(date)) : '—', 'التاريخ': date ? fd(date) : '—', 'نهاية_العقد': c && c.end ? fd(c.end) : '—', 'نهاية_التكليف': a && a.end ? fd(a.end) : '—', 'المشروع': (a && (a.project || a.code)) || '—', 'المسمى': (c && c.pos) || e.pos || '—', 'رقم_العقد': (c && c.no) || '—', 'تاريخ_اليوم': fd(todayS()), 'يوم_اليوم': wdS.format(noon(todayS())), 'وقت_الدخول': todayRow(e.id) && todayRow(e.id).firstIn ? tf.format(new Date(todayRow(e.id).firstIn)) : '—', 'دقائق_التأخير': todayRow(e.id) ? String(todayRow(e.id).lateMin || 0) : '0' } };
   }
   const fillText = (text, rec, kind) => { const m = tokenMap(rec, kind).t; return text.replace(/\{([^{}]+)\}/g, (x, k) => (m[k] != null ? m[k] : x)); };
 
@@ -1053,6 +1140,16 @@
     chipSet('hsWatch', [[0, 'إيقاف'], [1, 'كل دقيقة'], [2, 'كل 2 د'], [5, 'كل 5 د'], [10, 'كل 10 د'], [15, 'كل 15 د']], wst.min || 0, (v) => { HR.setWatch(v); toast(v ? 'بدأت المتابعة في الخلفية (إشعار دائم صغير)' : 'أُوقفت المتابعة في الخلفية'); });
     if ($('wBat')) $('wBat').onclick = () => B.batteryAsk();
     // إشعارات الحضور المنبثقة
+    // الملخص الصباحي
+    const dg = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('bell')}الملخص الصباحي</div>
+      <p class="hr-omn" style="margin:0 0 8px">إشعار واحد كل يوم عمل يلخّص: المتأخرين، وغير المسجلين، والطلبات المعلّقة، والعقود والتكليفات التي تنتهي هذا الأسبوع. يصل حتى والتطبيق مغلق (مع تفعيل المتابعة الخلفية).</p>
+      <label class="hr-srow"><span>تفعيل الملخص الصباحي</span><input type="checkbox" id="dgOn" class="hr-tog" ${s.digestOn === false ? '' : 'checked'}></label>
+      <label class="hr-srow"><span>وقت الإرسال<small>بعد بداية الدوام وتسجيلات الصباح</small></span><input type="time" id="dgAt" value="${s.digestAt || '08:45'}"></label>
+      <button class="btn-outline wide" id="dgNow" type="button">${icon('bell')}<span>عرض ملخص اليوم الآن</span></button>`);
+    body.appendChild(dg);
+    $('dgOn').onchange = (e) => { put({ digestOn: e.target.checked }); toast(e.target.checked ? 'فُعّل الملخص الصباحي' : 'أُوقف الملخص الصباحي'); };
+    $('dgAt').onchange = (e) => { if (e.target.value) { put({ digestAt: e.target.value }); toast('وقت الملخص ' + e.target.value); } };
+    $('dgNow').onclick = () => openDigest();
     const al = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('bell')}إشعارات الحضور المنبثقة</div>
       <p class="hr-omn" style="margin:0 0 8px">تظهر نافذة في منتصف الشاشة عند وصول تسجيل حضور أو انصراف جديد بعد كل مزامنة، حتى لو كنت في شاشة أخرى من التطبيق، وفوق التطبيقات عند المزامنة في الخلفية.</p>
       <div id="hsAl" class="chips"></div>
@@ -1330,11 +1427,12 @@
   let omDraw = null;
   if (window.OfflineMap) OfflineMap.onChange((st) => { if (omDraw) omDraw(st); });
   $('hrSync').onclick = () => doSync();
+  $('hrBell').onclick = () => { ntFilter = 'all'; openInbox(); };
   // المزامنة التلقائية: عند فتح القسم وأثناء استخدامه حسب الإعدادات، وفي الخلفية عبر أندرويد
   const due = () => { const s = HR.settings(); const m = HR.meta(); return HR.hasSession() && m.lastSync && s.auto !== 'off' && Date.now() - m.lastSync >= s.every * 60000; };
   function applyBg() { const s = HR.settings(); HR.setBackground(HR.hasSession() && s.bg && s.auto !== 'off' ? s.every : 0); }
   setInterval(() => { if (!document.hidden && due()) doSync(true); }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { HR.db.reload(); if (due()) doSync(true); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { HR.db.reload(); updateBell(); if (due()) doSync(true); } });
   $('hrSheet').onclick = (e) => { if (e.target.hasAttribute('data-close')) closeSheet(); };
   App.screens.hr = () => { render(); if (window.OfflineMap && HR.hasSession()) OfflineMap.ensure(); if (due() || (HR.hasSession() && HR.settings().auto === 'open' && HR.meta().lastSync && Date.now() - HR.meta().lastSync > 5 * 60000)) doSync(true); };
   if (HR.hasSession()) applyBg();

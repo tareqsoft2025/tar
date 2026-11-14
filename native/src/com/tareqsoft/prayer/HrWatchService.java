@@ -160,6 +160,7 @@ public class HrWatchService extends Service {
             @JavascriptInterface public boolean hrPut(String name, String data) { try { ErpClient.put(HrWatchService.this, name, data); return true; } catch (Exception e) { return false; } }
             @JavascriptInterface public String hrGet(String name) { return ErpClient.read(HrWatchService.this, name); }
             @JavascriptInterface public void attAlert(String data, String title, String body) { ReminderActivity.fireAtt(getApplicationContext(), data, title, body); }
+            @JavascriptInterface public void digestNotify(String title, String body, String go) { ReminderActivity.fireDigest(getApplicationContext(), title, body, go); }
             @JavascriptInterface public void done(boolean ok) {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putLong("watch_last", System.currentTimeMillis()).putBoolean("watch_ok", ok).apply();
                 h.post(finish);
