@@ -63,6 +63,7 @@ public class HrSyncJob extends JobService {
                 @JavascriptInterface public boolean erpSession() { return ErpClient.hasSession(HrSyncJob.this); }
                 @JavascriptInterface public boolean hrPut(String name, String data) { try { ErpClient.put(HrSyncJob.this, name, data); return true; } catch (Exception e) { return false; } }
                 @JavascriptInterface public String hrGet(String name) { return ErpClient.read(HrSyncJob.this, name); }
+                @JavascriptInterface public void attAlert(String data, String title, String body) { ReminderActivity.fireAtt(getApplicationContext(), data, title, body); }
                 @JavascriptInterface public void done() { h.post(finish); }
             }, "AndroidBridge");
             web.loadUrl("file:///android_asset/www/hr-sync.html");

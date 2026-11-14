@@ -9,7 +9,19 @@
 <script>
 // تُشغَّل في الخلفية من HrSyncJob: نفس المزامنة التراكمية دون فتح التطبيق
 (async function () {
-  try { if (window.AndroidBridge) await HR.sync(null, { background: true }); } catch (e) { /* retry next time */ }
+  try {
+    if (window.AndroidBridge) {
+      const st = await HR.sync(null, { background: true });
+      const ev = st ? HR.alertFilter(st.fresh) : [];
+      if (ev.length && AndroidBridge.attAlert) {
+        const tf = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: Core.TZ });
+        const last = ev[ev.length - 1], t = tf.format(new Date(last.ts));
+        const title = ev.length > 1 ? ev.length + ' تسجيلات حضور جديدة' : last.name;
+        const body = ev.length > 1 ? ev.slice(-4).map((v) => v.name + ' ' + (v.kind === 'in' ? 'دخول' : 'خروج')).join('، ') : (last.kind === 'in' ? 'سجّل دخوله ' : 'سجّل انصرافه ') + t + (last.late > 0 ? ' · متأخر ' + last.late + ' د' : '') + (last.st === 'outside' ? ' · خارج نطاق الموقع' : '');
+        AndroidBridge.attAlert(JSON.stringify({ type: 'att', events: ev }), title, body);
+      }
+    }
+  } catch (e) { /* retry next time */ }
   if (window.AndroidBridge) AndroidBridge.done();
 })();
 </script>

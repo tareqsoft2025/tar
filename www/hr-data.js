@@ -156,7 +156,7 @@
   function tzOff(ms) { const p = {}; offFmt.formatToParts(new Date(ms)).forEach((x) => { p[x.type] = x.value; }); return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000; }
   function localMidnight(ds) { const [y, m, d] = ds.split('-').map(Number); const g = Date.UTC(y, m - 1, d); return g - tzOff(g - tzOff(g)); }
   const dayRange = (ds) => ({ from: new Date(localMidnight(ds)).toISOString(), to: new Date(localMidnight(addDays(ds, 1)) - 1).toISOString() });
-  async function syncDay(ds) {
+  async function syncDay(ds, fresh) {
     const rg = dayRange(ds);
     const r = await get('/api/hr/attendance/events?from=' + encodeURIComponent(rg.from) + '&to=' + encodeURIComponent(rg.to) + '&limit=500');
     if (!r.ok) throw Object.assign(new Error(errText(r)), { res: r });
@@ -170,6 +170,19 @@
       dist: num(pick(e, 'distanceMeters', 'distance')), device: typeof e.deviceInfo === 'string' ? e.deviceInfo.slice(0, 120) : e.deviceInfo ? JSON.stringify(e.deviceInfo).slice(0, 120) : null,
       note: pick(e, 'note', 'reason', 'changeReason'), by: pick(e, 'createdByUserName')
     }));
+    // تسجيلات جديدة لم تكن محفوظة من قبل (اليوم وأمس فقط): للتنبيه المنبثق
+    if (fresh) {
+      const t = dayStr();
+      if (ds === t || ds === addDays(t, -1)) {
+        const seen = m[ds] ? new Set(m[ds].map((e) => e.id)) : null;
+        evs.forEach((e) => {
+          if (e.hiddenAt || !e.recordedAt) return;
+          const age = Date.now() - Date.parse(e.recordedAt);
+          if (age > 36 * 3600e3 || age < -3600e3) return;
+          if (seen ? !seen.has(e.id) : age < 3 * 3600e3) fresh.push(Object.assign({ ds }, e));
+        });
+      }
+    }
     const before = JSON.stringify(m[ds] || []), after = JSON.stringify(evs);
     m[ds] = evs; db.put(monthKey(ds), m);
     return before === after ? 0 : 1;
@@ -225,9 +238,12 @@
       const days = [...want].sort();
       const from = days[0] || t;
       let changedDays = 0, done = 0;
-      const worker = async () => { while (days.length) { const d = days.shift(); changedDays += await syncDay(d); done++; progress && progress(`الحضور ${done}/${done + days.length}`); } };
+      const freshRaw = [];
+      const worker = async () => { while (days.length) { const d = days.shift(); changedDays += await syncDay(d, freshRaw); done++; progress && progress(`الحضور ${done}/${done + days.length}`); } };
       await Promise.all([worker(), worker(), worker()]);
       st.attendance = { days: done, changed: changedDays };
+      // لا تنبيهات في أول مزامنة (كل شيء "جديد" حينها)
+      st.fresh = meta.lastSync ? summarizeFresh(freshRaw) : [];
       progress && progress('الإجازات والمهام…');
       st.leaves = await syncLeaves(addDays(from, -1), addDays(t, 30));
       // طلبات الإجازات والمغادرات والمهام والعمل الإضافي والعمل في العطلة
@@ -323,6 +339,32 @@
   }
   const balanceOf = (empId) => { const b = db.get('balances', {})[empId]; return b ? Object.assign(parseBalance(b.d) || {}, { at: b.at }) : null; };
 
+  /* ---------- تنبيهات الحضور ---------- */
+  // يحوّل التسجيلات الجديدة إلى بيانات جاهزة للعرض (بلا اعتماد على أي شاشة) ويتذكر ما سبق التنبيه عنه
+  function summarizeFresh(raw) {
+    if (!raw.length) return [];
+    const seen = new Set(db.get('attSeen', [])), reps = {}, emps = {};
+    employees().forEach((e) => { emps[e.id] = e; });
+    const out = [];
+    raw.sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt)).forEach((ev) => {
+      const key = String(ev.id) + ':' + ev.employeeId;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const kind = ev.eventType === 'check_in' ? 'in' : ev.eventType === 'check_out' ? 'out' : null;
+      const e = emps[ev.employeeId];
+      if (!kind || !e) return;
+      const rep = reps[ev.ds] || (reps[ev.ds] = dayReport(ev.ds));
+      const row = rep.rows.find((r) => r.e.id === ev.employeeId);
+      const pl = place(ev);
+      out.push({ id: key, empId: ev.employeeId, ds: ev.ds, name: e.name, dept: e.dept, org: e.org, type: e.type, kind, ts: Date.parse(ev.recordedAt),
+        late: kind === 'in' && row && row.firstIn === ev.recordedAt ? row.lateMin : 0, st: pl.st, place: pl.name || pl.near || null, dist: pl.dist, work: kind === 'out' && row ? row.workMin : 0 });
+    });
+    db.put('attSeen', [...seen].slice(-800));
+    return out.slice(-40);
+  }
+  // حسب إعداد المستخدم: الكل / الدخول فقط / المتأخرون والخارجون عن الموقع / إيقاف
+  const alertFilter = (arr) => { const m = settings().attAlert; if (!arr || m === 'off') return []; if (m === 'in') return arr.filter((x) => x.kind === 'in'); if (m === 'issues') return arr.filter((x) => x.late > 0 || x.st === 'outside'); return arr; };
+
   /* ---------- الاستعلام ---------- */
   const employees = () => Object.values(db.get('employees', {})).map(emp);
   const contracts = () => Object.values(db.get('contracts', {})).map(con);
@@ -330,7 +372,7 @@
   const events = (ds) => (db.get(monthKey(ds), {})[ds]) || null;
   const leaveOf = (eid, ds) => db.get('leaves', {})[eid + ':' + ds] || null;
   // auto: off | open (عند الفتح) ؛ every: كل كم دقيقة؛ bg: المزامنة في الخلفية
-  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, dayHours: 8, weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
+  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, dayHours: 8, attAlert: 'all', weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
 
   const minutesOf = (iso) => { const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso)).forEach((x) => { p[x.type] = x.value; }); return (+p.hour % 24) * 60 + +p.minute; };
   const hmToMin = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
@@ -395,7 +437,7 @@
     };
   }
 
-  window.HR = { requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  window.HR = { alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),
     forgetCreds: () => { if (B && B.erpForgetCreds) B.erpForgetCreds(); },
     setBackground: (min) => { if (B && B.hrSetBackground) B.hrSetBackground(min | 0); },

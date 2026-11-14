@@ -121,11 +121,27 @@
       add('الموظفون', st.employees); add('العقود', st.contracts); add('التكليفات', st.assignments);
       if (st.attendance && st.attendance.changed) parts.push(`الحضور: ${st.attendance.changed} يوم محدّث`);
       if (!silent || parts.length) toast(parts.length ? 'تمت المزامنة — ' + parts.join('، ') : 'تمت المزامنة، لا تغييرات جديدة');
+      if (st.fresh && st.fresh.length) showAttPopup(st.fresh);
     } catch (e) {
       if (e.res && e.res.status === 401) { toast('انتهت الجلسة، سجّل الدخول من جديد'); HR.logout(); }
       else if (!silent) toast(e.message || 'تعذّرت المزامنة');
-    } finally { btn.classList.remove('spin'); render(); }
+    } finally { btn.classList.remove('spin'); if (App.isActive('hr')) render(); }
   }
+
+  // نافذة منتصف الشاشة عند وصول تسجيل حضور/انصراف جديد
+  function showAttPopup(fresh, tries) {
+    const ev = HR.alertFilter(fresh);
+    if (!ev.length) return;
+    const host = $('remPop');
+    if (host.firstChild) { if ((tries || 0) < 8) setTimeout(() => showAttPopup(fresh, (tries || 0) + 1), 4000); return; }
+    RemindUI.showAttendance(host, { events: ev }, {
+      view: (v) => {
+        App.go('hr');
+        if (v) openDay(v.empId, v.ds); else { tab = 'att'; store.set('hrTab', 'att'); f.day = today(); render(); }
+      }
+    });
+  }
+  window.hrAttPopup = showAttPopup;
 
   /* ---------- مكوّنات ---------- */
   function filterChips(parent, key, opts, counts) {
@@ -878,13 +894,26 @@
     body.appendChild(sy);
     const chipSet = (id, opts, cur, fn) => { const b = $(id); opts.forEach(([v, n]) => { const c = el('button', 'chip sm' + (v === cur ? ' on' : ''), n); c.onclick = () => { fn(v); render(); }; b.appendChild(c); }); };
     chipSet('hsAuto', [['open', 'تلقائي'], ['off', 'يدوي فقط']], s.auto, (v) => put({ auto: v }));
-    chipSet('hsEvery', [[15, '15 دقيقة'], [30, '30 دقيقة'], [60, 'ساعة'], [120, 'ساعتين'], [360, '6 ساعات']], s.every, (v) => put({ every: v }));
+    chipSet('hsEvery', [[5, '5 دقائق'], [15, '15 دقيقة'], [30, '30 دقيقة'], [60, 'ساعة'], [120, 'ساعتين'], [360, '6 ساعات']], s.every, (v) => put({ every: v }));
     $('hsEveryBox').hidden = $('hsBgRow').hidden = s.auto === 'off';
     $('hsBg').onchange = (e) => { put({ bg: e.target.checked }); toast(e.target.checked ? 'ستتم المزامنة في الخلفية' : 'أُوقفت المزامنة في الخلفية'); };
     $('hsStart').onchange = async (e) => {
       if (!e.target.value) return;
       put({ attStart: e.target.value });
       if (meta.attFrom && e.target.value < meta.attFrom) { toast('جارٍ جلب السجلات الأقدم…'); await doSync(); }
+    };
+    // إشعارات الحضور المنبثقة
+    const al = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('bell')}إشعارات الحضور المنبثقة</div>
+      <p class="hr-omn" style="margin:0 0 8px">تظهر نافذة في منتصف الشاشة عند وصول تسجيل حضور أو انصراف جديد بعد كل مزامنة، حتى لو كنت في شاشة أخرى من التطبيق، وفوق التطبيقات عند المزامنة في الخلفية.</p>
+      <div id="hsAl" class="chips"></div>
+      ${B && B.canOverlay && !B.canOverlay() ? `<button class="btn-outline wide" id="alOv" type="button">${icon('eye')}<span>السماح بالظهور فوق التطبيقات</span></button>` : ''}
+      <button class="btn-outline wide" id="alTest" type="button">${icon('bell')}<span>تجربة النافذة</span></button>`);
+    body.appendChild(al);
+    chipSet('hsAl', [['all', 'كل التسجيلات'], ['in', 'الحضور فقط'], ['issues', 'المتأخرون والخارجون عن الموقع'], ['off', 'إيقاف']], s.attAlert || 'all', (v) => put({ attAlert: v }));
+    if ($('alOv')) $('alOv').onclick = () => B.requestOverlay();
+    $('alTest').onclick = () => {
+      const now = Date.now();
+      RemindUI.showAttendance($('remPop'), { events: [{ name: 'اسم الموظف التجريبي', dept: 'الإدارة', org: 'PEF', type: 'office', kind: 'in', ts: now, late: 12, st: 'matched', place: 'المكتب الرئيسي', dist: 35, work: 0, empId: '', ds: today() }] }, { view: () => {}, close: () => {} });
     };
     // حساب الدخول
     const acc = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('users')}الحساب</div>
@@ -1154,8 +1183,8 @@
   // المزامنة التلقائية: عند فتح القسم وأثناء استخدامه حسب الإعدادات، وفي الخلفية عبر أندرويد
   const due = () => { const s = HR.settings(); const m = HR.meta(); return HR.hasSession() && m.lastSync && s.auto !== 'off' && Date.now() - m.lastSync >= s.every * 60000; };
   function applyBg() { const s = HR.settings(); HR.setBackground(HR.hasSession() && s.bg && s.auto !== 'off' ? s.every : 0); }
-  setInterval(() => { if (!document.hidden && App.isActive('hr') && due()) doSync(true); }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && App.isActive('hr') && due()) doSync(true); });
+  setInterval(() => { if (!document.hidden && due()) doSync(true); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && due()) doSync(true); });
   $('hrSheet').onclick = (e) => { if (e.target.hasAttribute('data-close')) closeSheet(); };
   App.screens.hr = () => { render(); if (window.OfflineMap && HR.hasSession()) OfflineMap.ensure(); if (due() || (HR.hasSession() && HR.settings().auto === 'open' && HR.meta().lastSync && Date.now() - HR.meta().lastSync > 5 * 60000)) doSync(true); };
   if (HR.hasSession()) applyBg();
