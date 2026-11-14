@@ -29,7 +29,11 @@
     const d = window.AndroidBridge && AndroidBridge.digestNotify ? HR.maybeDigest() : null;
     if (d) AndroidBridge.digestNotify(d.title, d.body, d.first || 'inbox');
   } catch (e) { /* ignore */ }
-  if (window.AndroidBridge) AndroidBridge.done(ok);
+  if (window.AndroidBridge) {
+    let hint = 0;
+    try { if (location.hash === '#quick' && AndroidBridge.watchBase) hint = HR.pollHint(AndroidBridge.watchBase()); } catch (e) { hint = 0; }
+    if (hint > 0) AndroidBridge.done(ok, hint); else AndroidBridge.done(ok);
+  }
 })();
 </script>
 </body></html>

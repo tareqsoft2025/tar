@@ -63,7 +63,7 @@
     box.appendChild(nav);
     if (secOf() === 'rep') {
       const sub = el('div', 'chips hr-tabs');
-      [['att', 'الحضور', 'clock'], ['wk', 'ساعات الأسبوع', 'chart'], ['bal', 'الأرصدة', 'cal'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase']].forEach(([k, n, ic]) => {
+      [['att', 'الحضور', 'clock'], ['sites', 'المواقع', 'pin'], ['wk', 'ساعات الأسبوع', 'chart'], ['bal', 'الأرصدة', 'cal'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase']].forEach(([k, n, ic]) => {
         const on = k === 'bal' ? tab === 'lv' : tab === k;
         const b = el('button', 'chip sm' + (on ? ' on' : ''), `${icon(ic)}${n}`);
         b.onclick = () => { if (k === 'bal') { tab = 'lv'; f.lv = 'bal'; } else tab = k; f.q = ''; store.set('hrTab', tab); selOff(); render(); };
@@ -73,7 +73,7 @@
     }
     const body = el('div', 'hr-view'); box.appendChild(body);
     if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
-    ({ dash: renderDash, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
+    ({ dash: renderDash, sites: renderSites, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
     const on = box.querySelector('.hr-tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
     // زر "تحديد" في شريط أدوات القائمة
     const ts = body.querySelectorAll('.hr-tools');
@@ -227,6 +227,62 @@
   const pendingReqs = () => { try { return HR.pendingReqs(); } catch (e) { return []; } };
 
 
+
+  /* ---------- الحضور في المواقع: عدد الحاضرين في كل موقع عمل ---------- */
+  // يُحسب من بيانات اليوم المحفوظة على الجهاز (بلا أي طلب للنظام)
+  function siteStats(ds, filt) {
+    const rep = HR.dayReport(ds), isToday = ds === today(), groups = new Map();
+    const mk = (key, name, kind) => { if (!groups.has(key)) groups.set(key, { key, name, kind, rows: [], inside: 0 }); return groups.get(key); };
+    const byName = {};
+    HR.sites().forEach((x) => { const g = mk('s:' + x.id, x.name || 'موقع', 'site'); byName[x.name] = g; });
+    let active = 0;
+    rep.rows.forEach((r) => {
+      if (filt && !filt(r)) return;
+      active++;
+      if (!r.list.length) return;
+      const ins = r.list.filter((x) => x.eventType === 'check_in');
+      const ev = ins[ins.length - 1] || r.list[r.list.length - 1];
+      const pl = HR.place(ev);
+      const g = pl.st === 'matched' ? (byName[pl.name] || mk('n:' + pl.name, pl.name || 'موقع', 'site')) : pl.st === 'outside' ? mk('out', 'خارج نطاق مواقع العمل', 'outside') : mk('unk', 'بلا موقع جغرافي', 'unknown');
+      g.rows.push({ r, ev, pl });
+      if (isToday && r.openShift) g.inside++;
+    });
+    const list = [...groups.values()].sort((a, b) => (a.kind === 'site' ? 0 : 1) - (b.kind === 'site' ? 0 : 1) || b.rows.length - a.rows.length || a.name.localeCompare(b.name, 'ar'));
+    const total = list.reduce((n, g) => n + g.rows.length, 0);
+    return { rep, list, total, active, isToday, inside: list.reduce((n, g) => n + g.inside, 0) };
+  }
+  const openSites = new Set();
+  function renderSites(body) {
+    const nav = el('div', 'hr-dnav', `<button class="icon-btn flip" data-d="-1" aria-label="اليوم السابق">${icon('chev')}</button><label><b>${f.day === today() ? 'اليوم' : dLong.format(noon(f.day))}</b><small>${fd(f.day)}</small><input type="date" value="${f.day}" max="${today()}"></label><button class="icon-btn" data-d="1" aria-label="اليوم التالي" ${f.day >= today() ? 'disabled' : ''}>${icon('chev')}</button>`);
+    nav.querySelectorAll('[data-d]').forEach((b) => b.onclick = () => { f.day = addDays(f.day, +b.dataset.d); render(); });
+    nav.querySelector('input').onchange = (e) => { if (e.target.value) { f.day = e.target.value; render(); } };
+    body.appendChild(nav);
+    if (!HR.dayReport(f.day).synced) { body.appendChild(el('div', 'hr-empty', `<span class="hr-eic">${icon('pin')}</span><b>حضور هذا اليوم غير محفوظ على الجهاز</b><small>زامن من زر المزامنة لعرض الحضور في المواقع.</small>`)); return; }
+    filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']]);
+    filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
+    const st = siteStats(f.day, (r) => orgOk(r.e) && typeOk(r.e));
+    const max = Math.max(1, ...st.list.map((g) => g.rows.length));
+    body.appendChild(el('div', 'st-sum', `<div><b>${st.total}</b><small>سجّلوا حضوراً من ${st.active}</small></div>${st.isToday ? `<div><b>${st.inside}</b><small>داخل الدوام الآن</small></div>` : ''}<div><b>${st.list.filter((g) => g.kind === 'site' && g.rows.length).length}</b><small>مواقع بها حضور</small></div>`));
+    const tools = el('div', 'hr-tools', `<small>${st.list.length} موقع</small><span><button class="hr-tmap">${icon('pin')}الخريطة</button><button class="hr-tshare">${icon('share')}مشاركة</button></span>`);
+    const allRows = st.list.flatMap((g) => g.rows.map((x) => x.r));
+    tools.querySelector('.hr-tmap').onclick = () => openAllMap(allRows, f.day);
+    tools.querySelector('.hr-tshare').onclick = () => shareList(`الحضور في المواقع ${fd(f.day)}`, st.list.filter((g) => g.rows.length).map((g) => `${g.name}: ${g.rows.length}${st.isToday ? ' (داخل الآن ' + g.inside + ')' : ''}\n   ` + g.rows.map((x) => x.r.e.name).join('، ')));
+    body.appendChild(tools);
+    if (!st.list.length) { body.appendChild(el('div', 'hr-none', 'لا مواقع عمل محفوظة بعد، اضغط زر المزامنة')); return; }
+    st.list.forEach((g) => {
+      const open = openSites.has(g.key), n = g.rows.length;
+      const card = el('section', 'st-card ' + g.kind + (open ? ' open' : '') + (n ? '' : ' zero'));
+      card.innerHTML = `<button type="button" class="st-h" aria-expanded="${open}"><span class="st-ic">${icon(g.kind === 'site' ? 'pin' : 'alert')}</span><span class="st-t"><b>${esc(g.name)}</b><small>${n ? (st.isToday ? `داخل الآن ${g.inside} · انصرف ${n - g.inside}` : `${n} سجّلوا حضوراً`) : 'لا حضور'}</small></span><span class="st-n">${n}</span></button><div class="st-bar"><i style="width:${Math.round(n / max * 100)}%"></i></div><div class="st-b"></div>`;
+      const bodyEl = card.querySelector('.st-b');
+      g.rows.slice().sort((a, z) => String(a.ev.recordedAt).localeCompare(String(z.ev.recordedAt))).forEach(({ r, ev }) => {
+        const row = el('button', 'st-e', `<span class="hr-ava ${r.status === 'late' ? 'warn' : r.openShift ? 'ok' : 'mute'}">${esc(initials(r.e.name))}</span><span class="st-et"><b>${esc(r.e.name)}</b><small>${esc([r.e.dept, TYPE[r.e.type], r.e.org].filter(Boolean).join(' · '))}</small></span><span class="st-ee"><time>${tf.format(new Date(ev.recordedAt))}</time>${r.lateMin > 0 ? badge('+' + r.lateMin + ' د', 'warn') : ''}${st.isToday ? badge(r.openShift ? 'داخل' : 'منصرف', r.openShift ? 'ok' : 'mute') : ''}</span>`);
+        row.type = 'button'; row.onclick = () => openDay(r.e.id, f.day); bodyEl.appendChild(row);
+      });
+      card.querySelector('.st-h').onclick = () => { if (openSites.has(g.key)) openSites.delete(g.key); else openSites.add(g.key); card.classList.toggle('open'); card.querySelector('.st-h').setAttribute('aria-expanded', card.classList.contains('open')); };
+      body.appendChild(card);
+    });
+  }
+
   /* ---------- مركز الإشعارات ---------- */
   const NT = { att: ['clock', 'ok'], req: ['inbox', 'info'], digest: ['bell', 'warn'] };
   function updateBell() {
@@ -293,6 +349,7 @@
     selOff(); f.q = ''; f.day = today(); f.org = 'all'; f.type = 'all';
     if (key === 'late' || key === 'absent') { tab = 'att'; f.st = key; }
     else if (key === 'req') { tab = 'lv'; f.lv = 'req'; f.rs = 'pending'; f.rk = 'all'; f.am = today().slice(0, 7); }
+    else if (key === 'sites') { tab = 'sites'; }
     else if (key === 'con') { tab = 'con'; f.cs = 'soon30'; }
     else if (key === 'asg') { tab = 'asg'; f.as = 'soon'; }
     else if (key === 'inbox') { render(); openInbox(); return; }
@@ -358,6 +415,17 @@
     if (rows.length) {
       body.appendChild(el('div', 'hr-sec', '<span>تفصيل حضور اليوم</span>'));
       breakdown(body, rows, t, (flt) => { f.org = flt.org; f.type = flt.type; f.st = 'all'; f.day = t; f.q = ''; tab = 'att'; render(); });
+    }
+    if (rep.synced && rows.some((r) => r.list.length)) {
+      const ss = siteStats(t), top = ss.list.filter((g) => g.rows.length).slice(0, 4);
+      if (top.length) {
+        const h = el('div', 'hr-sec', '<span>الحضور في المواقع</span><button>عرض الكل</button>');
+        h.querySelector('button').onclick = () => { tab = 'sites'; f.day = t; f.org = 'all'; f.type = 'all'; f.q = ''; store.set('hrTab', tab); render(); };
+        body.appendChild(h);
+        const grid = el('div', 'st-mini');
+        top.forEach((g) => { const c = el('button', 'st-m ' + g.kind, `<b>${g.rows.length}</b><small>${esc(g.name)}</small>`); c.type = 'button'; c.onclick = () => { openSites.add(g.key); tab = 'sites'; f.day = t; f.org = 'all'; f.type = 'all'; store.set('hrTab', tab); render(); }; grid.appendChild(c); });
+        body.appendChild(grid);
+      }
     }
     const sec = (title, arr, empty, more) => {
       const h = el('div', 'hr-sec', `<span>${title}</span>${more ? '<button>عرض الكل</button>' : ''}`);
@@ -1132,12 +1200,12 @@
     // المتابعة في الخلفية (تعمل والتطبيق مغلق)
     const wst = HR.watchState();
     const wc = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('refresh')}المتابعة الفورية والتطبيق مغلق</div>
-      <p class="hr-omn" style="margin:0 0 8px">خدمة خفيفة تفحص تسجيلات الحضور الجديدة كل بضع دقائق وتعرض النافذة في منتصف الشاشة حتى لو كان التطبيق مغلقاً. تستهلك بيانات قليلة جداً (طلب صغير لتسجيلات اليوم الجديدة فقط) فتناسب الإنترنت الضعيف.</p>
+      <p class="hr-omn" style="margin:0 0 8px">خدمة خفيفة تفحص تسجيلات الحضور الجديدة كل بضع دقائق وتعرض النافذة في منتصف الشاشة حتى لو كان التطبيق مغلقاً. تستهلك بيانات قليلة جداً (طلب صغير لتسجيلات اليوم الجديدة فقط) فتناسب الإنترنت الضعيف. والفحص تكيّفي لتقليل الطلبات: بالفترة المختارة وقت وصول الموظفين وانصرافهم، وكل 20 دقيقة بين الفترتين، ويهدأ ليلاً وفي العطلة.</p>
       <div id="hsWatch" class="chips"></div>
       <div class="hr-srow"><span>آخر فحص</span><b id="hsWLast">${wst.last ? new Date(wst.last).toLocaleTimeString('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit' }) + (wst.ok ? '' : ' (تعذّر)') : '—'}</b></div>
       ${B && B.batteryOk && !B.batteryOk() ? `<button class="btn-outline wide" id="wBat" type="button">${icon('bell')}<span>استثناء التطبيق من توفير البطارية (مهم)</span></button><p class="hr-omn" style="margin:4px 0 0">بدونه قد يوقف أندرويد المتابعة عند تعطيل الشاشة لفترة طويلة.</p>` : ''}`);
     body.appendChild(wc);
-    chipSet('hsWatch', [[0, 'إيقاف'], [1, 'كل دقيقة'], [2, 'كل 2 د'], [5, 'كل 5 د'], [10, 'كل 10 د'], [15, 'كل 15 د']], wst.min || 0, (v) => { HR.setWatch(v); toast(v ? 'بدأت المتابعة في الخلفية (إشعار دائم صغير)' : 'أُوقفت المتابعة في الخلفية'); });
+    chipSet('hsWatch', [[0, 'إيقاف'], [2, 'كل 2 د'], [5, 'كل 5 د'], [10, 'كل 10 د'], [15, 'كل 15 د']], wst.min || 0, (v) => { HR.setWatch(v); toast(v ? 'بدأت المتابعة في الخلفية (إشعار دائم صغير)' : 'أُوقفت المتابعة في الخلفية'); });
     if ($('wBat')) $('wBat').onclick = () => B.batteryAsk();
     // إشعارات الحضور المنبثقة
     // الملخص الصباحي
