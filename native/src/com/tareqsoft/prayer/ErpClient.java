@@ -174,6 +174,22 @@ final class ErpClient {
         return r;
     }
 
+    /** تسجيل/تصحيح حضور يدوي (حساس): POST فقط على مساري إضافة حدث وتصحيحه، بمحاولة واحدة (لا تكرار عند الانقطاع حتى لا يتكرر السجل). */
+    static Res write(Context c, String path, String json, String role) {
+        boolean ok = path.equals("/api/hr/attendance/events") || path.matches("/api/hr/attendance/events/[A-Za-z0-9_-]{1,64}/correct");
+        if (!ok) return new Res(400, "{\"error\":\"bad_path\"}");
+        Res r = request(c, "POST", path, json, role);
+        if (r.status == 401) {   // 401 = لم يُنفَّذ الطلب؛ آمن إعادته بعد تجديد الجلسة
+            Res f = request(c, "POST", "/api/auth/refresh", "{}");
+            if (f.status >= 200 && f.status < 300) r = request(c, "POST", path, json, role);
+            if (r.status == 401) {
+                String[] cr = loadCreds(c);
+                if (cr != null && login(c, cr[0], cr[1], true).status / 100 == 2) r = request(c, "POST", path, json, role);
+            }
+        }
+        return r;
+    }
+
     static Res login(Context c, String user, String pass) { return login(c, user, pass, false); }
 
     static Res login(Context c, String user, String pass, boolean keepCreds) {
