@@ -247,12 +247,37 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    /** يفتح تطبيق الرسائل بالرقم كما هو ونص جاهز (ACTION_SENDTO مع smsto هو الأمر القياسي لكتابة رسالة) */
+    private void composeSms(String number, String body) {
+        String num = number == null ? "" : number.trim().replace(" ", "");
+        Intent i = new Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(num)));
+        i.putExtra("sms_body", body == null ? "" : body);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try { startActivity(i); return; } catch (Exception e) { /* جرّب الصيغة الثانية */ }
+        try {
+            Intent v = new Intent(Intent.ACTION_VIEW, Uri.parse("sms:" + Uri.encode(num) + (body == null || body.isEmpty() ? "" : "?body=" + Uri.encode(body))));
+            v.putExtra("sms_body", body == null ? "" : body);
+            v.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(v);
+        } catch (Exception e) { js("window.toast && window.toast('لا يوجد تطبيق رسائل على هذا الجوال')"); }
+    }
+
     /** يسمح فقط بالاتصال والرسائل والبريد وواتساب وروابط https */
     private void openExternalUrl(String url) {
         if (url == null) return;
         String u = url.trim();
         String low = u.toLowerCase(java.util.Locale.ROOT);
         if (!(low.startsWith("tel:") || low.startsWith("sms:") || low.startsWith("smsto:") || low.startsWith("mailto:") || low.startsWith("whatsapp:") || low.startsWith("https://"))) return;
+        if (low.startsWith("sms:") || low.startsWith("smsto:")) {
+            String rest = u.substring(u.indexOf(':') + 1), body = "";
+            int q = rest.indexOf('?');
+            if (q >= 0) {
+                String qs = rest.substring(q + 1); rest = rest.substring(0, q);
+                for (String kv : qs.split("&")) if (kv.toLowerCase(java.util.Locale.ROOT).startsWith("body=")) body = Uri.decode(kv.substring(5));
+            }
+            composeSms(Uri.decode(rest), body);
+            return;
+        }
         Intent i = low.startsWith("tel:") ? new Intent(Intent.ACTION_DIAL, Uri.parse(u)) : new Intent(Intent.ACTION_VIEW, Uri.parse(u));
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try { startActivity(i); }
@@ -414,6 +439,11 @@ public class MainActivity extends Activity {
                 });
                 js("window.mapDone && window.mapDone(" + (err == null) + "," + JSONObject.quote(err == null ? "" : err) + ")");
             } }).start();
+        }
+
+        @JavascriptInterface
+        public void smsCompose(final String number, final String body) {
+            runOnUiThread(new Runnable() { public void run() { composeSms(number, body); } });
         }
 
         @JavascriptInterface
