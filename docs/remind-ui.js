@@ -96,7 +96,6 @@
     if (!ev.length) return;
     const last = ev[ev.length - 1], many = ev.length > 1;
     const color = many ? (ev.some((x) => x.st === 'outside') ? '#F2716A' : ev.some((x) => x.late > 0) ? '#F0A64B' : '#2FBF71') : accentOf(last);
-    const ms = many ? 20000 : 14000;
     const body = many
       ? `<div class="ap-top"><span class="ap-pill"><i></i>تحديث الحضور</span><span class="ap-time">${tf.format(new Date(last.ts))}</span></div>
          <div class="ap-count"><b>${ev.length}</b><span>تسجيلات جديدة</span></div>
@@ -114,15 +113,11 @@
         <div class="rp-glow"></div>
         ${body}
         <div class="ap-btns"><button type="button" class="ap-view" data-a="view">${many ? 'عرض الحضور' : 'عرض سجل اليوم'}</button><button type="button" class="ap-x" data-a="close">إغلاق</button></div>
-        <div class="ap-bar"><i style="animation-duration:${ms}ms"></i></div>
       </div></div>`;
     const root = host.firstElementChild;
     requestAnimationFrame(() => root.classList.add('in'));
-    let auto = setTimeout(() => finish(h.close), ms);
-    const stopAuto = () => { clearTimeout(auto); const b = root.querySelector('.ap-bar'); if (b) b.style.opacity = '0'; };
-    root.addEventListener('pointerdown', stopAuto, { once: true });
+    // لا تُغلق النافذة تلقائياً: تبقى حتى يضغط المستخدم "إغلاق" أو "عرض"
     const finish = (fn) => {
-      clearTimeout(auto);
       root.classList.remove('in'); root.classList.add('out');
       setTimeout(() => { host.innerHTML = ''; if (fn) fn(); }, 260);
     };
