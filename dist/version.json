@@ -1,6 +1,6 @@
 {
-  "versionCode": 50,
-  "versionName": "8.4",
-  "notes": "زر المزامنة يجلب الجديد فقط بعد المحفوظ، وإعادة الجلب الكاملة زر منفصل",
+  "versionCode": 51,
+  "versionName": "8.5",
+  "notes": "تنبيهات الإدارة: عرض رمز الخطأ ورسالة الخادم عند تعذّر التحميل",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
