@@ -343,6 +343,7 @@
       if (done && st.errors.filter((x) => x.startsWith('att:')).length < total) st.ok++;
       st.attendance = { days: done, changed: changedDays };
       st.fresh = meta.lastSync ? summarizeFresh(freshRaw) : [];
+      alertFilter(st.fresh).forEach((v) => addNotice({ key: 'att:' + v.id, type: 'att', title: v.name, at: v.ts, body: (v.kind === 'in' ? 'دخول ' : 'خروج ') + hmFmt(v.ts) + (v.late > 0 ? ' · متأخر ' + v.late + ' د' : '') + (v.st === 'outside' ? ' · خارج نطاق الموقع' : ''), data: { empId: v.empId, ds: v.ds, bad: v.late > 0 || v.st === 'outside' } }));
       if (mode !== 'quick') {
         progress && progress('الإجازات والمهام…');
         await stage('leaves', async () => { st.leaves = await syncLeaves(addDays(mode === 'full' ? from : t, -1), addDays(t, mode === 'full' ? 30 : 3)); });
@@ -352,7 +353,7 @@
             progress && progress('الطلبات: ' + REQ_LABEL[k] + '…');
             await stage('req:' + k, async () => { const r = await get(path); if (!r.ok) throw new Error(k); st.requests[k] = merge('req_' + k, listOf(r.data)); reqCache = null; });
           }
-          if (!st.errors.some((x) => x.startsWith('req:'))) meta.reqAt = Date.now();
+          if (!st.errors.some((x) => x.startsWith('req:'))) { meta.reqAt = Date.now(); noticeNewRequests(); }
         }
         const bm = db.get('balMeta', {});
         if (heavyDue && (opts.balances || mode === 'full' || !bm.at || Date.now() - bm.at > (slow ? 48 : 24) * 3600e3)) await stage('balances', async () => { st.balances = await syncBalances(progress); });
@@ -475,7 +476,7 @@
   const events = (ds) => (db.get(monthKey(ds), {})[ds]) || null;
   const leaveOf = (eid, ds) => db.get('leaves', {})[eid + ':' + ds] || null;
   // auto: off | open (عند الفتح) ؛ every: كل كم دقيقة؛ bg: المزامنة في الخلفية
-  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, dayHours: 8, attAlert: 'all', weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
+  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, dayHours: 8, attAlert: 'all', digestOn: true, digestAt: '08:45', weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
 
   const minutesOf = (iso) => { const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso)).forEach((x) => { p[x.type] = x.value; }); return (+p.hour % 24) * 60 + +p.minute; };
   const hmToMin = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
@@ -540,7 +541,71 @@
     };
   }
 
-  window.HR = { reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+
+  /* ---------- مركز الإشعارات ---------- */
+  const hmFmt = (ms) => new Intl.DateTimeFormat('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ }).format(new Date(ms));
+  const PENDING_ST = ['pending', 'submitted', 'manager_approved', 'new'];
+  const pendingReqs = () => { const lim = addDays(dayStr(), -30); return requests().filter((q) => PENDING_ST.includes(q.status) && (q.to || q.from || '') >= lim); };
+  const notices = () => db.get('notices', {}).list || [];
+  const putNotices = (list) => db.put('notices', { list: list.slice(0, 200) });
+  function addNotice(n) {
+    const all = notices();
+    if (n.key && all.some((x) => x.key === n.key)) return false;
+    all.unshift(Object.assign({ id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: Date.now(), read: false, done: false }, n));
+    const lim = Date.now() - 45 * 864e5;
+    putNotices(all.filter((x) => x.at >= lim));
+    return true;
+  }
+  function patchNotice(id, patch) { const all = notices(); const x = all.find((n) => n.id === id); if (!x) return; Object.assign(x, patch); putNotices(all); }
+  const markAllRead = () => putNotices(notices().map((n) => Object.assign({}, n, { read: true })));
+  const clearDone = () => putNotices(notices().filter((n) => !n.done));
+  const unreadCount = () => notices().filter((n) => !n.read).length;
+  // طلبات معلّقة جديدة (أول مرة تُحفظ نقطة البداية دون إشعارات)
+  function noticeNewRequests() {
+    const pend = pendingReqs(), seen = db.get('reqSeen', null);
+    db.put('reqSeen', pend.map((q) => q.id).slice(-400));
+    if (seen === null) return;
+    const have = new Set(seen), fresh = pend.filter((q) => !have.has(q.id));
+    if (!fresh.length) return;
+    if (fresh.length > 3) { addNotice({ key: 'reqs:' + Date.now(), type: 'req', title: fresh.length + ' طلبات جديدة قيد الاعتماد', body: fresh.slice(0, 3).map((q) => q.name || '—').join('، ') + '…', data: { many: true } }); return; }
+    fresh.forEach((q) => addNotice({ key: 'req:' + q.id, type: 'req', title: (q.name || 'طلب جديد') + ' — ' + (q.kind === 'daily' ? 'إجازة' : q.kind === 'hourly' ? 'مغادرة ساعية' : q.kind === 'mission' ? 'مهمة عمل' : q.kind === 'overtime' ? 'عمل إضافي' : 'عمل في عطلة'), body: 'طلب جديد قيد الاعتماد', data: { reqId: q.id, empId: q.empId } }));
+  }
+
+  /* ---------- الملخص الصباحي ---------- */
+  function digest() {
+    const t = dayStr(), rep = dayReport(t);
+    if (!rep.synced) return null;
+    const by = (s) => rep.rows.filter((r) => r.status === s);
+    const late = by('late'), absent = by('absent');
+    const in7 = (x) => x.end && x.end >= t && x.end <= addDays(t, 7);
+    const cons = contracts().filter(in7), asgs = assignments().filter(in7), pend = pendingReqs();
+    const counts = { late: late.length, absent: absent.length, con: cons.length, asg: asgs.length, req: pend.length };
+    const parts = [];
+    if (counts.late) parts.push(`${counts.late} متأخر`);
+    if (counts.absent) parts.push(`${counts.absent} بلا تسجيل`);
+    if (counts.req) parts.push(`${counts.req} طلب معلّق`);
+    if (counts.con) parts.push(`${counts.con} عقد ينتهي هذا الأسبوع`);
+    if (counts.asg) parts.push(`${counts.asg} تكليف ينتهي هذا الأسبوع`);
+    const first = counts.late ? 'late' : counts.absent ? 'absent' : counts.req ? 'req' : counts.con ? 'con' : counts.asg ? 'asg' : null;
+    return { ds: t, counts, first, title: 'ملخص اليوم', body: parts.length ? parts.join(' · ') : 'كل شيء على ما يرام اليوم',
+      late: late.map((r) => ({ empId: r.e.id, name: r.e.name, min: r.lateMin })), absent: absent.map((r) => ({ empId: r.e.id, name: r.e.name })) };
+  }
+  // يُرسل مرة واحدة يومياً بعد وقت الملخص (بعد بداية الدوام وتسجيلات الصباح)، ويتخطى العطلة
+  function maybeDigest() {
+    const s = settings(), t = dayStr();
+    if (s.digestOn === false) return null;
+    if ((db.get('digestState', {}) || {}).day === t) return null;
+    if (s.weekend.includes(Tracker.dowOf(t))) return null;
+    const nowMin = minutesOf(new Date().toISOString());
+    if (nowMin < hmToMin(s.digestAt || '08:45')) return null;
+    const d = digest();
+    if (!d) return null;
+    db.put('digestState', { day: t });
+    addNotice({ key: 'digest:' + t, type: 'digest', title: d.title, body: d.body, data: { first: d.first, ds: t } });
+    return d;
+  }
+
+  window.HR = { notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     setWatch: (min) => { if (B && B.hrWatch) B.hrWatch(min | 0); },
     watchState: () => { try { return B && B.hrWatchState ? JSON.parse(B.hrWatchState()) : { min: 0, last: 0, ok: true }; } catch (e) { return { min: 0, last: 0, ok: true }; } },
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),

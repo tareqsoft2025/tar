@@ -1,6 +1,6 @@
 {
-  "versionCode": 57,
-  "versionName": "8.11",
-  "notes": "تغيير اسم تنبيهات الإدارة إلى النظام المساعد HR",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-57.apk"
+  "versionCode": 58,
+  "versionName": "8.12",
+  "notes": "مركز الإشعارات، والملخص الصباحي، والتذكير الجماعي بالمتأخرين",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-58.apk"
 }

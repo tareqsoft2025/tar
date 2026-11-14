@@ -66,6 +66,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView v, String url) {
                 checkUpdate();
                 if (pendingTab != null) { openTab(pendingTab); pendingTab = null; }
+                if (pendingGo != null) { openGo(pendingGo); pendingGo = null; }
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
@@ -76,6 +77,7 @@ public class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new Bridge(), "AndroidBridge");
         pendingTab = getIntent().getStringExtra("tab");
+        pendingGo = getIntent().getStringExtra("go");
         pendingInstall = getIntent().getBooleanExtra("install", false);
         UpdateChecker.arm(this);
         requestPerms();
@@ -111,6 +113,13 @@ public class MainActivity extends Activity {
         js("window.nativePermsChanged && window.nativePermsChanged()");
     }
 
+    private String pendingGo;
+
+    /** وجهة داخل قسم الموارد البشرية (من إشعار الملخص الصباحي): late / absent / req / con / asg / inbox */
+    private void openGo(String go) {
+        js("setTimeout(function(){window.hrGo && window.hrGo(" + JSONObject.quote(go) + ")},400)");
+    }
+
     private void openTab(String tab) {
         js("window.openTab && window.openTab(" + JSONObject.quote(tab) + ")");
     }
@@ -121,6 +130,8 @@ public class MainActivity extends Activity {
         setIntent(in);
         String tab = in.getStringExtra("tab");
         if (tab != null && web != null) openTab(tab);
+        String go = in.getStringExtra("go");
+        if (go != null && web != null) openGo(go);
         if (in.getBooleanExtra("install", false)) { pendingInstall = true; if (web != null) checkUpdate(); }
     }
 
