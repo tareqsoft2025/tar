@@ -9,6 +9,9 @@
  * - الحماية من CSRF: تُقبل الطلبات فقط مع الترويسة X-Requested-With: tarsof-app
  *   (لا يمكن لموقع خارجي إرسالها من المتصفح دون تصريح CORS)، وتُرسل الكتابة بصيغة JSON.
  * - لا تُغيّر هذه الواجهة أي ملف آخر؛ المنطق نفسه الموجود في session_save.php و directive_save.php.
+ *
+ * ⚠ مربوطة بتطبيق «تنبيهات الإدارة» (APK). أي تعديل على جداول mgmt_* أو includes/mgmt_ops.php
+ *   أو أسماء الحقول أدناه يجب أن يحافظ على عقد هذه الواجهة، وإلا تعطّل التطبيق المنشور.
  */
 declare(strict_types=1);
 
@@ -44,9 +47,8 @@ $user = currentUser();
 if (!$user) {
     api_fail('انتهت الجلسة، سجّل الدخول من جديد.', 401);
 }
-if (!userCan('mgmt_ops', 'view')) {
-    api_fail('لا تملك صلاحية عمليات الإدارة.', 403);
-}
+// صلاحية عمليات الإدارة تُفحص بعد تحديد الإجراء: وحدات السلة متاحة لأي مستخدم مسجَّل دخوله.
+$canView = userCan('mgmt_ops', 'view');
 $canEdit = userCan('mgmt_ops', 'edit');
 
 $pdo    = db();
@@ -58,6 +60,60 @@ if ($method === 'POST') {
     if (!is_array($body)) api_fail('بيانات غير صالحة.', 400);
 }
 $a = (string) ($method === 'POST' ? ($body['a'] ?? '') : ($_GET['a'] ?? 'bootstrap'));
+
+/* ───────────────────────── الوحدات والسلة (لأي مستخدم مسجَّل) ─────────────────────────
+ * modules: قائمة الوحدات التي يعرضها التطبيق في شريطه — تُضاف وحدةٌ جديدة هنا من الخادم فتظهر في التطبيق دون إعادة بنائه
+ *          (إن كان يرسم شريطه من هذه القائمة ويعرف فتح الوحدة من مفتاحها).
+ * basket: مهامّ السلة المُرسلة إلى المستخدم. basket_item_status: تحديث حالة مهمة ومتابعتها.
+ */
+if (in_array($a, ['modules', 'basket', 'basket_item_status'], true)) {
+    require_once __DIR__ . '/../includes/basket.php';
+    basket_ensure($pdo);
+    $uid = (int) $user['id'];
+    if ($a === 'modules') {
+        $bk = basket_counts($pdo, $uid);
+        api_out(200, ['ok' => true, 'at' => time(), 'modules' => [
+            ['key' => 'mgmt', 'label' => 'عمليات الإدارة', 'icon' => 'bi-clipboard2-pulse', 'enabled' => $canView, 'badge' => 0],
+            ['key' => 'basket', 'label' => 'السلة', 'icon' => 'bi-basket3', 'enabled' => true, 'badge' => (int) $bk['todo']],
+        ]]);
+    }
+    if ($a === 'basket') {
+        $q = $pdo->prepare("SELECT i.id, i.basket_id, i.source, i.source_ref, i.title, i.subject, i.details, i.due_date, i.status, i.result_note, i.done_at,
+                b.title basket_title, b.note basket_note, b.sent_at, b.status basket_status, uo.full_name from_name
+            FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id LEFT JOIN users uo ON uo.id = b.owner_user_id
+            WHERE b.assignee_user_id = :u AND b.status IN ('sent','closed') ORDER BY (i.status = 'done'), b.id DESC, i.id");
+        $q->execute(['u' => $uid]);
+        $items = [];
+        foreach ($q->fetchAll() as $r) {
+            $items[] = ['id' => (int) $r['id'], 'basket_id' => (int) $r['basket_id'], 'source' => $r['source'], 'source_ref' => $r['source_ref'], 'title' => $r['title'],
+                'subject' => $r['subject'], 'details' => $r['details'], 'due_date' => $r['due_date'], 'status' => $r['status'], 'result_note' => $r['result_note'],
+                'done_at' => $r['done_at'], 'basket_title' => $r['basket_title'], 'basket_note' => $r['basket_note'], 'sent_at' => $r['sent_at'], 'from' => $r['from_name']];
+        }
+        $sts = [];
+        foreach (basket_statuses() as $k => $v) { $sts[] = ['k' => $k, 'label' => $v[0]]; }
+        api_out(200, ['ok' => true, 'at' => time(), 'items' => $items, 'statuses' => $sts]);
+    }
+    // basket_item_status
+    if ($method !== 'POST') api_fail('إجراء غير معروف.', 400);
+    $iid = (int) ($body['id'] ?? 0);
+    $st = (string) ($body['status'] ?? '');
+    if (!isset(basket_statuses()[$st])) api_fail('حالة غير صالحة.');
+    $q = $pdo->prepare("SELECT i.id, b.id bid FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id WHERE i.id = :i AND b.assignee_user_id = :u AND b.status = 'sent'");
+    $q->execute(['i' => $iid, 'u' => $uid]);
+    $row = $q->fetch();
+    if (!$row) api_fail('المهمة غير موجودة أو ليست لك.', 404);
+    $note = array_key_exists('result_note', $body) ? (trim((string) $body['result_note']) ?: null) : null;
+    $pdo->prepare('UPDATE hr_basket_items SET status = :s, result_note = COALESCE(:n, result_note), done_at = :d, done_by = :b WHERE id = :i')
+        ->execute(['s' => $st, 'n' => $note, 'd' => $st === 'done' ? date('Y-m-d H:i:s') : null, 'b' => $st === 'done' ? $uid : null, 'i' => $iid]);
+    $left = $pdo->prepare("SELECT COUNT(*) FROM hr_basket_items WHERE basket_id = :b AND status <> 'done'");
+    $left->execute(['b' => (int) $row['bid']]);
+    if ((int) $left->fetchColumn() === 0) { $pdo->prepare("UPDATE hr_baskets SET status = 'closed' WHERE id = :b")->execute(['b' => (int) $row['bid']]); }
+    logAction('update', 'basket', 'basket_item', $iid, 'status=' . $st . ' (app)');
+    api_out(200, ['ok' => true, 'id' => $iid, 'status' => $st]);
+}
+if (!$canView) {
+    api_fail('لا تملك صلاحية عمليات الإدارة.', 403);
+}
 
 function mgmt_ref_of(array $s): string
 {
@@ -75,6 +131,65 @@ function api_guard_open(PDO $pdo, int $sessionId): void
     $st = $pdo->prepare('SELECT status FROM mgmt_sessions WHERE id = :i');
     $st->execute(['i' => $sessionId]);
     if ($st->fetchColumn() === 'closed') api_fail('الجلسة مُقفلة — أعِد فتحها أولاً.');
+}
+/**
+ * الأعمدة المعروفة للتطبيق الحالي. أي عمود جديد يُضاف إلى الجدول لاحقاً يظهر تلقائياً في الحقل «extra» وفي «schema»،
+ * وتسميته من تعليق العمود (COMMENT) في القاعدة، فيعرضه كل تطبيق يقرأ المخطط دون تغيير هذا الملف.
+ */
+const API_KNOWN_DIR = ['id','session_id','target_type','employee_id','candidate_id','target_name','target_title','project','action_type','start_date','end_date','details','hr_note','status','scale_grade','scale_level','scale_step','scale_amount','scale_currency','created_by','created_at','updated_at'];
+const API_KNOWN_SES = ['id','title','session_date','issued_by','notes','status','closed_at','closed_by','created_by','created_at','updated_at'];
+const API_HIDDEN = ['created_by','created_at','updated_at','closed_by'];
+
+/** أعمدة جدول بنوعها المبسّط وتسميتها (التعليق). @return array<string,array{type:string,label:string,null:bool}> */
+function api_columns(PDO $pdo, string $table): array
+{
+    static $cache = [];
+    if (isset($cache[$table])) return $cache[$table];
+    $out = [];
+    foreach ($pdo->query('SHOW FULL COLUMNS FROM ' . $table) as $c) {
+        $t = strtolower((string) $c['Type']);
+        if (str_contains($t, 'int')) { $type = 'int'; }
+        elseif (preg_match('/decimal|float|double/', $t)) { $type = 'number'; }
+        elseif (str_starts_with($t, 'datetime') || str_starts_with($t, 'timestamp')) { $type = 'datetime'; }
+        elseif (str_starts_with($t, 'date')) { $type = 'date'; }
+        elseif (str_contains($t, 'text')) { $type = 'text'; }
+        else { $type = 'string'; }
+        $out[(string) $c['Field']] = ['type' => $type, 'label' => trim((string) $c['Comment']), 'null' => $c['Null'] === 'YES'];
+    }
+    return $cache[$table] = $out;
+}
+/** قيمة عمودٍ إضافي بنوعها الصحيح للتطبيق. */
+function api_cast($v, string $type)
+{
+    if ($v === null) return null;
+    return $type === 'int' ? (int) $v : ($type === 'number' ? (float) $v : (string) $v);
+}
+/** الأعمدة الإضافية في صفٍّ: كل ما ليس في المعروف ولا مخفياً. */
+function api_extra(PDO $pdo, string $table, array $known, array $row): array
+{
+    $x = [];
+    foreach (api_columns($pdo, $table) as $col => $m) {
+        if (in_array($col, $known, true) || in_array($col, API_HIDDEN, true)) continue;
+        $x[$col] = api_cast($row[$col] ?? null, $m['type']);
+    }
+    return $x;
+}
+/** يقرأ extra من الطلب ويُرجع [عمود => قيمة] للأعمدة الإضافية الموجودة فعلاً فقط (قائمة بيضاء من القاعدة نفسها). */
+function api_extra_in(PDO $pdo, string $table, array $known, $in): array
+{
+    $o = [];
+    if (!is_array($in)) return $o;
+    foreach (api_columns($pdo, $table) as $col => $m) {
+        if (in_array($col, $known, true) || in_array($col, API_HIDDEN, true) || !array_key_exists($col, $in)) continue;
+        $v = $in[$col];
+        if (is_array($v) || is_object($v)) continue;
+        $v = $v === null ? null : trim((string) $v);
+        if ($v === '') $v = null;
+        if ($v !== null && $m['type'] === 'int') $v = (string) (int) $v;
+        if ($v !== null && $m['type'] === 'number') $v = (string) (float) $v;
+        $o[$col] = $v !== null ? mb_substr($v, 0, 5000, 'UTF-8') : null;
+    }
+    return $o;
 }
 function api_need_edit(bool $canEdit): void
 {
@@ -101,6 +216,7 @@ if ($a === 'bootstrap') {
             'scale_grade' => $d['scale_grade'], 'scale_level' => $d['scale_level'] !== null ? (int) $d['scale_level'] : null,
             'scale_step' => $d['scale_step'] !== null ? (int) $d['scale_step'] : null,
             'scale_amount' => $d['scale_amount'] !== null ? (float) $d['scale_amount'] : null, 'scale_currency' => $d['scale_currency'],
+            'extra' => api_extra($pdo, 'mgmt_directives', API_KNOWN_DIR, $d),
         ];
     }
     $outSessions = [];
@@ -109,6 +225,7 @@ if ($a === 'bootstrap') {
             'id' => (int) $s['id'], 'ref' => mgmt_ref_of($s), 'title' => $s['title'], 'session_date' => $s['session_date'],
             'issued_by' => $s['issued_by'], 'notes' => $s['notes'], 'status' => $s['status'] ?? 'open', 'closed_at' => $s['closed_at'] ?? null,
             'directives' => $dirs[(int) $s['id']] ?? [],
+            'extra' => api_extra($pdo, 'mgmt_sessions', API_KNOWN_SES, $s),
         ];
     }
 
@@ -145,7 +262,20 @@ if ($a === 'bootstrap') {
     $statuses = [];
     foreach (mgmt_statuses() as $k => $s) { $statuses[] = ['k' => $k, 'label' => $s['label'] ?? $k]; }
 
+    // مخطط ذاتيّ الوصف: يتغيّر رقمه كلما تغيّرت الحقول أو الأنواع أو الحالات، فيعرف التطبيق أن عليه إعادة البناء.
+    $sch = ['directive' => [], 'session' => []];
+    foreach (['directive' => ['mgmt_directives', API_KNOWN_DIR], 'session' => ['mgmt_sessions', API_KNOWN_SES]] as $k => [$tbl, $known]) {
+        foreach (api_columns($pdo, $tbl) as $col => $m) {
+            if (in_array($col, API_HIDDEN, true)) continue;
+            $sch[$k][] = ['k' => $col, 'type' => $m['type'], 'label' => $m['label'] !== '' ? $m['label'] : null, 'extra' => !in_array($col, $known, true)];
+        }
+    }
+    $theme = ['brand' => '#123a40', 'accent' => '#c29a4b', 'ok' => '#16653a', 'warn' => '#7a4a05', 'bad' => '#8a2019',
+        'tones' => array_map(static fn ($t) => $t['tone'] ?? 'slate', $ACTIONS), 'statuses' => mgmt_statuses()];
+    $schemaVer = substr(md5(json_encode([$sch, $actions, $statuses, $theme])), 0, 12);
+
     api_out(200, ['ok' => true, 'user' => ['name' => $user['username'] ?? '', 'canEdit' => $canEdit], 'at' => time(),
+        'schema_version' => $schemaVer, 'schema' => $sch, 'theme' => $theme,
         'sessions' => $outSessions, 'employees' => $employees, 'candidates' => $cands, 'scale' => $scale, 'projects' => $projects,
         'actions' => $actions, 'statuses' => $statuses, 'targets' => mgmt_target_types()]);
 }
@@ -202,16 +332,19 @@ if ($a === 'session_save') {
     $by = trim((string) ($body['issued_by'] ?? ''));
     $notes = trim((string) ($body['notes'] ?? ''));
     if ($title === '') api_fail('يرجى إدخال عنوان الجلسة.');
+    $sx = api_extra_in($pdo, 'mgmt_sessions', API_KNOWN_SES, $body['extra'] ?? null);
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) $date = date('Y-m-d');
     if ($id > 0) {
         $pdo->prepare('UPDATE mgmt_sessions SET title = :t, session_date = :d, issued_by = :b, notes = :n WHERE id = :i')
             ->execute(['t' => $title, 'd' => $date, 'b' => $by ?: null, 'n' => $notes ?: null, 'i' => $id]);
+        foreach ($sx as $col => $val) { $pdo->prepare('UPDATE mgmt_sessions SET `' . $col . '` = :v WHERE id = :i')->execute(['v' => $val, 'i' => $id]); }
         logAction('update', 'mgmt_ops', 'mgmt_session', $id, $title);
         api_out(200, ['ok' => true, 'id' => $id]);
     }
     $pdo->prepare('INSERT INTO mgmt_sessions (title, session_date, issued_by, notes, created_by) VALUES (:t, :d, :b, :n, :c)')
         ->execute(['t' => $title, 'd' => $date, 'b' => $by ?: null, 'n' => $notes ?: null, 'c' => $user['username'] ?? null]);
     $sid = (int) $pdo->lastInsertId();
+    foreach ($sx as $col => $val) { $pdo->prepare('UPDATE mgmt_sessions SET `' . $col . '` = :v WHERE id = :i')->execute(['v' => $val, 'i' => $sid]); }
     logAction('create', 'mgmt_ops', 'mgmt_session', $sid, $title);
     api_out(200, ['ok' => true, 'id' => $sid]);
 }
@@ -317,6 +450,7 @@ if ($a === 'directive_save') {
         $startDate = null;
     }
 
+    $xin = api_extra_in($pdo, 'mgmt_directives', API_KNOWN_DIR, $body['extra'] ?? null);
     if ($id > 0) {
         $sid = api_session_of($pdo, $id);
         if ($sid === null) api_fail('التوجيه غير موجود.', 404);
@@ -327,6 +461,7 @@ if ($a === 'directive_save') {
             ->execute(['tt' => $targetType, 'eid' => $employeeId ?: null, 'cid' => $candidateId ?: null, 'tn' => $targetName, 'ttl' => $targetTitle ?: null,
                 'pj' => $project ?: null, 'at' => $actionType, 'sd' => $startDate, 'ed' => $endDate, 'd' => $details ?: null,
                 'sg' => $scaleGrade, 'sl' => $scaleLevel, 'ss' => $scaleStepOut, 'sa' => $scaleAmount, 'sc' => $scaleCurrency, 'i' => $id]);
+        foreach ($xin as $col => $val) { $pdo->prepare('UPDATE mgmt_directives SET `' . $col . '` = :v WHERE id = :i')->execute(['v' => $val, 'i' => $id]); }
         logAction('update', 'mgmt_ops', 'mgmt_directive', $id, $targetName);
         api_out(200, ['ok' => true, 'id' => $id, 'session_id' => $sid]);
     }
@@ -342,6 +477,7 @@ if ($a === 'directive_save') {
             'sg' => $scaleGrade, 'sl' => $scaleLevel, 'ss' => $scaleStepOut, 'sa' => $scaleAmount, 'sc' => $scaleCurrency, 'st' => 'new',
             'cb' => $user['username'] ?? null]);
     $did = (int) $pdo->lastInsertId();
+    foreach ($xin as $col => $val) { $pdo->prepare('UPDATE mgmt_directives SET `' . $col . '` = :v WHERE id = :i')->execute(['v' => $val, 'i' => $did]); }
     logAction('create', 'mgmt_ops', 'mgmt_directive', $did, $targetName);
     api_out(200, ['ok' => true, 'id' => $did, 'session_id' => $sessionId]);
 }
