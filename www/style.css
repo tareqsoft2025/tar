@@ -1209,3 +1209,12 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-wdh2.z{color:var(--muted)}
 .hr-dsum b.okc{color:var(--ok)}
 .hr-dsum em{font-style:normal;font-size:.6875rem;color:var(--muted);font-weight:600}
+/* شريط حالة الخريطة المحلية */
+.hm-dl{position:absolute;top:calc(84px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:1000;max-width:calc(100% - 140px);padding:7px 14px;border-radius:14px;font-size:.75rem;font-weight:800;text-align:center;color:var(--text);background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));box-shadow:0 6px 18px rgba(0,0,0,.25);animation:in .3s var(--ease)}
+.hm-dl[hidden]{display:none}
+.hm-map[data-mode="offline"] .leaflet-tile{image-rendering:auto}
+.hr-omb{display:flex;gap:8px;margin:10px 0}
+.hr-omb .btn-outline{flex:1;justify-content:center}
+.hr-omn{margin:6px 2px 0;color:var(--muted);font-size:.75rem;line-height:1.6}
+#omSt.omok{color:var(--ok)}
+.hr-set .hr-pbar{margin:8px 0}

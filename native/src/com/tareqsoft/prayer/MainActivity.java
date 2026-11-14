@@ -396,6 +396,26 @@ public class MainActivity extends Activity {
         }
 
         /** Opens the maps app on a place (mosque directions). */
+        /* ----- الخريطة دون إنترنت ----- */
+        @JavascriptInterface
+        public String mapInfo() { return OfflineMap.info(MainActivity.this); }
+
+        @JavascriptInterface
+        public String mapRead(double offset, int length) { return OfflineMap.read(MainActivity.this, (long) offset, length); }
+
+        @JavascriptInterface
+        public void mapDelete() { OfflineMap.delete(MainActivity.this); }
+
+        @JavascriptInterface
+        public void mapDownload(final String url) {
+            new Thread(new Runnable() { public void run() {
+                String err = OfflineMap.download(MainActivity.this, url, new OfflineMap.Progress() {
+                    public void on(int pct) { js("window.mapProgress && window.mapProgress(" + pct + ")"); }
+                });
+                js("window.mapDone && window.mapDone(" + (err == null) + "," + JSONObject.quote(err == null ? "" : err) + ")");
+            } }).start();
+        }
+
         @JavascriptInterface
         public void openExternal(final String url) {
             runOnUiThread(new Runnable() { public void run() { openExternalUrl(url); } });
