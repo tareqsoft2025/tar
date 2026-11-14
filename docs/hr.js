@@ -1110,9 +1110,10 @@
     { id: 'assignment', name: 'انتهاء التكليف', kind: 'assignment', text: 'عزيزي الموظف {الاسم}\nنعلمكم بانتهاء التكليف الخاص بكم يوم {اليوم} الموافق {التاريخ}، ويعتبر هذا إشعاراً رسمياً من الموارد البشرية.' },
     { id: 'late', name: 'تذكير بالتأخر', kind: 'custom', text: 'عزيزي الموظف {الاسم}\nنلفت انتباهكم إلى تأخركم عن الدوام اليوم {يوم_اليوم} {تاريخ_اليوم} ({دقائق_التأخير} دقيقة). نرجو الالتزام بمواعيد الدوام.' },
     { id: 'absent', name: 'عدم تسجيل الحضور', kind: 'custom', text: 'عزيزي الموظف {الاسم}\nلم يُسجَّل حضوركم اليوم {يوم_اليوم} {تاريخ_اليوم}. نرجو تسجيل الحضور أو إفادتنا بسبب الغياب.' },
+    { id: 'directive', name: 'إشعار بتوجيه إدارة', kind: 'custom', text: 'عزيزي الموظف {الاسم}\nنبلغكم بتوجيه الإدارة: {نوع_التوجيه}.\n{تفاصيل_التوجيه}\nالمدة: {تاريخ_بداية_التوجيه} ← {تاريخ_نهاية_التوجيه}\nمع التحية.' },
     { id: 'free', name: 'رسالة حرة', kind: 'custom', text: 'عزيزي الموظف {الاسم}\n' }
   ];
-  const TOKENS = ['الاسم', 'اليوم', 'التاريخ', 'نهاية_العقد', 'نهاية_التكليف', 'المشروع', 'المسمى', 'رقم_العقد', 'تاريخ_اليوم', 'يوم_اليوم', 'وقت_الدخول', 'دقائق_التأخير'];
+  const TOKENS = ['الاسم', 'اليوم', 'التاريخ', 'نهاية_العقد', 'نهاية_التكليف', 'المشروع', 'المسمى', 'رقم_العقد', 'تاريخ_اليوم', 'يوم_اليوم', 'وقت_الدخول', 'دقائق_التأخير', 'نوع_التوجيه', 'تفاصيل_التوجيه', 'تاريخ_بداية_التوجيه', 'تاريخ_نهاية_التوجيه', 'مشروع_التوجيه'];
   const tplStore = () => Object.assign({ over: {}, custom: [] }, HR.db.get('msgTpl', {}));
   const templates = () => { const st = tplStore(); return TPL.map((t) => Object.assign({}, t, { text: st.over[t.id] != null ? st.over[t.id] : t.text, edited: st.over[t.id] != null })).concat(st.custom.map((c) => ({ id: c.id, name: c.name, kind: 'custom', text: c.text, custom: true }))); };
   const todayS = () => today();
@@ -1136,7 +1137,7 @@
   function tokenMap(rec, kind) {
     const e = rec.e, c = rec.con || bestContract(e.id), a = rec.asg || bestAsg(e.id);
     const date = kind === 'assignment' ? (a && a.end) : kind === 'contract' ? (c && c.end) : ((c && c.end) || (a && a.end));
-    return { date, t: { 'الاسم': e.name, 'اليوم': date ? wdS.format(noon(date)) : '—', 'التاريخ': date ? fd(date) : '—', 'نهاية_العقد': c && c.end ? fd(c.end) : '—', 'نهاية_التكليف': a && a.end ? fd(a.end) : '—', 'المشروع': (a && (a.project || a.code)) || '—', 'المسمى': (c && c.pos) || e.pos || '—', 'رقم_العقد': (c && c.no) || '—', 'تاريخ_اليوم': fd(todayS()), 'يوم_اليوم': wdS.format(noon(todayS())), 'وقت_الدخول': todayRow(e.id) && todayRow(e.id).firstIn ? tf.format(new Date(todayRow(e.id).firstIn)) : '—', 'دقائق_التأخير': todayRow(e.id) ? String(todayRow(e.id).lateMin || 0) : '0' } };
+    return { date, t: { 'الاسم': e.name, 'اليوم': date ? wdS.format(noon(date)) : '—', 'التاريخ': date ? fd(date) : '—', 'نهاية_العقد': c && c.end ? fd(c.end) : '—', 'نهاية_التكليف': a && a.end ? fd(a.end) : '—', 'المشروع': (a && (a.project || a.code)) || '—', 'المسمى': (c && c.pos) || e.pos || '—', 'رقم_العقد': (c && c.no) || '—', 'تاريخ_اليوم': fd(todayS()), 'يوم_اليوم': wdS.format(noon(todayS())), 'وقت_الدخول': todayRow(e.id) && todayRow(e.id).firstIn ? tf.format(new Date(todayRow(e.id).firstIn)) : '—', 'دقائق_التأخير': todayRow(e.id) ? String(todayRow(e.id).lateMin || 0) : '0', 'نوع_التوجيه': (rec.dir && rec.dir.label) || '—', 'تفاصيل_التوجيه': (rec.dir && rec.dir.details) || '', 'تاريخ_بداية_التوجيه': (rec.dir && rec.dir.start) || '—', 'تاريخ_نهاية_التوجيه': (rec.dir && rec.dir.end) || '—', 'مشروع_التوجيه': (rec.dir && rec.dir.project) || '—' } };
   }
   const fillText = (text, rec, kind) => { const m = tokenMap(rec, kind).t; return text.replace(/\{([^{}]+)\}/g, (x, k) => (m[k] != null ? m[k] : x)); };
 
@@ -1198,7 +1199,7 @@
     items.forEach((it) => {
       if (seen.has(it.empId) || !emps[it.empId]) return; seen.add(it.empId);
       const e = HR.emp(emps[it.empId]);
-      recs.push({ key: it.empId, e, con: it.con || null, asg: it.asg || null, sms: smsNumber(e.phone), wa: waOrder(it.empId, (phoneInfo(e.phone) || { wa: [] }).wa), cc: 0, noWa: !!(waPrefs()[it.empId] || {}).none });
+      recs.push({ key: it.empId, e, con: it.con || null, asg: it.asg || null, dir: it.dir || null, sms: smsNumber(e.phone), wa: waOrder(it.empId, (phoneInfo(e.phone) || { wa: [] }).wa), cc: 0, noWa: !!(waPrefs()[it.empId] || {}).none });
     });
     if (!recs.length) { toast('لا يوجد موظفون للإرسال'); return; }
     const t = templates().find((x) => x.id === tplId) || templates()[0];
