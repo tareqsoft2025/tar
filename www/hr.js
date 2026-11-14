@@ -47,13 +47,28 @@
     const meta = HR.meta();
     const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
     box.appendChild(acc);
-    const tabs = el('div', 'chips hr-tabs');
-    [['dash', 'لوحة اليوم', 'grid'], ['att', 'الحضور', 'clock'], ['wk', 'ساعات الأسبوع', 'chart'], ['lv', 'الإجازات', 'cal'], ['emp', 'الموظفون', 'users'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase'], ['set', 'الإعدادات', 'sliders']].forEach(([k, n, ic]) => {
-      const b = el('button', 'chip sm' + (tab === k ? ' on' : ''), `${icon(ic)}${n}`);
-      b.onclick = () => { tab = k; store.set('hrTab', k); selOff(); render(); };
-      tabs.appendChild(b);
+    // خمسة أقسام ثابتة، وتحتها شرائح فرعية لقسم التقارير
+    const secOf = () => tab === 'dash' ? 'today' : tab === 'emp' ? 'team' : tab === 'set' ? 'more' : (tab === 'lv' && f.lv === 'req') ? 'req' : 'rep';
+    const pend = pendingReqs().length;
+    const nav = el('div', 'hr2-nav');
+    [['today', 'اليوم', 'grid', () => { tab = 'dash'; }], ['team', 'الفريق', 'users', () => { tab = 'emp'; }], ['req', 'الطلبات', 'inbox', () => { tab = 'lv'; f.lv = 'req'; }],
+      ['rep', 'التقارير', 'chart', () => { if (secOf() !== 'rep') tab = 'att'; }], ['more', 'المزيد', 'sliders', () => { tab = 'set'; }]].forEach(([k, n, ic, go]) => {
+      const b = el('button', 'hr2-n' + (secOf() === k ? ' on' : ''), `${icon(ic)}<span>${n}</span>${k === 'req' && pend ? `<i class="hr2-bd">${pend > 99 ? '99+' : pend}</i>` : ''}`);
+      b.type = 'button';
+      b.onclick = () => { go(); f.q = ''; store.set('hrTab', tab); selOff(); render(); window.scrollTo && window.scrollTo(0, 0); };
+      nav.appendChild(b);
     });
-    box.appendChild(tabs);
+    box.appendChild(nav);
+    if (secOf() === 'rep') {
+      const sub = el('div', 'chips hr-tabs');
+      [['att', 'الحضور', 'clock'], ['wk', 'ساعات الأسبوع', 'chart'], ['bal', 'الأرصدة', 'cal'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase']].forEach(([k, n, ic]) => {
+        const on = k === 'bal' ? tab === 'lv' : tab === k;
+        const b = el('button', 'chip sm' + (on ? ' on' : ''), `${icon(ic)}${n}`);
+        b.onclick = () => { if (k === 'bal') { tab = 'lv'; f.lv = 'bal'; } else tab = k; f.q = ''; store.set('hrTab', tab); selOff(); render(); };
+        sub.appendChild(b);
+      });
+      box.appendChild(sub);
+    }
     const body = el('div', 'hr-view'); box.appendChild(body);
     if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
     ({ dash: renderDash, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
@@ -206,6 +221,10 @@
     body.appendChild(box);
   }
 
+  const PENDING = ['pending', 'submitted', 'manager_approved', 'new'];
+  function pendingReqs() {
+    try { const lim = addDays(today(), -30); return HR.requests().filter((q) => PENDING.includes(q.status) && (q.to || q.from || '') >= lim); } catch (e) { return []; }
+  }
   /* ---------- لوحة اليوم ---------- */
   function renderDash(body) {
     const t = today();
@@ -215,23 +234,52 @@
     const cons = HR.contracts().filter((c) => c.end && daysTo(c.end) >= 0 && daysTo(c.end) <= 30);
     const asgs = HR.assignments().filter((a) => a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
     body.appendChild(el('div', 'hr-day', `<b>${dLong.format(new Date())}</b><small>${rep.synced ? 'حسب آخر مزامنة' : 'لم يُزامن حضور اليوم بعد'}${rep.weekend ? ' · عطلة' : ''}</small>`));
-    const k = el('div', 'hr-kpis');
-    [['emp', rows.length, 'موظف نشط', '', () => { tab = 'emp'; }],
-      ['present', cnt('present') + cnt('late'), 'سجّلوا حضوراً', 'ok', () => { tab = 'att'; f.st = 'in'; }],
-      ['late', cnt('late'), 'متأخرون', 'warn', () => { tab = 'att'; f.st = 'late'; }],
-      ['absent', cnt('absent'), 'بلا تسجيل ولا إجازة', 'bad', () => { tab = 'att'; f.st = 'absent'; }],
-      ['leave', cnt('leave'), 'إجازة / مهمة', 'info', () => { tab = 'att'; f.st = 'leave'; }],
-      ['con', cons.length, 'عقود تنتهي خلال 30 يوماً', 'warn', () => { tab = 'con'; f.cs = 'soon30'; }]
-    ].forEach(([key, n, l, tone, go]) => {
-      const c = el('button', 'hr-kpi ' + tone, `<b>${n}</b><small>${l}</small>`);
-      c.onclick = () => { go(); f.day = t; f.q = ''; render(); };
-      k.appendChild(c);
+    // بحث شامل: يفتح قائمة الفريق مفلترة
+    const gs = el('form', 'hr2-search', `${icon('search')}<input id="hrGS" type="search" enterkeyhint="search" placeholder="ابحث عن موظف: اسم، رقم، هاتف، قسم…" autocomplete="off">`);
+    gs.onsubmit = (ev) => { ev.preventDefault(); const v = $('hrGS').value.trim(); if (!v) return; tab = 'emp'; f.es = 'all'; f.q = v; store.set('hrTab', tab); render(); };
+    body.appendChild(gs);
+    // حلقة حال اليوم
+    const nPresent = cnt('present') + cnt('noin'), nLate = cnt('late'), nAbs = cnt('absent'), nLv = cnt('leave'), tot = rows.length || 1;
+    const seg = [[nPresent, 'var(--ok)'], [nLate, '#F0A64B'], [nAbs, '#F2716A'], [nLv, '#5B9DFF']];
+    let acc = 0; const stops = seg.map(([n, c]) => { const a0 = acc; acc += n / tot * 100; return `${c} ${a0}% ${acc}%`; });
+    if (acc < 100) stops.push(`var(--line) ${acc}% 100%`);
+    const went = nPresent + nLate;
+    const hero = el('div', 'hr2-hero', `<div class="hr2-ring" style="background:conic-gradient(${stops.join(',')})"><div><b>${went}</b><small>من ${rows.length} حضروا</small></div></div>
+      <div class="hr2-leg">${[['present', 'في الموعد', nPresent, 'var(--ok)', 'in'], ['late', 'متأخرون', nLate, '#F0A64B', 'late'], ['absent', 'بلا تسجيل', nAbs, '#F2716A', 'absent'], ['leave', 'إجازة / مهمة', nLv, '#5B9DFF', 'leave']].map(([k, l, n, c, st]) => `<button type="button" data-st="${st}"><i style="background:${c}"></i>${l}<b>${n}</b></button>`).join('')}</div>`);
+    hero.querySelectorAll('[data-st]').forEach((x) => x.onclick = () => { tab = 'att'; f.st = x.dataset.st; f.day = t; f.q = ''; render(); });
+    body.appendChild(hero);
+    // يحتاج انتباهك
+    const att = [];
+    const outside = rows.filter((r) => r.outside).length, pend = pendingReqs();
+    if (!rep.synced) att.push(['info', 'clock', 'حضور اليوم غير مزامن', 'اضغط لمزامنة الآن', () => doSync()]);
+    if (nLate) { const top = rows.filter((r) => r.status === 'late').sort((a, z) => z.lateMin - a.lateMin)[0]; att.push(['warn', 'clock', `${nLate} متأخرون اليوم`, `أطولهم: ${top.e.name} +${top.lateMin} د`, () => { tab = 'att'; f.st = 'late'; }]); }
+    if (nAbs) att.push(['bad', 'alert', `${nAbs} بلا تسجيل ولا إجازة`, 'راسلهم من قائمة الحضور', () => { tab = 'att'; f.st = 'absent'; }]);
+    if (outside) att.push(['bad', 'pin', `${outside} سجّلوا خارج نطاق الموقع`, 'راجع مواقعهم على الخريطة', () => { tab = 'att'; f.st = 'outside'; }]);
+    if (pend.length) att.push(['info', 'inbox', `${pend.length} طلبات قيد الاعتماد`, 'إجازات، مغادرات، عمل إضافي', () => { tab = 'lv'; f.lv = 'req'; f.rs = 'pending'; f.rk = 'all'; f.am = today().slice(0, 7); }]);
+    if (cons.length) att.push(['warn', 'note', `${cons.length} عقود تنتهي خلال 30 يوماً`, 'ارسل إشعار الانتهاء من القائمة', () => { tab = 'con'; f.cs = 'soon30'; }]);
+    if (asgs.length) att.push(['warn', 'briefcase', `${asgs.length} تكليفات تنتهي خلال 30 يوماً`, 'راجع نسب التكليف', () => { tab = 'asg'; f.as = 'soon'; }]);
+    body.appendChild(el('div', 'hr-sec', `<span>يحتاج انتباهك</span><small>${att.length ? att.length + ' عناصر' : ''}</small>`));
+    const ab = el('div', 'hr2-attn');
+    if (!att.length) ab.appendChild(el('div', 'hr2-ok', `${icon('check')}<span>كل شيء على ما يرام اليوم</span>`));
+    att.forEach(([tone, ic, title, sub, go]) => {
+      const c = el('button', 'hr2-ac ' + tone, `<span class="hr2-ic">${icon(ic)}</span><span class="hr2-at"><b>${title}</b><small>${esc(sub)}</small></span><span class="flip hr2-go">${icon('chev')}</span>`);
+      c.type = 'button';
+      c.onclick = () => { go(); f.day = t; f.q = ''; store.set('hrTab', tab); render(); };
+      ab.appendChild(c);
     });
-    body.appendChild(k);
-    // شريط الحالة
-    if (rows.length) {
-      const seg = ['present', 'late', 'leave', 'absent', 'noin'].map((s) => [s, cnt(s)]).filter((x) => x[1]);
-      body.appendChild(el('div', 'hr-bar', seg.map(([s, n]) => `<i class="${STATUS[s][1]}" style="flex:${n}" title="${STATUS[s][0]}"></i>`).join('')));
+    body.appendChild(ab);
+    // آخر التسجيلات
+    const last = rows.filter((r) => r.list.length).map((r) => ({ r, ev: r.list[r.list.length - 1] })).sort((a, z) => String(z.ev.recordedAt).localeCompare(String(a.ev.recordedAt))).slice(0, 4);
+    if (last.length) {
+      body.appendChild(el('div', 'hr-sec', '<span>آخر التسجيلات</span>'));
+      const fd2 = el('div', 'hr2-feed');
+      last.forEach(({ r, ev }) => {
+        const bad = r.outside || r.lateMin > 0;
+        const row = el('button', 'hr2-fr', `<i class="${r.outside ? 'bad' : r.lateMin > 0 ? 'warn' : 'ok'}"></i><b>${esc(r.e.name)}</b><span>${ev.eventType === 'check_out' ? 'خروج' : 'دخول'}${r.outside ? ' · خارج الموقع' : ''}</span><time>${tf.format(new Date(ev.recordedAt))}</time>`);
+        row.type = 'button'; row.onclick = () => openDay(r.e.id, t);
+        fd2.appendChild(row);
+      });
+      body.appendChild(fd2);
     }
     if (rows.length) {
       body.appendChild(el('div', 'hr-sec', '<span>تفصيل حضور اليوم</span>'));
@@ -299,10 +347,19 @@
     filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']]);
     filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
     search(body, 'الاسم، الرقم الوظيفي، الهوية، القسم');
-    const rows = all.filter((e) => (f.es === 'all' || (f.es === 'active' ? e.active : !e.active)) && orgOk(e) && typeOk(e) && match(f.q, e.name, e.nameEn, e.empId, e.nid, e.dept, e.pos))
+    const digits = (v) => String(v || '').replace(/\D/g, '');
+    const qd = digits(f.q);
+    const rows = all.filter((e) => (f.es === 'all' || (f.es === 'active' ? e.active : !e.active)) && orgOk(e) && typeOk(e) && (match(f.q, e.name, e.nameEn, e.empId, e.nid, e.dept, e.pos) || (qd.length >= 4 && digits(e.phone).includes(qd.replace(/^0+/, '').replace(/^(970|972)/, '')))))
       .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     body.appendChild(el('div', 'hr-tools', `<small>${rows.length} من ${all.length} موظف</small>`));
-    list(body, rows.map((e) => personRow(e, e.empId ? `<small>#${esc(e.empId)}</small>` : '')), 'لا نتائج');
+    // حالة اليوم بجانب كل موظف
+    const trep = HR.dayReport(today()), tmap = {}; trep.rows.forEach((r) => { tmap[r.e.id] = r; });
+    list(body, rows.map((e) => {
+      const r = tmap[e.id];
+      let right = e.empId ? `<small>#${esc(e.empId)}</small>` : '';
+      if (r && trep.synced) { const st = STATUS[r.status]; right = (r.status === 'late' ? badge('+' + r.lateMin + ' د', 'warn') : r.status === 'leave' ? badge(leaveLbl(r.leave), 'info') : badge(st[0], st[1])) + (r.firstIn ? `<small>${tf.format(new Date(r.firstIn))}</small>` : ''); }
+      return personRow(e, right);
+    }), 'لا نتائج');
   }
 
   /* ---------- العقود ---------- */
@@ -560,7 +617,6 @@
     if (!['bal', 'req'].includes(f.lv)) f.lv = 'bal';
     const seg = el('div', 'seg hr-vseg', `<button data-v="bal" class="${f.lv === 'bal' ? 'on' : ''}">${icon('chart')}الأرصدة</button><button data-v="req" class="${f.lv === 'req' ? 'on' : ''}">${icon('note')}الطلبات</button>`);
     seg.querySelectorAll('button').forEach((b) => b.onclick = () => { f.lv = b.dataset.v; render(); });
-    body.appendChild(seg);
     if (f.lv === 'bal') {
       const bm = HR.db.get('balMeta', {});
       const head = el('div', 'hr-tools', `<small>${bm.at ? 'الأرصدة محدّثة ' + ago(bm.at) + ` · ${bm.ok || 0} موظف` : 'لم تُجلب الأرصدة بعد'}</small><button>${icon('refresh')}جلب كل الأرصدة</button>`);
@@ -910,6 +966,15 @@
     const s = HR.settings();
     const meta = HR.meta();
     const put = (patch) => { HR.db.put('settings', Object.assign(HR.settings(), patch)); applyBg(); };
+    // حالة المزامنة والاتصال + اختصارات
+    const ni = HR.netInfo(), slow = HR.isSlow(), ws0 = HR.watchState();
+    body.appendChild(el('div', 'hr2-status' + (ni.online ? '' : ' off'), `${icon('refresh')}<div><b>${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</b><small>${!ni.online ? 'لا يوجد اتصال: يعمل التطبيق من البيانات المحفوظة' : slow ? 'اتصال ضعيف (2G): تُجلب البيانات الصغيرة فقط' : ni.wifi ? 'متصل عبر Wi‑Fi' : 'متصل ببيانات الجوال'}${ws0.min ? ' · المتابعة الخلفية كل ' + ws0.min + ' د' : ''}</small></div>`));
+    const quick = el('div', 'hr2-tiles');
+    [['note', 'العقود', () => { tab = 'con'; }], ['briefcase', 'التكليفات', () => { tab = 'asg'; }], ['cal', 'الأرصدة', () => { tab = 'lv'; f.lv = 'bal'; }], ['chart', 'ساعات الأسبوع', () => { tab = 'wk'; }]].forEach(([ic, n, go]) => {
+      const b = el('button', 'hr2-tile', `${icon(ic)}<b>${n}</b>`); b.type = 'button';
+      b.onclick = () => { go(); store.set('hrTab', tab); render(); }; quick.appendChild(b);
+    });
+    body.appendChild(quick);
     // المزامنة
     const sy = el('div', 'group pad hr-set', `
       <div class="hr-sl">${icon('refresh')}المزامنة</div>
