@@ -1315,3 +1315,46 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-bd-n b{font-size:.875rem}
 .hr-bd-n i{display:block;height:4px;border-radius:3px;background:linear-gradient(to left,var(--ok) var(--p),color-mix(in srgb,var(--muted) 25%,transparent) var(--p))}
 .hr-bd-r .ok{color:var(--ok)}.hr-bd-r .warn{color:#F0A64B}.hr-bd-r .bad{color:#F2716A}.hr-bd-r .info{color:#5B9DFF}
+
+/* ---- تصميم الموارد البشرية الجديد (v8) ---- */
+.hr2-nav{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;position:sticky;top:0;z-index:5;background:var(--bg);padding:6px 0 8px;margin:0 0 4px;border-bottom:1px solid var(--line)}
+.hr2-n{position:relative;display:grid;justify-items:center;gap:2px;padding:7px 2px;border-radius:14px;color:var(--muted);font-size:.72rem;font-weight:700;background:transparent;border:0;cursor:pointer}
+.hr2-n svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.hr2-n.on{color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent)}
+.hr2-bd{position:absolute;top:1px;inset-inline-start:calc(50% + 6px);background:#F2716A;color:#fff;font-style:normal;font-size:.62rem;min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+.hr2-search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0 12px;margin:8px 0}
+.hr2-search svg{width:18px;height:18px;flex:none;color:var(--muted);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.hr2-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);font:inherit;padding:12px 0}
+.hr2-hero{display:grid;grid-template-columns:104px 1fr;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;margin:8px 0}
+.hr2-ring{width:104px;height:104px;border-radius:50%;display:grid;place-items:center;position:relative}
+.hr2-ring::after{content:"";position:absolute;inset:12px;background:var(--card);border-radius:50%}
+.hr2-ring div{position:relative;z-index:1;text-align:center;line-height:1.1}
+.hr2-ring b{font-size:1.7rem;display:block}.hr2-ring small{font-size:.66rem;color:var(--muted)}
+.hr2-leg{display:grid;gap:4px;min-width:0}
+.hr2-leg button{display:flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--text);font:inherit;font-size:.84rem;padding:5px 2px;border-radius:8px;cursor:pointer;text-align:start}
+.hr2-leg button:active{background:color-mix(in srgb,var(--gold) 10%,transparent)}
+.hr2-leg i{width:10px;height:10px;border-radius:3px;flex:none}.hr2-leg b{margin-inline-start:auto;font-size:1rem}
+.hr2-attn{display:grid;gap:8px}
+.hr2-ac{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-align:start;cursor:pointer;color:var(--text);font:inherit;width:100%}
+.hr2-ac:active{transform:scale(.985)}
+.hr2-ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none}
+.hr2-ic svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.hr2-ac.warn .hr2-ic{background:color-mix(in srgb,#F0A64B 18%,transparent);color:#F0A64B}
+.hr2-ac.bad .hr2-ic{background:color-mix(in srgb,#F2716A 18%,transparent);color:#F2716A}
+.hr2-ac.info .hr2-ic{background:color-mix(in srgb,#5B9DFF 18%,transparent);color:#5B9DFF}
+.hr2-at{min-width:0;flex:1;display:grid}.hr2-at b{font-size:.9rem}.hr2-at small{color:var(--muted);font-size:.76rem}
+.hr2-go{color:var(--muted);flex:none}.hr2-go svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2}
+.hr2-ok{display:flex;gap:10px;align-items:center;padding:12px;border-radius:14px;background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok);font-weight:700}
+.hr2-ok svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.5}
+.hr2-feed{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:2px 12px}
+.hr2-fr{display:flex;align-items:center;gap:9px;padding:10px 0;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);font:inherit;font-size:.84rem;width:100%;text-align:start;cursor:pointer}
+.hr2-fr:last-child{border-bottom:0}
+.hr2-fr i{width:8px;height:8px;border-radius:50%;flex:none;background:var(--ok)}.hr2-fr i.warn{background:#F0A64B}.hr2-fr i.bad{background:#F2716A}
+.hr2-fr span{color:var(--muted);font-size:.78rem}.hr2-fr time{margin-inline-start:auto;color:var(--muted);font-size:.74rem}
+.hr2-status{display:flex;gap:10px;align-items:center;padding:11px 12px;border-radius:14px;background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok);margin:6px 0 10px}
+.hr2-status.off{background:color-mix(in srgb,#F0A64B 15%,transparent);color:#F0A64B}
+.hr2-status svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.hr2-status b{display:block;font-size:.88rem}.hr2-status small{font-size:.76rem;opacity:.9}
+.hr2-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.hr2-tile{display:grid;justify-items:center;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 2px;color:var(--text);font:inherit;font-size:.74rem;cursor:pointer}
+.hr2-tile svg{width:21px;height:21px;color:var(--gold);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

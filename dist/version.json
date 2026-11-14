@@ -1,6 +1,6 @@
 {
-  "versionCode": 45,
-  "versionName": "7.4",
-  "notes": "تفصيل الحضور: PEF وHHO والمكتبي والميداني في لوحة المعلومات وتبويب الحضور",
+  "versionCode": 46,
+  "versionName": "8.0",
+  "notes": "تصميم الموارد البشرية الجديد: خمسة أقسام، لوحة اليوم، بطاقات يحتاج انتباهك، بحث شامل",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
