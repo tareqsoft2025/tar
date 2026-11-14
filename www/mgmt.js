@@ -121,7 +121,7 @@
     const ICONS = { mgmt: 'note', basket: 'briefcase' };
     const bar = el('div', 'mg-mods');
     list.forEach((m) => {
-      const b = el('button', 'mg-mod' + (S.mod === m.key ? ' on' : ''), `${icon(ICONS[m.key] || 'grid')}<span>${esc(m.label)}</span>${m.badge ? `<i class="mg-mb">${m.badge > 99 ? '99+' : m.badge}</i>` : ''}`);
+      const b = el('button', 'mg-mod' + (S.mod === m.key ? ' on' : ''), `${icon(ICONS[m.key] || 'grid')}<span>${esc(m.label)}</span>${m.badge ? `<i class="mg-mbd">${m.badge > 99 ? '99+' : m.badge}</i>` : ''}`);
       b.type = 'button';
       b.onclick = () => { S.mod = m.key; draw(); if (m.key === 'basket') refresh(true); };
       bar.appendChild(b);
@@ -292,7 +292,8 @@
       t.appendChild(e); t.appendChild(x); side.appendChild(t);
     } else side.appendChild(el('span', 'mg-stat', esc((STC[d.status] || [d.status])[0])));
     if (d.target_type === 'employee' && window.HR && HR.matchEmp) {
-      const pf = el('button', 'mg-pefb', `${icon('users')}ملف PEF`); pf.type = 'button'; pf.onclick = () => openPef(d, s); side.prepend(pf);
+      const pf = el('button', 'mg-pefb', `${icon('users')}ملف PEF`); pf.type = 'button'; pf.onclick = () => openPef(d, s);
+      const row = side.querySelector('.mg-dtools'); if (row) row.prepend(pf); else side.appendChild(pf);
     }
     card.appendChild(side);
     return card;
@@ -319,7 +320,7 @@
     if (!BK) { box.appendChild(el('div', 'mg-empty', S.loading ? `${icon('refresh')}<b>جارٍ التحميل…</b>` : `${icon('briefcase')}<b>السلة</b><small>${S.err === 'net' ? 'لا يوجد اتصال. تحقق من الإنترنت ثم اضغط تحديث.' : 'اضغط تحديث لجلب مهامك.'}</small>`)); const rb = el('button', 'btn-gold wide', 'تحديث'); rb.onclick = () => refresh(); box.appendChild(rb); return; }
     const todo = BK.items.filter((i) => i.status !== 'done'), doneN = BK.items.length - todo.length;
     const t = today(), late = todo.filter((i) => i.due_date && i.due_date < t).length;
-    const h = el('div', 'mg-hero', `<div class="mg-hid"><span class="mg-eyebrow">مهام أُرسلت إليك</span><h2>السلة</h2><small>${todo.length} للتنفيذ${late ? ` · <b class="mg-wait">${late} متأخرة</b>` : ''} · ${doneN} منفّذة${outbox.length ? ` · <b class="mg-wait">${outbox.length} بانتظار الإرسال</b>` : ''}${BK.cachedAt ? ' · حُدّث ' + ago(BK.cachedAt) : ''}</small></div><div class="mg-hside"><button class="icon-btn mg-ref${S.loading ? ' spin' : ''}" id="bkRef" aria-label="تحديث">${icon('refresh')}</button></div>`);
+    const h = el('div', 'mg-hero row', `<div class="mg-hid"><span class="mg-eyebrow">مهام أُرسلت إليك</span><h2>السلة</h2><small>${todo.length} للتنفيذ${late ? ` · <b class="mg-wait">${late} متأخرة</b>` : ''} · ${doneN} منفّذة${outbox.length ? ` · <b class="mg-wait">${outbox.length} بانتظار الإرسال</b>` : ''}${BK.cachedAt ? ' · حُدّث ' + ago(BK.cachedAt) : ''}</small></div><div class="mg-hside"><button class="icon-btn mg-ref${S.loading ? ' spin' : ''}" id="bkRef" aria-label="تحديث">${icon('refresh')}</button></div>`);
     box.appendChild(h);
     h.querySelector('#bkRef').onclick = () => refresh();
     const fl = el('div', 'chips mg-bkf');
