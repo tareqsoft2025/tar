@@ -1623,3 +1623,18 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-gact button{flex:1;min-height:46px}
 .hr-gact button{border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit}
 .hr-gact .btn-primary{background:var(--accent,#d9b56b);color:#1a1405;border-color:transparent;font-weight:700}
+
+/* تعديل الحضور اليدوي */
+.hr-evedit{margin-top:6px;min-height:36px;padding:0 12px;border-radius:10px;border:1px dashed var(--line,#2a3b3d);background:transparent;color:inherit;font:inherit;font-size:.85em;display:inline-flex;align-items:center;gap:6px}
+.hr-evedit svg{width:14px;height:14px}
+.hr-warnbox{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:rgba(224,160,60,.14);border:1px solid rgba(224,160,60,.45);margin:8px 0;font-size:.9em;line-height:1.5}
+.hr-warnbox svg{width:18px;height:18px;flex:none;margin-top:2px}
+.hr-fl{display:block;margin:8px 0;font-size:.9em;opacity:.95}
+.hr-fl .hr-in{margin-top:4px}
+.hr-fl textarea.hr-in{padding:8px 12px;resize:vertical}
+.hr-confirm{margin:10px 0;padding:10px 12px;border-radius:12px;border:1px solid var(--accent,#d9b56b);line-height:1.7;font-size:.92em}
+.hr-gact .btn-primary.danger{background:#c0392b;color:#fff}
+.hr-gact{flex-wrap:wrap}
+.hr-wimg{width:100%;height:auto;border-radius:14px;border:1px solid var(--line,#2a3b3d);margin:8px 0}
+.hr-sgrow{display:grid;grid-template-columns:1fr 1fr 40px;gap:6px;align-items:center;margin:4px 0}.hr-sgrow .hr-in{margin:0;min-width:0}.hr-sgx{min-height:44px;border-radius:12px;border:1px solid var(--line,#2a3b3d);background:transparent;color:inherit}.hr-sgx svg{width:16px;height:16px}
+.hr-wh{display:block;color:#e0a03c}.hr-wrs{margin:-2px 10px 6px;font-size:.85em;opacity:.7}

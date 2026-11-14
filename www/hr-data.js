@@ -30,6 +30,34 @@
     if (!B || !B.erpSend) return webCall('PUT', path, body);
     return new Promise((res) => { const id = 's' + (++seq); pending[id] = res; B.erpSend(id, path, JSON.stringify(body), role || ''); });
   }
+  // كتابة حضور يدوي (POST محدود المسارات في الطبقة الأصلية) — حساس: بلا إعادة تلقائية
+  function writeAtt(path, body, role) {
+    if (!B || !B.erpWrite) return webCall('POST', path, body);
+    return new Promise((res) => { const id = 'w' + (++seq); pending[id] = res; B.erpWrite(id, path, JSON.stringify(body), role || ''); });
+  }
+  const audit = (rec) => { const l = db.get('attAudit', []); l.unshift(Object.assign({ t: Date.now() }, rec)); db.put('attAudit', l.slice(0, 200)); };
+  const attAudit = () => db.get('attAudit', []);
+  // وقت HH:MM في يوم ds بتوقيت فلسطين ← ISO
+  const localTs = (ds, hm) => { const [h, m] = String(hm).split(':').map(Number); return new Date(localMidnight(ds) + ((h || 0) * 60 + (m || 0)) * 60000).toISOString(); };
+  async function attAdd(o) {
+    const body = { employeeId: o.employeeId, eventType: o.eventType, recordedAt: o.recordedAt, source: 'hr_manual' };
+    if (o.notes) body.notes = o.notes;
+    if (o.lat != null && o.lon != null) { body.latitude = o.lat; body.longitude = o.lon; }
+    if (o.force) body.force = true;
+    const r = await writeAtt('/api/hr/attendance/events', body, await userRole());
+    audit({ op: 'add', emp: o.employeeId, name: o.name || '', ds: o.ds, type: o.eventType, at: o.recordedAt, reason: o.notes || '', ok: !!r.ok, status: r.status, err: r.ok ? '' : ((r.data && (r.data.error || r.data.message)) || '') });
+    if (r.ok && o.ds) { try { await syncDay(o.ds); } catch (e) { /* يُحدَّث في المزامنة التالية */ } }
+    return { ok: r.ok, status: r.status, data: r.data, invalid: !r.ok && r.data && r.data.error === 'invalid_transition' };
+  }
+  // تعديل (edit) أو إخفاء (hide) حدث موجود مع سبب إلزامي
+  async function attFix(ev, o) {
+    const body = { action: o.action, reason: o.reason };
+    if (o.action === 'edit') { body.eventType = o.eventType; body.recordedAt = o.recordedAt; }
+    const r = await writeAtt('/api/hr/attendance/events/' + encodeURIComponent(ev.id) + '/correct', body, await userRole());
+    audit({ op: o.action, emp: ev.employeeId, name: o.name || '', ds: o.ds, type: o.eventType || ev.eventType, at: o.recordedAt || ev.recordedAt, was: ev.recordedAt, reason: o.reason, ok: !!r.ok, status: r.status, err: r.ok ? '' : ((r.data && (r.data.error || r.data.message)) || '') });
+    if (r.ok && o.ds) { try { await syncDay(o.ds); } catch (e) { /* ignore */ } }
+    return { ok: r.ok, status: r.status, data: r.data };
+  }
   let roleCache = null;
   async function userRole() {
     if (roleCache) return roleCache;
@@ -646,7 +674,7 @@
   }
   const linkEmp = (sysId, pefId) => { const l = db.get('empLinks', {}); if (pefId == null) delete l[sysId]; else l[sysId] = String(pefId); db.put('empLinks', l); };
 
-  window.HR = { matchEmp, linkEmp, pollHint, notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  window.HR = { attAdd, attFix, attAudit, localTs, matchEmp, linkEmp, pollHint, notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     setWatch: (min) => { if (B && B.hrWatch) B.hrWatch(min | 0); },
     watchState: () => { try { return B && B.hrWatchState ? JSON.parse(B.hrWatchState()) : { min: 0, last: 0, ok: true }; } catch (e) { return { min: 0, last: 0, ok: true }; } },
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),

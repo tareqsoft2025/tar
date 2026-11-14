@@ -357,6 +357,32 @@ public class MainActivity extends Activity {
             new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.send(MainActivity.this, path, json, role)); } }).start();
         }
 
+        @JavascriptInterface
+        public void erpWrite(final String id, final String path, final String json, final String role) {
+            new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.write(MainActivity.this, path, json, role)); } }).start();
+        }
+
+        @JavascriptInterface
+        public void shareImage(final String b64, final String name, final String caption) {
+            try {
+                byte[] data = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                java.io.File dir = new java.io.File(getCacheDir(), "share"); dir.mkdirs();
+                String fn = name.replaceAll("[^A-Za-z0-9._-]", "_");
+                java.io.File f = new java.io.File(dir, fn);
+                java.io.FileOutputStream o = new java.io.FileOutputStream(f); o.write(data); o.close();
+                final android.net.Uri u = android.net.Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
+                final String cap = caption;
+                runOnUiThread(new Runnable() { public void run() {
+                    Intent i = new Intent(Intent.ACTION_SEND);
+                    i.setType("image/png");
+                    i.putExtra(Intent.EXTRA_STREAM, u);
+                    if (cap != null && cap.length() > 0) i.putExtra(Intent.EXTRA_TEXT, cap);
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(i, "مشاركة"));
+                } });
+            } catch (Exception e) { js("window.toast && window.toast('تعذّرت المشاركة')"); }
+        }
+
         private void mgmtReply(final String id, final ErpClient.Res r) {
             js("window.__mgmt && window.__mgmt(" + JSONObject.quote(id) + "," + r.status + "," + JSONObject.quote(r.body) + ")");
         }
