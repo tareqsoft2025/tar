@@ -109,6 +109,7 @@ public class MainActivity extends Activity {
             sp.edit().putBoolean("bg_asked", true).apply();
             requestPermissions(new String[] { "android.permission.ACCESS_BACKGROUND_LOCATION" }, 2);
         }
+        if (code == 3) js("window.smsPerm && window.smsPerm(" + SmsSender.can(this) + ")");
         maybeSendTest();
         js("window.nativePermsChanged && window.nativePermsChanged()");
     }
@@ -491,6 +492,23 @@ public class MainActivity extends Activity {
                 });
                 js("window.mapDone && window.mapDone(" + (err == null) + "," + JSONObject.quote(err == null ? "" : err) + ")");
             } }).start();
+        }
+
+        @JavascriptInterface public boolean smsAvailable() { return SmsSender.available(MainActivity.this); }
+        @JavascriptInterface public boolean smsCan() { return SmsSender.can(MainActivity.this); }
+        @JavascriptInterface public void smsAsk() {
+            runOnUiThread(new Runnable() { public void run() {
+                if (Build.VERSION.SDK_INT >= 23) requestPermissions(new String[] { Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE }, 3);
+                else js("window.smsPerm && window.smsPerm(true)");
+            } });
+        }
+        @JavascriptInterface public String smsSims() { return SmsSender.sims(MainActivity.this); }
+        @JavascriptInterface public void smsSend(String json) { SmsSender.send(getApplicationContext(), json); }
+        @JavascriptInterface public String smsStatus(String idsJson) { return SmsSender.status(MainActivity.this, idsJson); }
+        @JavascriptInterface public void openAppSettings() {
+            runOnUiThread(new Runnable() { public void run() {
+                try { startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + getPackageName()))); } catch (Exception e) { /* ignore */ }
+            } });
         }
 
         @JavascriptInterface

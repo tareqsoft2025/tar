@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="60" android:versionName="8.14">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tareqsoft.prayer" android:versionCode="61" android:versionName="8.15">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="33"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -16,6 +16,9 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-feature android:name="android.hardware.telephony" android:required="false"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <application android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:allowBackup="true" android:hardwareAccelerated="true">
         <activity android:name="com.tareqsoft.prayer.MainActivity" android:exported="true" android:launchMode="singleTask" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|layoutDirection">
@@ -28,6 +31,7 @@
         <service android:name="com.tareqsoft.prayer.HrSyncJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false"/>
         <receiver android:name="com.tareqsoft.prayer.AlarmReceiver" android:exported="false"/>
         <receiver android:name="com.tareqsoft.prayer.TickReceiver" android:exported="false"/>
+        <receiver android:name="com.tareqsoft.prayer.SmsStatusReceiver" android:exported="false"/>
         <receiver android:name="com.tareqsoft.prayer.UpdateChecker" android:exported="false"/>
         <service android:name="com.tareqsoft.prayer.HrWatchService" android:exported="false"/>
         <service android:name="com.tareqsoft.prayer.OverlayService" android:exported="false"/>
