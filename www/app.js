@@ -536,7 +536,7 @@
 
   /* ---------- التنقل ---------- */
   const App = { screens: {} };
-  const PARENT = { hr: 'more', agenda: 'more', qada: 'more', asma: 'more', fx: 'more', duas: 'more', khatma: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', jumah: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
+  const PARENT = { hr: 'more', mgmt: 'more', agenda: 'more', qada: 'more', asma: 'more', fx: 'more', duas: 'more', khatma: 'more', calendar: 'more', mosques: 'more', tasbih: 'more', azkar: 'more', jumah: 'more', hadith: 'more', seerah: 'more', lessons: 'more', story: 'more', reader: 'quran' };
   const stack = [];
   let current = 'times';
   const isActive = (n) => current === n;

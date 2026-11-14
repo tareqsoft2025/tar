@@ -72,6 +72,9 @@
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
     <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.1"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
   </defs>
 </svg>
@@ -175,6 +178,14 @@
     <div class="wxs-grab"></div>
     <div class="ag-edh"><button class="icon-btn" data-close aria-label="إغلاق"><svg class="ic" data-close><use href="#i-x"/></svg></button></div>
     <div id="hrSheetBody"></div>
+  </div>
+</div>
+<div id="mgSheet" class="qsheet ag-sheet" hidden>
+  <div class="qs-scrim" data-close></div>
+  <div class="qs-box ag-ed hr-sheet" role="dialog" aria-modal="true" aria-label="تنبيهات الإدارة">
+    <div class="wxs-grab"></div>
+    <div class="ag-edh"><button class="icon-btn" data-close aria-label="إغلاق"><svg class="ic" data-close><use href="#i-x"/></svg></button></div>
+    <div id="mgSheetBody"></div>
   </div>
 </div>
 <div id="miniPlayer" class="mini" hidden>
@@ -303,6 +314,7 @@
     <div class="sub">أدوات تعينك على المحافظة على صلاتك وعبادتك</div>
     <div class="hub">
       <button class="hub-card ag-hub hr-hub" data-go="hr"><span class="hub-ic"><svg class="ic"><use href="#i-users"/></svg></span><b>الموارد البشرية</b><small>الموظفون والعقود والتكليفات والحضور من نظام PEF</small></button>
+      <button class="hub-card ag-hub mg-hub" data-go="mgmt"><span class="hub-ic"><svg class="ic"><use href="#i-note"/></svg></span><b>تنبيهات الإدارة</b><small>توجيهات الإدارة إلى الموارد البشرية وتنفيذها</small></button>
       <button class="hub-card ag-hub" data-go="agenda"><span class="hub-ic"><svg class="ic"><use href="#i-cal"/></svg></span><b>الأجندة</b><small>مهامك ومواعيدك بالتاريخ والوقت، مع تذكير في منتصف الشاشة</small></button>
       <button class="hub-card" data-go="jumah"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>يوم الجمعة</b><small>سنن وساعة الإجابة والصلاة على النبي</small></button>
       <button class="hub-card" data-go="fx"><span class="hub-ic"><svg class="ic"><use href="#i-chart"/></svg></span><b>الدولار والشيكل</b><small>سعر الصرف والتحويل</small></button>
@@ -424,6 +436,12 @@
   <section id="tab-hr" class="tab">
     <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">الموارد البشرية</h1><button id="hrSync" class="icon-btn hr-syncb" type="button" aria-label="مزامنة" hidden><svg class="ic"><use href="#i-refresh"/></svg></button></div>
     <div id="hrBody"></div>
+  </section>
+
+  <!-- تنبيهات الإدارة -->
+  <section id="tab-mgmt" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">تنبيهات الإدارة</h1></div>
+    <div id="mgBody"></div>
   </section>
 
   <!-- الأجندة -->
@@ -672,5 +690,6 @@
 <script src="hr-map.js"></script>
 <script src="hr-data.js"></script>
 <script src="hr.js"></script>
+<script src="mgmt.js"></script>
 </body>
 </html>
