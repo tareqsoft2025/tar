@@ -1,6 +1,6 @@
 {
-  "versionCode": 48,
-  "versionName": "8.2",
-  "notes": "تنبيهات الإدارة: جلسات وتوجيهات الإدارة مرتبطة بنظام tarsof.top",
+  "versionCode": 49,
+  "versionName": "8.3",
+  "notes": "مزامنة أسرع: كل شيء أول مرة ثم السجلات الحديثة فقط",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
