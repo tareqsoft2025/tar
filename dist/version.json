@@ -1,6 +1,6 @@
 {
-  "versionCode": 49,
-  "versionName": "8.3",
-  "notes": "مزامنة أسرع: كل شيء أول مرة ثم السجلات الحديثة فقط",
+  "versionCode": 50,
+  "versionName": "8.4",
+  "notes": "زر المزامنة يجلب الجديد فقط بعد المحفوظ، وإعادة الجلب الكاملة زر منفصل",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
