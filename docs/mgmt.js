@@ -1,4 +1,4 @@
-// تنبيهات الإدارة: جلسات توجيهات الإدارة إلى الموارد البشرية، مرتبطة بنظام tarsof.top (/hrnew/mgmt/api.php)
+// النظام المساعد HR (تنبيهات الإدارة): جلسات توجيهات الإدارة إلى الموارد البشرية، مرتبطة بنظام tarsof.top (/hrnew/mgmt/api.php)
 (function () {
   const { $, icon, toast, store } = App;
   const B = App.B;
@@ -143,7 +143,7 @@
   function hero() {
     const c = counts(), n = D.sessions.length;
     const h = el('div', 'mg-hero', `
-      <div class="mg-hid"><span class="mg-eyebrow">الإدارة ← الموارد البشرية</span><h2>تنبيهات الإدارة</h2>
+      <div class="mg-hid"><span class="mg-eyebrow">الإدارة ← الموارد البشرية</span><h2>النظام المساعد HR</h2>
         <small>${n} جلسة${outbox.length ? ` · <b class="mg-wait">${outbox.length} بانتظار الإرسال</b>` : ''}${D.cachedAt ? ' · حُدّث ' + ago(D.cachedAt) : ''}</small></div>
       <div class="mg-hside"><button class="icon-btn mg-ref${S.loading ? ' spin' : ''}" id="mgRef" aria-label="تحديث">${icon('refresh')}</button>${canEdit() ? `<button class="btn-gold mg-new" id="mgNew">${icon('plus')}<span>جلسة جديدة</span></button>` : ''}</div>`);
     const cr = el('div', 'mg-counts');
