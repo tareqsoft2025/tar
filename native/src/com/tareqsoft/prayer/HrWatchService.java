@@ -39,7 +39,7 @@ public class HrWatchService extends Service {
 
     /** minutes <= 0 stops watching. */
     static void set(Context c, int minutes) {
-        c.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("watch_min", Math.max(0, minutes)).apply();
+        c.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("watch_min", Math.max(0, minutes)).putInt("watch_hint", 0).apply();
         if (minutes <= 0) {
             cancelTick(c);
             c.stopService(new Intent(c, HrWatchService.class));
@@ -69,7 +69,10 @@ public class HrWatchService extends Service {
     private static void armTick(Context c) {
         int m = minutes(c);
         if (m <= 0) return;
-        Scheduler.setAlarm(c, System.currentTimeMillis() + m * 60_000L, tickIntent(c), false);
+        // الفحص التكيّفي: آخر تلميح من الصفحة (دقائق) يحلّ محل الفترة الثابتة، فيقلّ عدد الطلبات خارج أوقات الحضور
+        int hint = c.getSharedPreferences(PREFS, MODE_PRIVATE).getInt("watch_hint", 0);
+        int delay = hint > 0 ? Math.min(480, Math.max(1, hint)) : m;
+        Scheduler.setAlarm(c, System.currentTimeMillis() + delay * 60_000L, tickIntent(c), false);
     }
 
     static String state(Context c) {
@@ -125,7 +128,7 @@ public class HrWatchService extends Service {
     private void check() {
         if (running) return;
         // والتطبيق مفتوح أمام المستخدم فهو يزامن بنفسه ويعرض النافذة داخله
-        if (MainActivity.visible) return;
+        if (MainActivity.visible) { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("watch_hint", 0).apply(); return; }
         if (!ErpClient.hasSession(this) && !ErpClient.hasCreds(this)) return;
         running = true;
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -165,6 +168,12 @@ public class HrWatchService extends Service {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putLong("watch_last", System.currentTimeMillis()).putBoolean("watch_ok", ok).apply();
                 h.post(finish);
             }
+            @JavascriptInterface public void done(boolean ok, int hintMin) {
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("watch_hint", hintMin).apply();
+                done(ok);
+                armTick(HrWatchService.this);
+            }
+            @JavascriptInterface public int watchBase() { return minutes(HrWatchService.this); }
             @JavascriptInterface public void done() { done(true); }
         }, "AndroidBridge");
         web.loadUrl("file:///android_asset/www/hr-sync.html#quick");

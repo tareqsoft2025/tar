@@ -605,7 +605,26 @@
     return d;
   }
 
-  window.HR = { notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  /* ---------- فحص تكيّفي: أقل عدد ممكن من الطلبات للنظام ---------- */
+  // كثيف (الفترة التي يختارها المستخدم، بحد أدنى دقيقتين) وقت وصول الموظفين وانصرافهم،
+  // 20 دقيقة بين النافذتين، ساكن ليلاً حتى الصباح، وساعة في أيام العطلة.
+  function pollHint(base, at) {
+    const now = at ? new Date(at) : new Date(), cfg = settings();
+    base = Math.max(2, +base || 5);
+    const nowMin = minutesOf(now.toISOString());
+    const start = Math.min(hmToMin(cfg.office), hmToMin(cfg.field)), end = start + (cfg.dayHours || 8) * 60;
+    const MORNING = 330, NIGHT = 21 * 60;
+    if (nowMin < MORNING) return Math.min(480, MORNING - nowMin + 1);
+    if (nowMin >= NIGHT) return Math.min(480, 24 * 60 - nowMin + MORNING);
+    if (cfg.weekend.includes(Tracker.dowOf(dayStr(now)))) return 60;
+    const inWin = (nowMin >= start - 30 && nowMin <= start + 150) || (nowMin >= end - 30 && nowMin <= end + 120);
+    if (inWin) return base;
+    const nextWin = nowMin < start - 30 ? start - 30 : (nowMin > start + 150 && nowMin < end - 30) ? end - 30 : null;
+    const gap = nextWin != null ? nextWin - nowMin : 0;
+    return gap > 0 && gap < 20 ? gap : 20;
+  }
+
+  window.HR = { pollHint, notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     setWatch: (min) => { if (B && B.hrWatch) B.hrWatch(min | 0); },
     watchState: () => { try { return B && B.hrWatchState ? JSON.parse(B.hrWatchState()) : { min: 0, last: 0, ok: true }; } catch (e) { return { min: 0, last: 0, ok: true }; } },
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),
