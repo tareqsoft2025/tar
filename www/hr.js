@@ -50,7 +50,7 @@
     const tabs = el('div', 'chips hr-tabs');
     [['dash', 'لوحة اليوم', 'grid'], ['att', 'الحضور', 'clock'], ['wk', 'ساعات الأسبوع', 'chart'], ['lv', 'الإجازات', 'cal'], ['emp', 'الموظفون', 'users'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase'], ['set', 'الإعدادات', 'sliders']].forEach(([k, n, ic]) => {
       const b = el('button', 'chip sm' + (tab === k ? ' on' : ''), `${icon(ic)}${n}`);
-      b.onclick = () => { tab = k; store.set('hrTab', k); render(); };
+      b.onclick = () => { tab = k; store.set('hrTab', k); selOff(); render(); };
       tabs.appendChild(b);
     });
     box.appendChild(tabs);
@@ -58,6 +58,10 @@
     if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
     ({ dash: renderDash, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet }[tab] || renderDash)(body);
     const on = box.querySelector('.hr-tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+    // زر "تحديد" في شريط أدوات القائمة
+    const ts = body.querySelectorAll('.hr-tools');
+    if (SELTABS.includes(tab) && ts.length) addSelBtn(ts[ts.length - 1]);
+    selBarUpdate();
   }
 
   /* ---------- تسجيل الدخول ---------- */
@@ -147,6 +151,7 @@
     const r = el('button', 'hr-row');
     r.innerHTML = `<span class="hr-ava ${tone || ''}">${esc(initials(e.name))}</span><span class="hr-rt"><b>${esc(e.name)}</b><small>${sub != null ? sub : esc([e.pos || e.dept, TYPE[e.type], e.org].filter(Boolean).join(' · '))}</small></span><span class="hr-rr">${right || ''}</span>`;
     r.onclick = () => openEmp(e.id);
+    r.dataset.emp = e.id;
     return r;
   }
   function list(parent, rows, empty, limit) {
@@ -154,6 +159,7 @@
     const g = el('div', 'hr-list');
     rows.slice(0, limit || 400).forEach((r) => g.appendChild(r));
     parent.appendChild(g);
+    decorate(g);
     if (rows.length > (limit || 400)) parent.appendChild(el('p', 'note c', `<span>يُعرض أول ${limit || 400} من ${rows.length}. استخدم البحث أو الفلاتر.</span>`));
   }
   const badge = (txt, tone) => `<span class="hr-b ${tone || ''}">${txt}</span>`;
@@ -287,6 +293,7 @@
       <small>${esc([c.pos, gls(c), money(c.salary, c.cur)].filter(Boolean).join(' · '))}</small>
       <small>${fd(c.start)} ← ${fd(c.end)}</small>${flags(sm) ? `<span class="hr-flags">${flags(sm)}</span>` : ''}</span><span class="hr-rr">${remain(c.end)}</span>`;
     r.onclick = () => openCon(c);
+    r.dataset.emp = c.empId; r.dataset.ctx = 'c:' + c.id;
     return r;
   }
   function conCard(c, focus) {
@@ -306,8 +313,10 @@
       ${conCard(c, true)}
       ${others.length ? `<div class="hr-sec"><span>عقود وسجلات أخرى لنفس الموظف (${others.length})</span></div>${others.map((x) => conCard(x)).join('')}` : ''}
       ${c.empId && HR.db.get('employees', {})[c.empId] ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}
+      ${c.empId ? `<button class="btn-outline wide" id="hrMsgCon">${icon('note')}<span>إرسال إشعار انتهاء العقد</span></button>` : ''}
       ${rawTable(c.raw)}`);
     const b = $('hrToEmp'); if (b) b.onclick = () => openEmp(c.empId, c.id);
+    const mc = $('hrMsgCon'); if (mc) mc.onclick = () => openCompose([{ empId: c.empId, con: c }], 'contract');
   }
   function renderCon(body) {
     sumCache = null;
@@ -340,6 +349,7 @@
       <small>${esc([a.code, a.pno, a.project].filter(Boolean).join(' · ') || 'مشروع')}</small>${a.no ? `<small>#${esc(a.no)}</small>` : ''}
       <small>${fd(a.start)} ← ${fd(a.end)}${a.pct != null ? ' · ' + esc(a.pct) + '%' : ''}${a.cur ? ' · ' + esc(a.cur) : ''}</small>${en ? `<span class="hr-flags">${badge(en[0], en[1])}</span>` : ''}</span><span class="hr-rr">${remain(a.end)}</span>`;
     r.onclick = () => openAsg(a);
+    r.dataset.emp = a.empId; r.dataset.ctx = 'a:' + a.id;
     return r;
   }
   function asgCard(a) {
@@ -352,8 +362,10 @@
   function openAsg(a) {
     const name = a.name || empName(a.empId) || '—';
     sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('briefcase')}</span><div><b>${esc(name)}</b><small>${esc([a.code, a.project].filter(Boolean).join(' · '))}</small></div></div>${asgCard(a)}
-      ${a.empId && HR.db.get('employees', {})[a.empId] ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}${rawTable(a.raw)}`);
+      ${a.empId && HR.db.get('employees', {})[a.empId] ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}
+      ${a.empId ? `<button class="btn-outline wide" id="hrMsgAsg">${icon('note')}<span>إرسال إشعار انتهاء التكليف</span></button>` : ''}${rawTable(a.raw)}`);
     const b = $('hrToEmp'); if (b) b.onclick = () => openEmp(a.empId);
+    const ma = $('hrMsgAsg'); if (ma) ma.onclick = () => openCompose([{ empId: a.empId, asg: a }], 'assignment');
   }
   /* ----- التكليفات حسب الشهر ----- */
   const MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
@@ -410,7 +422,7 @@
       const projs = g.items.map((x) => x.a.pno || x.a.code || x.a.project).filter(Boolean);
       r.innerHTML = `<span class="hr-ava ${tone}">${esc(initials(g.name))}</span><span class="hr-rt"><b>${esc(g.name)}</b><small>${g.items.length} ${g.items.length === 1 ? 'تكليف' : 'تكليفات'} · ${esc(projs.slice(0, 2).join(' · '))}${projs.length > 2 ? ' …' : ''}</small>
         <span class="hr-pbar ${tone}"><i style="width:${Math.min(100, g.total)}%"></i></span></span><span class="hr-rr"><b class="hr-pt ${tone}">${pctTxt(g.total)}</b><small>من الشهر</small></span>`;
-      r.onclick = () => openAsgMonth(g.empId);
+      r.onclick = () => openAsgMonth(g.empId); r.dataset.emp = g.empId;
       return r;
     }), 'لا تكليفات في هذا الشهر');
   }
@@ -530,7 +542,7 @@
         r.innerHTML = `<span class="hr-ava ${tone}">${esc(initials(e.name))}</span><span class="hr-rt"><b>${esc(e.name)}</b><small>${esc([e.dept, e.org].filter(Boolean).join(' · '))}</small>
           ${b ? `<span class="hr-flags">${badge('مرضية ' + num2(sk ? sk.rem : null), 'warn')}${b.comp && b.comp.remH ? badge('تعويضية ' + num2(b.comp.remH) + ' س', 'info') : ''}</span>` : ''}</span>
           <span class="hr-rr"><b class="hr-pt ${tone}">${an ? num2(an.rem) : '—'}</b><small>${an ? 'يوم سنوي' : 'غير مجلوب'}</small></span>`;
-        r.onclick = () => openBalance(e.id);
+        r.onclick = () => openBalance(e.id); r.dataset.emp = e.id;
         return r;
       }), 'لا موظفين');
       return;
@@ -556,7 +568,7 @@
       const st = rqStatus(q.status);
       const r = el('button', 'hr-row hr-crow');
       r.innerHTML = `<span class="hr-ava ${RQ[q.kind][1]}">${icon(RQ[q.kind][2])}</span><span class="hr-rt"><b>${esc(q.name || empName(q.empId) || '—')}</b><small>${RQ[q.kind][0]}${q.kind === 'daily' && q.nature ? ' · ' + esc(leaveLbl(q.nature)) : ''}${q.project ? ' · ' + esc(q.project) : ''}</small><small>${rqWhen(q)}</small>${q.reason ? `<small>${esc(q.reason)}</small>` : ''}</span><span class="hr-rr">${st ? badge(st[0], st[1]) : ''}</span>`;
-      r.onclick = () => openBalance(q.empId);
+      r.onclick = () => openBalance(q.empId); r.dataset.emp = q.empId;
       return r;
     }), 'لا طلبات بهذه الفلاتر');
   }
@@ -640,7 +652,7 @@
       r.innerHTML = `<span class="hr-ava ${tone}">${esc(initials(o.e.name))}</span><span class="hr-rt"><b>${esc(o.e.name)}</b><small>${esc([o.e.dept, TYPE[o.e.type], o.e.org].filter(Boolean).join(' · '))}</small><span class="hr-wbars">${bars}</span>
         <span class="hr-flags">${o.late ? badge('تأخير ' + o.late, 'warn') : ''}${o.noOut ? badge('بلا خروج ' + o.noOut, 'bad') : ''}${o.outside ? badge('خارج الموقع ' + o.outside, 'bad') : ''}${o.leave ? badge('إجازة ' + o.leave, 'info') : ''}</span></span>
         <span class="hr-rr"><b class="hr-pt ${tone}">${hh(o.total)}</b><small>${o.expected ? 'من ' + hh(o.expected) : 'ساعة'}</small>${o.expected && o.total !== o.expected ? `<small class="hr-df ${o.total > o.expected ? 'up' : 'dn'}">${o.total > o.expected ? 'زيادة' : 'نقص'} ${hh(Math.abs(o.total - o.expected))}</small>` : ''}</span>`;
-      r.onclick = () => openWeek(o.e.id, ws);
+      r.onclick = () => openWeek(o.e.id, ws); r.dataset.emp = o.e.id;
       return r;
     }), 'لا موظفين بهذه الفلاتر', 300);
   }
@@ -679,6 +691,176 @@
     const body = $('hrSheetBody');
     body.querySelectorAll('[data-day]').forEach((b) => { b.onclick = () => openDay(empId, b.dataset.day); });
     $('hrToEmp').onclick = () => openEmp(empId);
+  }
+
+  /* ---------- الرسائل: القوالب والإرسال لعدة موظفين ---------- */
+  const SELTABS = ['att', 'wk', 'lv', 'emp', 'con', 'asg'];
+  let selMode = false; const sel = new Map(); // معرّف الموظف ← { empId, ctx }
+  const TPL = [
+    { id: 'contract', name: 'إنهاء العقد', kind: 'contract', text: 'عزيزي الموظف {الاسم}\nنعلمكم بانتهاء العقد الخاص بكم يوم {اليوم} الموافق {التاريخ}.' },
+    { id: 'assignment', name: 'انتهاء التكليف', kind: 'assignment', text: 'عزيزي الموظف {الاسم}\nنعلمكم بانتهاء التكليف الخاص بكم يوم {اليوم} الموافق {التاريخ}، ويعتبر هذا إشعاراً رسمياً من الموارد البشرية.' },
+    { id: 'free', name: 'رسالة حرة', kind: 'custom', text: 'عزيزي الموظف {الاسم}\n' }
+  ];
+  const TOKENS = ['الاسم', 'اليوم', 'التاريخ', 'نهاية_العقد', 'نهاية_التكليف', 'المشروع', 'المسمى', 'رقم_العقد'];
+  const tplStore = () => Object.assign({ over: {}, custom: [] }, HR.db.get('msgTpl', {}));
+  const templates = () => { const st = tplStore(); return TPL.map((t) => Object.assign({}, t, { text: st.over[t.id] != null ? st.over[t.id] : t.text, edited: st.over[t.id] != null })).concat(st.custom.map((c) => ({ id: c.id, name: c.name, kind: 'custom', text: c.text, custom: true }))); };
+  const todayS = () => today();
+  // العقد/التكليف الأنسب للموظف: ما ينتهي أولاً من الجاري، وإلا الأحدث انتهاءً
+  function bestContract(empId) {
+    const l = HR.contracts().filter((c) => c.empId === empId && c.end);
+    const act = l.filter((c) => c.end >= todayS()).sort((a, b) => b.end.localeCompare(a.end));
+    return act[0] || l.sort((a, b) => b.end.localeCompare(a.end))[0] || null;
+  }
+  function bestAsg(empId) {
+    const l = HR.assignments().filter((a) => a.empId === empId && a.end);
+    const act = l.filter((a) => a.end >= todayS()).sort((a, b) => a.end.localeCompare(b.end));
+    return act[0] || l.sort((a, b) => b.end.localeCompare(a.end))[0] || null;
+  }
+  function tokenMap(rec, kind) {
+    const e = rec.e, c = rec.con || bestContract(e.id), a = rec.asg || bestAsg(e.id);
+    const date = kind === 'assignment' ? (a && a.end) : kind === 'contract' ? (c && c.end) : ((c && c.end) || (a && a.end));
+    return { date, t: { 'الاسم': e.name, 'اليوم': date ? wdS.format(noon(date)) : '—', 'التاريخ': date ? fd(date) : '—', 'نهاية_العقد': c && c.end ? fd(c.end) : '—', 'نهاية_التكليف': a && a.end ? fd(a.end) : '—', 'المشروع': (a && (a.project || a.code)) || '—', 'المسمى': (c && c.pos) || e.pos || '—', 'رقم_العقد': (c && c.no) || '—' } };
+  }
+  const fillText = (text, rec, kind) => { const m = tokenMap(rec, kind).t; return text.replace(/\{([^{}]+)\}/g, (x, k) => (m[k] != null ? m[k] : x)); };
+
+  /* --- وضع التحديد --- */
+  function selOff() { selMode = false; sel.clear(); }
+  function ensureSelBar() {
+    let bar = $('hrSelBar');
+    if (bar) return bar;
+    bar = el('div', 'hr-selbar', `<span id="selCount">0 محدد</span><button id="selAll" type="button">تحديد الكل</button><button id="selMsg" type="button" class="go">${icon('note')}رسالة</button><button id="selX" type="button" aria-label="إلغاء">${icon('x')}</button>`);
+    bar.id = 'hrSelBar'; bar.hidden = true;
+    $('tab-hr').appendChild(bar);
+    $('selX').onclick = () => { selOff(); render(); };
+    $('selAll').onclick = () => {
+      const rows = [...document.querySelectorAll('#hrBody .hr-row[data-emp]')];
+      const all = rows.length && rows.every((r) => sel.has(r.dataset.emp));
+      rows.forEach((r) => { if (all) sel.delete(r.dataset.emp); else if (!sel.has(r.dataset.emp)) sel.set(r.dataset.emp, { empId: r.dataset.emp, ctx: r.dataset.ctx || null }); });
+      rows.forEach((r) => { r.classList.toggle('sel', sel.has(r.dataset.emp)); const c = r.querySelector('.hr-chk'); if (c) c.classList.toggle('on', sel.has(r.dataset.emp)); });
+      selBarUpdate();
+    };
+    $('selMsg').onclick = () => {
+      if (!sel.size) { toast('اختر موظفاً واحداً على الأقل'); return; }
+      openCompose([...sel.values()].map((v) => { const r = { empId: v.empId }; if (v.ctx && v.ctx.startsWith('c:')) r.con = HR.contracts().find((c) => c.id === v.ctx.slice(2)); if (v.ctx && v.ctx.startsWith('a:')) r.asg = HR.assignments().find((a) => a.id === v.ctx.slice(2)); return r; }), tab === 'con' ? 'contract' : tab === 'asg' ? 'assignment' : 'free');
+    };
+    return bar;
+  }
+  function selBarUpdate() {
+    const bar = ensureSelBar();
+    bar.hidden = !(selMode && SELTABS.includes(tab));
+    $('selCount').textContent = `${sel.size} محدد`;
+    $('selMsg').disabled = !sel.size;
+  }
+  function addSelBtn(tools) {
+    const wrap = el('span');
+    const b = el('button', 'hr-tsel' + (selMode ? ' on' : ''), `${icon('check')}${selMode ? 'إنهاء التحديد' : 'تحديد'}`);
+    b.onclick = () => { selMode = !selMode; if (!selMode) sel.clear(); render(); };
+    [...tools.children].filter((x) => x.tagName === 'BUTTON').forEach((x) => wrap.appendChild(x));
+    const inner = tools.querySelector(':scope > span'); if (inner) { inner.prepend(b); return; }
+    wrap.prepend(b); tools.appendChild(wrap);
+  }
+  function decorate(g) {
+    if (!selMode) return;
+    g.querySelectorAll('.hr-row[data-emp]').forEach((r) => {
+      const k = r.dataset.emp, on = sel.has(k);
+      r.classList.toggle('sel', on);
+      r.insertBefore(el('span', 'hr-chk' + (on ? ' on' : ''), icon('check')), r.firstChild);
+      r.onclick = (ev) => {
+        ev.preventDefault();
+        if (sel.has(k)) sel.delete(k); else sel.set(k, { empId: k, ctx: r.dataset.ctx || null });
+        r.classList.toggle('sel', sel.has(k)); r.querySelector('.hr-chk').classList.toggle('on', sel.has(k));
+        selBarUpdate();
+      };
+    });
+  }
+
+  /* --- نافذة الإرسال --- */
+  let cmp = null;
+  function openCompose(items, tplId) {
+    const seen = new Set(), emps = HR.db.get('employees', {}), recs = [];
+    items.forEach((it) => {
+      if (seen.has(it.empId) || !emps[it.empId]) return; seen.add(it.empId);
+      const e = HR.emp(emps[it.empId]);
+      recs.push({ key: it.empId, e, con: it.con || null, asg: it.asg || null, sms: smsNumber(e.phone), wa: (phoneInfo(e.phone) || { wa: [] }).wa, cc: 0 });
+    });
+    if (!recs.length) { toast('لا يوجد موظفون للإرسال'); return; }
+    const t = templates().find((x) => x.id === tplId) || templates()[0];
+    cmp = { recs, tplId: t.id, text: t.text, ch: store.get('hrMsgCh', 'sms'), done: {}, newName: false };
+    drawCompose();
+  }
+  const waNum = (r) => (r.wa[r.cc] || r.wa[0] || {}).num || '';
+  const numOf = (r) => cmp.ch === 'sms' ? r.sms : waNum(r);
+  function bodyFor(r) { const t = templates().find((x) => x.id === cmp.tplId) || { kind: 'custom' }; return fillText(cmp.text, r, t.kind); }
+  function drawCompose() {
+    const tp = templates(), cur = tp.find((x) => x.id === cmp.tplId), kind = cur ? cur.kind : 'custom';
+    const noNum = cmp.recs.filter((r) => !numOf(r)).length;
+    const noDate = kind === 'custom' ? 0 : cmp.recs.filter((r) => !tokenMap(r, kind).date).length;
+    const first = cmp.recs.find((r) => numOf(r)) || cmp.recs[0];
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('note')}</span><div><b>إرسال رسالة</b><small>${cmp.recs.length} موظف</small></div></div>
+      <div class="seg hr-vseg" id="cmCh"><button data-c="sms" class="${cmp.ch === 'sms' ? 'on' : ''}">رسالة SMS</button><button data-c="wa" class="${cmp.ch === 'wa' ? 'on' : ''}">واتساب</button></div>
+      <div class="ag-lbl">القالب</div><div class="chips" id="cmTpl">${tp.map((x) => `<button class="chip sm${x.id === cmp.tplId ? ' on' : ''}" data-t="${esc(x.id)}">${esc(x.name)}</button>`).join('')}<button class="chip sm" data-t="__new">+ قالب جديد</button></div>
+      ${cmp.newName ? `<div class="hr-newtpl"><input id="cmNewName" class="ag-in" placeholder="اسم القالب الجديد" maxlength="40"><button class="btn-gold" id="cmNewOk" type="button">حفظ</button></div>` : ''}
+      <textarea id="cmText" class="ag-in hr-cmt" rows="5" placeholder="نص الرسالة"></textarea>
+      <div class="hr-toks" id="cmToks">${TOKENS.map((k) => `<button type="button" data-k="${k}">{${k}}</button>`).join('')}</div>
+      <div class="hr-cmact"><button class="btn-outline" id="cmSave" type="button">${icon('check')}<span>${cur && cur.custom ? 'حفظ التعديل' : 'حفظ تعديلي على القالب'}</span></button>${cur && cur.custom ? `<button class="btn-outline hr-out" id="cmDel" type="button">${icon('x')}<span>حذف القالب</span></button>` : (cur && cur.edited ? `<button class="btn-outline" id="cmReset" type="button">${icon('refresh')}<span>استعادة الأصلي</span></button>` : '')}</div>
+      <div class="hr-sec"><span>معاينة</span><small>${first ? esc(first.e.name) : ''}</small></div>
+      <div class="hr-bubble" id="cmPrev"></div>
+      ${noDate ? `<div class="hr-warnbox warn">${noDate} موظف بلا تاريخ انتهاء في بياناتهم، سيظهر "—" في مكان التاريخ.</div>` : ''}
+      <div class="hr-sec"><span>المستلمون (${cmp.recs.length})</span><small>${cmp.ch === 'sms' ? 'الرقم كما هو في النظام' : 'اضغط المقدمة لتبديلها'}</small></div>
+      <div class="hr-rcp" id="cmRecs">${cmp.recs.map((r, i) => {
+        const n = numOf(r);
+        return `<div class="hr-rc${n ? '' : ' no'}"><span class="hr-ava">${esc(initials(r.e.name))}</span><div class="hr-rct"><b>${esc(r.e.name)}</b><small dir="ltr">${n ? (cmp.ch === 'wa' ? '+' : '') + esc(n) : 'لا يوجد رقم جوال'}</small></div>
+          ${cmp.ch === 'wa' && r.wa.length > 1 ? `<button class="hr-cc" data-i="${i}" type="button">+${esc(r.wa[r.cc].cc)}</button>` : ''}<button class="hr-rx" data-i="${i}" type="button" aria-label="إزالة">${icon('x')}</button></div>`;
+      }).join('')}</div>
+      ${noNum ? `<div class="hr-warnbox bad">${noNum} موظف بلا رقم جوال صالح، سيُتخطّون.</div>` : ''}
+      <button class="btn-gold" id="cmGo" type="button" ${cmp.recs.length - noNum ? '' : 'disabled'}>بدء الإرسال (${cmp.recs.length - noNum})</button>
+      <p class="hr-omn">تُفتح الرسائل واحدة تلو الأخرى في تطبيق ${cmp.ch === 'sms' ? 'الرسائل' : 'واتساب'} بنص مخصّص لكل موظف، وتضغط "إرسال" فيه ثم ترجع إلى هنا للتالي.</p>`);
+    const ta = $('cmText'); ta.value = cmp.text;
+    const prev = () => { $('cmPrev').textContent = first ? bodyFor(first) : ''; };
+    ta.oninput = () => { cmp.text = ta.value; prev(); }; prev();
+    document.querySelectorAll('#cmCh button').forEach((b) => b.onclick = () => { cmp.ch = b.dataset.c; store.set('hrMsgCh', cmp.ch); drawCompose(); });
+    document.querySelectorAll('#cmTpl button').forEach((b) => b.onclick = () => {
+      if (b.dataset.t === '__new') { cmp.newName = true; drawCompose(); setTimeout(() => { const i = $('cmNewName'); if (i) i.focus(); }, 60); return; }
+      const t = templates().find((x) => x.id === b.dataset.t); cmp.tplId = t.id; cmp.text = t.text; cmp.newName = false; drawCompose();
+    });
+    document.querySelectorAll('#cmToks button').forEach((b) => b.onclick = () => {
+      const a = ta.selectionStart == null ? ta.value.length : ta.selectionStart, z = ta.selectionEnd == null ? a : ta.selectionEnd, tok = `{${b.dataset.k}}`;
+      ta.value = ta.value.slice(0, a) + tok + ta.value.slice(z); ta.focus(); ta.setSelectionRange(a + tok.length, a + tok.length); cmp.text = ta.value; prev();
+    });
+    if ($('cmNewOk')) $('cmNewOk').onclick = () => {
+      const nm = $('cmNewName').value.trim(); if (!nm) { toast('اكتب اسم القالب'); return; }
+      const st = tplStore(); const id = 'c' + Date.now().toString(36); st.custom.push({ id, name: nm, text: cmp.text }); HR.db.put('msgTpl', st);
+      cmp.tplId = id; cmp.newName = false; toast('تم حفظ القالب'); drawCompose();
+    };
+    $('cmSave').onclick = () => {
+      const st = tplStore();
+      if (cur && cur.custom) { const c = st.custom.find((x) => x.id === cur.id); if (c) c.text = cmp.text; } else st.over[cmp.tplId] = cmp.text;
+      HR.db.put('msgTpl', st); toast('تم حفظ القالب'); drawCompose();
+    };
+    if ($('cmDel')) $('cmDel').onclick = () => { if (!confirm('حذف هذا القالب؟')) return; const st = tplStore(); st.custom = st.custom.filter((x) => x.id !== cmp.tplId); HR.db.put('msgTpl', st); const t = templates()[0]; cmp.tplId = t.id; cmp.text = t.text; drawCompose(); };
+    if ($('cmReset')) $('cmReset').onclick = () => { const st = tplStore(); delete st.over[cmp.tplId]; HR.db.put('msgTpl', st); cmp.text = TPL.find((x) => x.id === cmp.tplId).text; drawCompose(); };
+    document.querySelectorAll('.hr-cc').forEach((b) => b.onclick = () => { const r = cmp.recs[+b.dataset.i]; r.cc = (r.cc + 1) % r.wa.length; drawCompose(); });
+    document.querySelectorAll('.hr-rx').forEach((b) => b.onclick = () => { cmp.recs.splice(+b.dataset.i, 1); if (!cmp.recs.length) { closeSheet(); return; } drawCompose(); });
+    $('cmGo').onclick = () => { cmp.done = {}; drawQueue(); };
+  }
+  function sendTo(r) {
+    const n = numOf(r); if (!n) return;
+    const body = bodyFor(r);
+    if (cmp.ch === 'sms') smsSend(n, body); else openExt('https://wa.me/' + n + '?text=' + encodeURIComponent(body));
+    cmp.done[r.key] = true;
+  }
+  function drawQueue() {
+    const list2 = cmp.recs.filter((r) => numOf(r)), done = list2.filter((r) => cmp.done[r.key]).length, next = list2.find((r) => !cmp.done[r.key]);
+    sheet(`<div class="hr-ph"><span class="hr-ava big ${next ? 'info' : 'ok'}">${icon(next ? 'note' : 'check')}</span><div><b>${next ? 'قائمة الإرسال' : 'تم فتح كل الرسائل'}</b><small>${done} من ${list2.length}</small></div></div>
+      <div class="hr-pbar ${next ? '' : 'ok'}"><i style="width:${list2.length ? done / list2.length * 100 : 0}%"></i></div>
+      ${next ? `<button class="btn-gold hr-qnext" id="qNext" type="button">${icon('note')}<span>إرسال إلى ${esc(next.e.name)}</span></button><p class="hr-omn">يفتح ${cmp.ch === 'sms' ? 'تطبيق الرسائل' : 'واتساب'} بالرسالة جاهزة؛ اضغط إرسال هناك ثم ارجع (زر الرجوع) واضغط "التالي".</p>` : `<div class="hr-warnbox" style="color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)">اكتمل فتح الرسائل لكل الموظفين.</div>`}
+      <div class="hr-rcp">${list2.map((r) => `<div class="hr-rc ${cmp.done[r.key] ? 'ok' : ''}"><span class="hr-ava ${cmp.done[r.key] ? 'ok' : ''}">${cmp.done[r.key] ? icon('check') : esc(initials(r.e.name))}</span><div class="hr-rct"><b>${esc(r.e.name)}</b><small dir="ltr">${cmp.ch === 'wa' ? '+' : ''}${esc(numOf(r))}</small></div>
+        ${cmp.ch === 'wa' && r.wa.length > 1 ? `<button class="hr-cc" data-k="${esc(r.key)}" type="button">+${esc(r.wa[r.cc].cc)}</button>` : ''}<button class="hr-qs" data-k="${esc(r.key)}" type="button">${cmp.done[r.key] ? 'إعادة' : 'إرسال'}</button></div>`).join('')}</div>
+      <button class="btn-outline wide" id="qBack" type="button">${icon('chev')}<span>تعديل الرسالة والمستلمين</span></button>`);
+    const q = $('qNext'); if (q) q.onclick = () => { sendTo(next); setTimeout(drawQueue, 350); };
+    document.querySelectorAll('.hr-qs').forEach((b) => b.onclick = () => { sendTo(cmp.recs.find((r) => r.key === b.dataset.k)); setTimeout(drawQueue, 350); });
+    document.querySelectorAll('.hr-cc').forEach((b) => b.onclick = () => { const r = cmp.recs.find((x) => x.key === b.dataset.k); r.cc = (r.cc + 1) % r.wa.length; drawQueue(); });
+    $('qBack').onclick = drawCompose;
   }
 
   /* ---------- الإعدادات ---------- */
@@ -836,14 +1018,22 @@
   const openExt = (url) => { if (B && B.openExternal) B.openExternal(url); else window.open(url, '_blank'); };
   window.hrDial = (n) => openExt('tel:' + n);
   window.hrWa = (n) => openExt('https://wa.me/' + n);
-  window.hrSms = (n) => openExt('sms:' + n);
+  // الرسائل القصيرة: الرقم كما هو (0598815128)؛ إذا كُتب بلا صفر (598815128) نضيف 0؛ والدولي (+970…) يبقى كما هو
+  function smsNumber(raw) {
+    const s0 = String(raw || '').trim(), plus = s0.startsWith('+'), d = s0.replace(/\D/g, '');
+    if (!d) return '';
+    if (/^5\d{8}$/.test(d)) return '0' + d;
+    return (plus ? '+' : '') + d;
+  }
+  const smsSend = (num, body) => { if (B && B.smsCompose) B.smsCompose(num, body || ''); else window.open('sms:' + num + (body ? '?body=' + encodeURIComponent(body) : ''), '_blank'); };
+  window.hrSms = (n) => smsSend(n, '');
   function contactBar(raw) {
     const p = phoneInfo(raw);
     if (!p) return '';
     return `<div class="hr-contact">
       <button class="hr-cbtn call" onclick="hrDial('${p.dial}')">${icon('phone')}<span><b>اتصال</b><small>${esc(p.dial)}</small></span></button>
       ${p.wa.map((w, i) => `<button class="hr-cbtn wa${i ? ' alt' : ''}" onclick="hrWa('${w.num}')"><svg viewBox="0 0 24 24" class="ic"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.1 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7a2.8 2.8 0 0 0 1.8-1.3 2.3 2.3 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg><span><b>واتساب ${i ? '(بديل)' : ''}</b><small dir="ltr">${esc(w.label)}</small></span></button>`).join('')}
-      <button class="hr-cbtn sms" onclick="hrSms('${p.dial}')">${icon('note')}<span><b>رسالة</b><small>SMS</small></span></button>
+      <button class="hr-cbtn sms" onclick="hrSms('${esc(smsNumber(raw))}')">${icon('note')}<span><b>رسالة</b><small dir="ltr">${esc(smsNumber(raw))}</small></span></button>
     </div>${p.wa.length ? '<p class="hr-wanote">إذا ظهر في واتساب أن الرقم غير مسجّل، جرّب زر البديل (+970 / +972).</p>' : ''}`;
   }
   const telLink = (k, v) => /mobile|phone/i.test(k) ? (phoneInfo(v) ? `<button class="hr-tel" onclick="hrDial('${phoneInfo(v).dial}')">${icon('phone')}${esc(v)}</button>` : esc(v)) : /email/i.test(k) ? `<a href="mailto:${esc(v)}">${esc(v)}</a>` : esc(v);
@@ -874,6 +1064,7 @@
         <div><b>${asgs.length}</b><small>تكليفات</small></div>
       </div>
       ${contactBar(e.phone)}
+      <button class="btn-outline wide hr-mbtn" id="hrMsgEmp">${icon('note')}<span>إرسال رسالة بقالب جاهز</span></button>
       ${groups.map(([title, ic, cells]) => `<div class="hr-grp"><div class="hr-grph">${icon(ic)}<span>${title}</span></div><div class="hr-info">${cells.map(([k, v, key]) => `<div><small>${esc(k)}</small><b>${telLink(key, v)}</b></div>`).join('')}</div></div>`).join('')}
       <div class="hr-sec"><span>الحضور آخر 14 يوماً</span><small>اضغط على يوم لعرض التفاصيل</small></div><div class="hr-cal14">${cells.join('')}</div>
       <div class="hr-sec"><span>العقود (${cons.length})</span></div>
@@ -882,6 +1073,7 @@
       ${asgs.map(asgCard).join('') || '<div class="hr-none">لا تكليفات</div>'}
       ${rawTable(raw)}`);
     $('hrSheetBody').querySelectorAll('[data-day]').forEach((c) => { c.onclick = () => openDay(id, c.dataset.day); });
+    $('hrMsgEmp').onclick = () => openCompose([{ empId: id }], 'free');
   }
 
   /* ---------- الخريطة داخل التطبيق ---------- */
