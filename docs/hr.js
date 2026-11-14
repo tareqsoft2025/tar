@@ -595,6 +595,50 @@
     const pct = p.ent ? Math.max(0, Math.min(100, (p.rem || 0) / p.ent * 100)) : 0;
     return `<div class="hr-pool ${tone}"><small>${title}</small><b class="${p.rem < 0 ? 'neg' : ''}">${num2(p.rem)} <em>${unit}</em></b><span class="hr-pbar ${tone}"><i style="width:${pct}%"></i></span><small>مستحقة ${num2(p.ent)} · مستهلكة ${num2(p.used)}</small></div>`;
   }
+  // تفاصيل الطلب + اعتماد/رفض من التطبيق
+  function openReq(q) {
+    const raw = HR.db.get('employees', {})[q.empId];
+    const e = raw ? HR.emp(raw) : { name: q.name || empName(q.empId) || '—', id: q.empId };
+    const st = rqStatus(q.status), act = HR.reqActions(q), b = HR.balanceOf(q.empId);
+    const an = b && b.annual;
+    const kv = [['النوع', RQ[q.kind][0] + (q.kind === 'daily' && q.nature ? ' · ' + leaveLbl(q.nature) : '')], ['الفترة', rqWhen(q)], ['السبب', q.reason], ['المشروع', q.project], ['اعتمده', q.by]].filter((x) => x[1]);
+    sheet(`<div class="hr-ph"><span class="hr-ava big ${RQ[q.kind][1]}">${esc(initials(e.name))}</span><div><b>${esc(e.name)}</b><small>${RQ[q.kind][0]}</small><div class="hr-tags">${st ? badge(st[0], st[1]) : ''}</div></div></div>
+      <div class="hr-cgrid">${kv.map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join('')}</div>
+      ${q.kind === 'daily' && an ? `<div class="hr2-bal"><span>رصيد الموظف السنوي</span><b>${num2(an.rem)} يوم${q.days && an.rem != null ? ' ← ' + num2(an.rem - q.days) + ' بعد هذه الإجازة' : ''}</b></div>` : ''}
+      ${act ? `<div class="hr2-dec" id="hrDec">
+          <textarea id="hrDecWhy" rows="2" placeholder="سبب الرفض (اختياري)" hidden></textarea>
+          <div class="hr2-decb"><button type="button" class="btn-gold" id="hrOk">${act.label === 'الاعتماد' ? 'اعتماد' : 'موافقة المدير'}</button><button type="button" class="btn-outline" id="hrNo">رفض</button></div>
+          <p class="hr-omn" id="hrDecMsg" style="margin:6px 0 0">سيُرسَل القرار فوراً إلى نظام PEF ويُسجَّل باسم حسابك.</p></div>`
+        : `<div class="hr-omn">${q.status === 'approved' || q.status === 'applied' ? 'الطلب معتمد.' : q.kind === 'overtime' || q.kind === 'holiday' ? 'اعتماد العمل الإضافي والعمل في العطل يتم من نظام PEF.' : 'لا إجراء متاح على هذا الطلب في حالته الحالية.'}</div>`}
+      <button class="btn-outline wide" id="hrReqBal">${icon('cal')}<span>رصيد الموظف وطلباته</span></button>
+      ${raw ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}`);
+    $('hrReqBal').onclick = () => openBalance(q.empId);
+    const t = $('hrToEmp'); if (t) t.onclick = () => openEmp(q.empId);
+    if (!act) return;
+    const msg = $('hrDecMsg'), ok = $('hrOk'), no = $('hrNo'), why = $('hrDecWhy');
+    const lbl = act.label === 'الاعتماد' ? 'اعتماد' : 'موافقة المدير';
+    const IDLE = 'سيُرسَل القرار فوراً إلى نظام PEF ويُسجَّل باسم حسابك.';
+    let state = 'idle';
+    const paint = (note) => {
+      ok.textContent = state === 'ok' ? 'تأكيد الموافقة' : state === 'no' ? 'إلغاء' : lbl;
+      no.textContent = state === 'no' ? 'تأكيد الرفض' : state === 'ok' ? 'إلغاء' : 'رفض';
+      why.hidden = state !== 'no';
+      msg.style.color = '';
+      msg.textContent = note || (state === 'ok' ? 'اضغط "تأكيد الموافقة" لإرسال القرار إلى النظام.' : state === 'no' ? 'أدخل السبب إن رغبت ثم اضغط "تأكيد الرفض".' : IDLE);
+    };
+    const run = async (action) => {
+      ok.disabled = no.disabled = true; msg.textContent = 'جارٍ الإرسال إلى النظام…';
+      let r; try { r = await HR.decide(q, action, why.value.trim()); } catch (er) { r = { ok: false, status: 0 }; }
+      if (r.ok) { toast(action === 'approve' ? 'تمت الموافقة على الطلب' : 'تم رفض الطلب'); closeSheet(); render(); return; }
+      ok.disabled = no.disabled = false; state = 'idle';
+      const code = r.data && (r.data.error || r.data.message);
+      paint(r.status === 403 ? 'ليست لديك صلاحية لهذا الإجراء في النظام.' : r.status === 401 ? 'انتهت الجلسة، أعد تسجيل الدخول.' : r.status === 0 ? 'تعذّر الاتصال ولم يُرسل القرار. حاول مرة أخرى.' : 'رفض النظام الطلب' + (code ? ': ' + code : '') + '.');
+      msg.style.color = '#F2716A';
+    };
+    ok.onclick = () => { if (state === 'ok') run('approve'); else { state = state === 'idle' ? 'ok' : 'idle'; paint(); } };
+    no.onclick = () => { if (state === 'no') run('reject'); else { state = state === 'idle' ? 'no' : 'idle'; paint(); } };
+  }
+
   function openBalance(empId) {
     const raw = HR.db.get('employees', {})[empId];
     const e = raw ? HR.emp(raw) : { name: empName(empId) || '—', id: empId };
@@ -666,7 +710,7 @@
       const st = rqStatus(q.status);
       const r = el('button', 'hr-row hr-crow');
       r.innerHTML = `<span class="hr-ava ${RQ[q.kind][1]}">${icon(RQ[q.kind][2])}</span><span class="hr-rt"><b>${esc(q.name || empName(q.empId) || '—')}</b><small>${RQ[q.kind][0]}${q.kind === 'daily' && q.nature ? ' · ' + esc(leaveLbl(q.nature)) : ''}${q.project ? ' · ' + esc(q.project) : ''}</small><small>${rqWhen(q)}</small>${q.reason ? `<small>${esc(q.reason)}</small>` : ''}</span><span class="hr-rr">${st ? badge(st[0], st[1]) : ''}</span>`;
-      r.onclick = () => openBalance(q.empId); r.dataset.emp = q.empId;
+      r.onclick = () => openReq(q); r.dataset.emp = q.empId;
       return r;
     }), 'لا طلبات بهذه الفلاتر');
   }

@@ -25,6 +25,47 @@
     if (!B || !B.erpGet) return webCall('GET', path);
     return new Promise((res) => { const id = 'r' + (++seq); pending[id] = res; B.erpGet(id, path); });
   }
+  // تحديث حالة طلب (PUT) عبر الطبقة الأصلية؛ في المتصفح للاختبار فقط
+  function send(path, body, role) {
+    if (!B || !B.erpSend) return webCall('PUT', path, body);
+    return new Promise((res) => { const id = 's' + (++seq); pending[id] = res; B.erpSend(id, path, JSON.stringify(body), role || ''); });
+  }
+  let roleCache = null;
+  async function userRole() {
+    if (roleCache) return roleCache;
+    try {
+      const r = await get('/api/auth/session');
+      const d = r.data || {}, u = d.user || d.data || d;
+      const v = u.role || u.activeRole || d.role || (Array.isArray(u.roles) ? u.roles[0] : null) || (Array.isArray(d.roles) ? d.roles[0] : null);
+      roleCache = typeof v === 'string' ? v : v && (v.code || v.key || v.name) ? String(v.code || v.key || v.name) : '';
+    } catch (e) { roleCache = ''; }
+    return roleCache;
+  }
+  // ما يمكن عمله على الطلب حسب نوعه وحالته (نفس خطوات نظام PEF)
+  function reqActions(q) {
+    const st = String(q.status || '');
+    if (q.kind === 'daily') {
+      if (st === 'submitted') return { approve: 'manager_approved', reject: 'manager_rejected', label: 'موافقة المدير' };
+      if (st === 'manager_approved') return { approve: 'approved', reject: 'rejected', label: 'الاعتماد' };
+    }
+    if ((q.kind === 'hourly' || q.kind === 'mission') && st === 'submitted') return { approve: 'approved', reject: 'rejected', label: 'الاعتماد' };
+    return null;
+  }
+  async function decide(q, action, reason) {
+    const a = reqActions(q); if (!a) return { ok: false, error: 'not_actionable' };
+    const status = a[action]; if (!status) return { ok: false, error: 'not_actionable' };
+    const path = q.kind === 'daily' ? '/api/hr/leaves/requests' : '/api/hr/leaves/requests/hourly';
+    const rawId = q.raw && q.raw.id != null ? q.raw.id : null;
+    if (rawId == null) return { ok: false, error: 'no_id' };
+    const body = { id: rawId, status };
+    if (action === 'reject' && reason) { if (q.kind === 'daily') body.reason = reason; else body.comment = reason; }
+    const r = await send(path, body, await userRole());
+    if (r.ok) {
+      const key = 'req_' + q.kind, all = db.get(key, {}); const k = Object.keys(all).find((x) => String(all[x].id) === String(rawId));
+      if (k) { all[k] = Object.assign({}, all[k], { status }); db.put(key, all); reqCache = null; }
+    }
+    return { ok: r.ok, status: r.status, data: r.data, newStatus: status };
+  }
   function login(user, pass, remember) {
     if (!B || !B.erpLogin) return webCall('POST', '/api/auth/login', { username: user, password: pass, rememberMe: true });
     return new Promise((res) => { const id = 'l' + (++seq); pending[id] = res; if (B.erpLogin2) B.erpLogin2(id, user, pass, !!remember); else B.erpLogin(id, user, pass); });
@@ -495,7 +536,7 @@
     };
   }
 
-  window.HR = { netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  window.HR = { reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     setWatch: (min) => { if (B && B.hrWatch) B.hrWatch(min | 0); },
     watchState: () => { try { return B && B.hrWatchState ? JSON.parse(B.hrWatchState()) : { min: 0, last: 0, ok: true }; } catch (e) { return { min: 0, last: 0, ok: true }; } },
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),

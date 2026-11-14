@@ -341,6 +341,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void erpSend(final String id, final String path, final String json, final String role) {
+            new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.send(MainActivity.this, path, json, role)); } }).start();
+        }
+
+        @JavascriptInterface
         public void erpLogout() {
             new Thread(new Runnable() { public void run() { ErpClient.logout(MainActivity.this); } }).start();
         }

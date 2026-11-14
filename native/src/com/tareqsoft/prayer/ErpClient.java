@@ -72,7 +72,9 @@ final class ErpClient {
         return b.toString();
     }
 
-    static Res request(Context c, String method, String path, String json) {
+    static Res request(Context c, String method, String path, String json) { return request(c, method, path, json, null); }
+
+    static Res request(Context c, String method, String path, String json, String role) {
         if (!path.startsWith("/api/")) return new Res(400, "{\"error\":\"bad_path\"}");
         HttpURLConnection con = null;
         try {
@@ -88,6 +90,7 @@ final class ErpClient {
             con.setRequestProperty("Referer", BASE + "/");
             String ck = cookieHeader(c);
             if (!ck.isEmpty()) con.setRequestProperty("Cookie", ck);
+            if (role != null && !role.isEmpty()) con.setRequestProperty("x-user-role", role);
             if (json != null) {
                 con.setDoOutput(true);
                 con.setRequestProperty("Content-Type", "application/json");
@@ -151,6 +154,21 @@ final class ErpClient {
             if (r.status == 401) {
                 String[] cr = loadCreds(c);
                 if (cr != null && login(c, cr[0], cr[1], true).status / 100 == 2) r = getRetry(c, path);
+            }
+        }
+        return r;
+    }
+
+    /** تحديث حالة طلب (اعتماد/رفض) فقط: PUT على مسارات الطلبات، دون إعادة محاولة عند الانقطاع (لا تكرار للطلب). */
+    static Res send(Context c, String path, String json, String role) {
+        if (!(path.equals("/api/hr/leaves/requests") || path.equals("/api/hr/leaves/requests/hourly") || path.equals("/api/hr/overtime"))) return new Res(400, "{\"error\":\"bad_path\"}");
+        Res r = request(c, "PUT", path, json, role);
+        if (r.status == 401) {
+            Res f = request(c, "POST", "/api/auth/refresh", "{}");
+            if (f.status >= 200 && f.status < 300) r = request(c, "PUT", path, json, role);
+            if (r.status == 401) {
+                String[] cr = loadCreds(c);
+                if (cr != null && login(c, cr[0], cr[1], true).status / 100 == 2) r = request(c, "PUT", path, json, role);
             }
         }
         return r;
