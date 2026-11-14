@@ -68,8 +68,41 @@ public class ReminderActivity extends Activity {
         }
     }
 
+    /** نافذة حضور الموظفين (من المزامنة في الخلفية): إشعار عاجل + نافذة فوق التطبيقات إن سُمح بذلك. */
+    static void fireAtt(Context c, String data, String title, String body) {
+        Intent show = new Intent(c, ReminderActivity.class)
+            .putExtra("data", data).putExtra("title", title).putExtra("body", body)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
+        PendingIntent pi = PendingIntent.getActivity(c, 7500, show, f | PendingIntent.FLAG_UPDATE_CURRENT);
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        Notification.Builder nb;
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel ch = new NotificationChannel("hr_attendance", "حضور الموظفين", NotificationManager.IMPORTANCE_HIGH);
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[] { 0, 120, 80, 120 });
+            ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+            nm.createNotificationChannel(ch);
+            nb = new Notification.Builder(c, "hr_attendance");
+        } else {
+            nb = new Notification.Builder(c).setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+        }
+        nb.setContentTitle(title).setContentText(body)
+          .setStyle(new Notification.BigTextStyle().bigText(body))
+          .setSmallIcon(android.R.drawable.ic_dialog_info)
+          .setCategory(Notification.CATEGORY_EVENT)
+          .setContentIntent(pi)
+          .setFullScreenIntent(pi, true)
+          .setAutoCancel(true);
+        nm.notify(5500, nb.build());
+        if (OverlayService.canDraw(c)) {
+            try { c.startActivity(show); } catch (Exception e) { /* الإشعار العاجل يكفي */ }
+        }
+    }
+
     static int nid(String data) {
-        try { JSONObject o = new JSONObject(data); return 4000 + Math.abs((o.optString("tid") + o.optString("ds")).hashCode() % 1000); }
+        try { JSONObject o = new JSONObject(data); if ("att".equals(o.optString("type"))) return 5500; return 4000 + Math.abs((o.optString("tid") + o.optString("ds")).hashCode() % 1000); }
         catch (Exception e) { return 4000; }
     }
 
@@ -136,6 +169,10 @@ public class ReminderActivity extends Activity {
         }
         @JavascriptInterface public void snooze(final int min) {
             ReminderActivity.this.snooze(min);
+            close();
+        }
+        @JavascriptInterface public void openTab(final String tab) {
+            startActivity(new Intent(ReminderActivity.this, MainActivity.class).putExtra("tab", tab).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             close();
         }
         @JavascriptInterface public void open() {

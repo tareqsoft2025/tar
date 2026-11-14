@@ -18,6 +18,13 @@
   var data = {};
   try { data = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch (e) {}
   function close() { if (R) R.close(); }
+  if (data.type === 'att') {
+    RemindUI.showAttendance(document.getElementById('host'), data, {
+      close: close,
+      view: function () { if (R && R.openTab) R.openTab('hr'); else close(); }
+    });
+    return;
+  }
   RemindUI.show(document.getElementById('host'), data, {
     done: function () { RemindUI.markDone(data.tid, data.ds); if (R) R.done(); else close(); },
     snooze: function (m) { if (R) R.snooze(m); else close(); },

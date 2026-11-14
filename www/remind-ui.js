@@ -71,5 +71,67 @@
     setTimeout(() => { const b = root.querySelector('.rp-done'); if (b) b.focus(); }, 300);
   }
 
-  window.RemindUI = { show, markDone, left };
+  /* ---------- نافذة حضور الموظفين ---------- */
+  const ARR_IN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>';
+  const ARR_OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>';
+  const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+  const INI = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('');
+  const accentOf = (v) => v.st === 'outside' ? '#F2716A' : v.late > 0 ? '#F0A64B' : v.kind === 'out' ? '#5B9DFF' : '#2FBF71';
+  const hhmm = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} س`;
+  const dist = (d) => d == null ? '' : d >= 1000 ? (d / 1000).toFixed(1) + ' كم' : d + ' م';
+  const TYPE_AR = { office: 'مكتبي', field: 'ميداني' };
+  function chipsOf(v) {
+    const c = [];
+    if (v.kind === 'in') c.push(v.late > 0 ? `<span class="ap-chip warn">متأخر ${v.late} د</span>` : '<span class="ap-chip ok">في الموعد</span>');
+    if (v.kind === 'out' && v.work) c.push(`<span class="ap-chip info">ساعات العمل ${hhmm(v.work)}</span>`);
+    if (v.st === 'matched') c.push(`<span class="ap-chip ok">داخل موقع العمل${v.dist != null ? ' · ' + dist(v.dist) : ''}</span>`);
+    else if (v.st === 'outside') c.push(`<span class="ap-chip bad">خارج نطاق الموقع${v.dist != null ? ' · ' + dist(v.dist) : ''}</span>`);
+    return c.join('');
+  }
+  // d = { events:[{ name, dept, org, type, kind:'in'|'out', ts, late, st, place, dist, work, empId, ds }] }
+  function showAttendance(host, d, h) {
+    h = h || {};
+    clearInterval(timer);
+    const ev = (d.events || []).slice().sort((a, b) => a.ts - b.ts);
+    if (!ev.length) return;
+    const last = ev[ev.length - 1], many = ev.length > 1;
+    const color = many ? (ev.some((x) => x.st === 'outside') ? '#F2716A' : ev.some((x) => x.late > 0) ? '#F0A64B' : '#2FBF71') : accentOf(last);
+    const ms = many ? 20000 : 14000;
+    const body = many
+      ? `<div class="ap-top"><span class="ap-pill"><i></i>تحديث الحضور</span><span class="ap-time">${tf.format(new Date(last.ts))}</span></div>
+         <div class="ap-count"><b>${ev.length}</b><span>تسجيلات جديدة</span></div>
+         <ul class="ap-list">${ev.slice(-6).reverse().map((v) => `<li style="--ac:${accentOf(v)}"><span class="ap-mini">${v.kind === 'in' ? ARR_IN : ARR_OUT}</span><div><b>${esc(v.name)}</b><small>${v.kind === 'in' ? 'دخول' : 'خروج'} ${tf.format(new Date(v.ts))}${v.late > 0 ? ' · متأخر ' + v.late + ' د' : ''}${v.st === 'outside' ? ' · خارج الموقع' : ''}</small></div></li>`).join('')}${ev.length > 6 ? `<li class="more">و${ev.length - 6} آخرين</li>` : ''}</ul>`
+      : `<div class="ap-top"><span class="ap-pill"><i></i>${last.kind === 'in' ? 'حضور جديد' : 'انصراف جديد'}</span><span class="ap-time">الآن</span></div>
+         <div class="ap-av"><span class="ap-ring"></span><span class="ap-ring r2"></span><span class="ap-ini">${esc(INI(last.name))}</span><span class="ap-kind">${last.kind === 'in' ? ARR_IN : ARR_OUT}</span></div>
+         <h2 class="rp-title" id="rpT">${esc(last.name)}</h2>
+         <div class="ap-sub">${esc([last.dept, last.org, TYPE_AR[last.type]].filter(Boolean).join(' · '))}</div>
+         <div class="ap-what"><span>${last.kind === 'in' ? 'سجّل دخوله' : 'سجّل انصرافه'}</span><b>${tf.format(new Date(last.ts))}</b></div>
+         <div class="ap-chips">${chipsOf(last)}</div>
+         ${last.place ? `<div class="ap-place">${PIN}<span>${esc(last.place)}</span></div>` : ''}`;
+    host.innerHTML = `<div class="rp ap" role="alertdialog" aria-modal="true" style="--rc:${color}">
+      <div class="rp-scrim"></div>
+      <div class="rp-card ap-card">
+        <div class="rp-glow"></div>
+        ${body}
+        <div class="ap-btns"><button type="button" class="ap-view" data-a="view">${many ? 'عرض الحضور' : 'عرض سجل اليوم'}</button><button type="button" class="ap-x" data-a="close">إغلاق</button></div>
+        <div class="ap-bar"><i style="animation-duration:${ms}ms"></i></div>
+      </div></div>`;
+    const root = host.firstElementChild;
+    requestAnimationFrame(() => root.classList.add('in'));
+    let auto = setTimeout(() => finish(h.close), ms);
+    const stopAuto = () => { clearTimeout(auto); const b = root.querySelector('.ap-bar'); if (b) b.style.opacity = '0'; };
+    root.addEventListener('pointerdown', stopAuto, { once: true });
+    const finish = (fn) => {
+      clearTimeout(auto);
+      root.classList.remove('in'); root.classList.add('out');
+      setTimeout(() => { host.innerHTML = ''; if (fn) fn(); }, 260);
+    };
+    root.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      if (b.dataset.a === 'view') finish(() => h.view && h.view(many ? null : last)); else finish(h.close);
+    });
+    if (navigator.vibrate) navigator.vibrate([90, 60, 90]);
+  }
+
+  window.RemindUI = { show, showAttendance, markDone, left };
 })();
