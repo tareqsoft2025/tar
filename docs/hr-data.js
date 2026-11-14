@@ -291,7 +291,7 @@
       // أول مرة: كل شيء. بعدها: الحضور والإجازات حديثاً فقط (تراكمياً)، والطلبات كل ساعتين، والبيانات شبه الثابتة (موظفون، عقود، تكليفات، أرصدة) مرة يومياً.
       // النظام لا يوفّر «ما تغيّر منذ…» لهذه القوائم، فتُخفَّف تكرارها بدل جلبها كل مرة. الزر اليدوي يجلب كل شيء.
       const heavyDue = mode === 'full' || !haveEmps || (mode === 'light' && (!meta.heavyAt || Date.now() - meta.heavyAt > (slow ? 48 : 24) * 3600e3));
-      const reqDue = heavyDue || (mode === 'light' && (!meta.reqAt || Date.now() - meta.reqAt > (slow ? 4 : 2) * 3600e3));
+      const reqDue = heavyDue || opts.requests || (mode === 'light' && (!meta.reqAt || Date.now() - meta.reqAt > (slow ? 4 : 2) * 3600e3));
       if (mode !== 'quick' && heavyDue) {
         progress && progress('الموظفون…');
         await stage('employees', async () => { st.employees = merge('employees', await pagedAll('/api/hr/employees?pageSize=150&status=all&sortBy=empId&sortDir=asc', progress, 'الموظفون')); });

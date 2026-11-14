@@ -129,7 +129,7 @@
     const prog = () => $('hrProg'), txt = () => $('hrSyncTxt');
     if (prog()) prog().hidden = false;
     try {
-      const st = await HR.sync((m) => { if (txt()) txt().textContent = 'جارٍ المزامنة: ' + m; }, { full: !silent });
+      const st = await HR.sync((m) => { if (txt()) txt().textContent = 'جارٍ المزامنة: ' + m; }, { requests: !silent });
       if (!st) return;
       const parts = [];
       const add = (n, s) => { if (s && (s.added || s.updated || s.removed)) parts.push(`${n}: ${s.added ? '+' + s.added + ' جديد' : ''}${s.updated ? ' ' + s.updated + ' محدّث' : ''}${s.removed ? ' ' + s.removed + ' محذوف' : ''}`.trim()); };
@@ -1032,6 +1032,11 @@
     chipSet('hsEvery', [[5, '5 دقائق'], [15, '15 دقيقة'], [30, '30 دقيقة'], [60, 'ساعة'], [120, 'ساعتين'], [360, '6 ساعات']], s.every, (v) => put({ every: v }));
     $('hsEveryBox').hidden = $('hsBgRow').hidden = s.auto === 'off';
     $('hsBg').onchange = (e) => { put({ bg: e.target.checked }); toast(e.target.checked ? 'ستتم المزامنة في الخلفية' : 'أُوقفت المزامنة في الخلفية'); };
+    // إعادة جلب كل شيء (نادر الحاجة): الزر العادي يجلب الجديد فقط بعد المحفوظ على الجهاز
+    const full = el('button', 'btn-outline wide', `${icon('refresh')}<span>إعادة جلب كل البيانات من النظام</span>`);
+    full.type = 'button';
+    full.onclick = async () => { full.disabled = true; toast('جارٍ جلب كل البيانات…'); try { await HR.sync(null, { full: true }); toast('تم جلب كل البيانات'); } catch (e) { toast(e.message || 'تعذّرت المزامنة'); } full.disabled = false; render(); };
+    sy.appendChild(full);
     $('hsStart').onchange = async (e) => {
       if (!e.target.value) return;
       put({ attStart: e.target.value });
