@@ -1,6 +1,6 @@
 {
-  "versionCode": 51,
-  "versionName": "8.5",
-  "notes": "تنبيهات الإدارة: عرض رمز الخطأ ورسالة الخادم عند تعذّر التحميل",
+  "versionCode": 52,
+  "versionName": "8.6",
+  "notes": "نافذة الحضور المنبثقة لا تُغلق تلقائياً، تُغلق بزر إغلاق",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
