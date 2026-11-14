@@ -1,6 +1,6 @@
 {
-  "versionCode": 54,
-  "versionName": "8.8",
-  "notes": "إصلاح تحميل شاشة تنبيهات الإدارة (كان الطلب يُرسل خطأً كـ POST)",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
+  "versionCode": 55,
+  "versionName": "8.9",
+  "notes": "إصلاح تحميل تنبيهات الإدارة، وتحديث يصل بملف بعنوان خاص بالإصدار",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-55.apk"
 }
