@@ -288,7 +288,10 @@
     try {
       const t = dayStr();
       const haveEmps = Object.keys(db.get('employees', {})).length > 0;
-      const heavyDue = mode === 'full' || !haveEmps || (mode === 'light' && (!meta.heavyAt || Date.now() - meta.heavyAt > (slow ? 12 : 6) * 3600e3));
+      // أول مرة: كل شيء. بعدها: الحضور والإجازات حديثاً فقط (تراكمياً)، والطلبات كل ساعتين، والبيانات شبه الثابتة (موظفون، عقود، تكليفات، أرصدة) مرة يومياً.
+      // النظام لا يوفّر «ما تغيّر منذ…» لهذه القوائم، فتُخفَّف تكرارها بدل جلبها كل مرة. الزر اليدوي يجلب كل شيء.
+      const heavyDue = mode === 'full' || !haveEmps || (mode === 'light' && (!meta.heavyAt || Date.now() - meta.heavyAt > (slow ? 48 : 24) * 3600e3));
+      const reqDue = heavyDue || (mode === 'light' && (!meta.reqAt || Date.now() - meta.reqAt > (slow ? 4 : 2) * 3600e3));
       if (mode !== 'quick' && heavyDue) {
         progress && progress('الموظفون…');
         await stage('employees', async () => { st.employees = merge('employees', await pagedAll('/api/hr/employees?pageSize=150&status=all&sortBy=empId&sortDir=asc', progress, 'الموظفون')); });
@@ -343,15 +346,16 @@
       if (mode !== 'quick') {
         progress && progress('الإجازات والمهام…');
         await stage('leaves', async () => { st.leaves = await syncLeaves(addDays(mode === 'full' ? from : t, -1), addDays(t, mode === 'full' ? 30 : 3)); });
-        if (heavyDue) {
+        if (reqDue) {
           st.requests = {};
           for (const [k, path] of REQ_SRC) {
             progress && progress('الطلبات: ' + REQ_LABEL[k] + '…');
             await stage('req:' + k, async () => { const r = await get(path); if (!r.ok) throw new Error(k); st.requests[k] = merge('req_' + k, listOf(r.data)); reqCache = null; });
           }
-          const bm = db.get('balMeta', {});
-          if (opts.balances || !bm.at || Date.now() - bm.at > (slow ? 12 : 6) * 3600e3) await stage('balances', async () => { st.balances = await syncBalances(progress); });
+          if (!st.errors.some((x) => x.startsWith('req:'))) meta.reqAt = Date.now();
         }
+        const bm = db.get('balMeta', {});
+        if (heavyDue && (opts.balances || mode === 'full' || !bm.at || Date.now() - bm.at > (slow ? 48 : 24) * 3600e3)) await stage('balances', async () => { st.balances = await syncBalances(progress); });
       }
       if (!st.ok) throw Object.assign(new Error('تعذّر الاتصال بالنظام، تحقق من الإنترنت'), { res: { status: 0 } });
       if (heavyDue && !st.errors.some((x) => x === 'employees' || x === 'contracts')) meta.heavyAt = Date.now();
