@@ -40,5 +40,15 @@ JSON دائماً: `{"ok":true,...}` أو `{"ok":false,"error":"رسالة عر�
 - مفاتيح مصفوفة الأنواع: `label, tone, icon`؛ والحالات: `label`.
 - قيم `status` المستعملة: `new`, `in_progress`, `done`؛ والجلسة: `open`, `closed`.
 
+## الوحدات والسلة (لأي مستخدم مسجَّل دخوله)
+- `GET ?a=modules` ← `modules[{key,label,icon,enabled,badge}]`: الوحدات التي يعرضها التطبيق في شريطه (`mgmt` و`basket` حالياً). وحدة جديدة تظهر في التطبيق دون تحديثه، وغير المعروفة تُعرض برسالة «غير مدعومة في هذا الإصدار».
+- `GET ?a=basket` ← `items[]` (`id, basket_id, source, source_ref, title, subject, details, due_date, status, result_note, done_at, basket_title, basket_note, sent_at, from`) و`statuses[{k,label}]`.
+- `POST {a:'basket_item_status', id, status, result_note?}` ← تحديث حالة مهمة تخصّ المستخدم (والحالة `done` تُغلق السلة إن لم يبقَ شيء).
+
+## الحقول الإضافية والمخطط
+- كل عمود جديد في `mgmt_directives` أو `mgmt_sessions` يظهر في `extra` لكل توجيه/جلسة وفي `schema.directive` / `schema.session` (`k, type, label, extra`) وتسميته من تعليق العمود (COMMENT).
+- يعرضه التطبيق تلقائياً في البطاقة ويحرّره في النموذج، ويُرسَل في `extra` عند `directive_save` و`session_save`.
+- `schema_version` يتغيّر كلما تغيّر المخطط، و`theme` ألوان ونغمات الأنواع (التطبيق يقرأ الأنواع من `actions`).
+
 ## ملاحظة
 هذه الواجهة لا تستعمل مفتاح API. إن رغبتم بمفتاح بدل حساب المستخدم فهذا تغيير في الواجهة والتطبيق معاً، ولا يُنفَّذ إلا بطلب صريح.

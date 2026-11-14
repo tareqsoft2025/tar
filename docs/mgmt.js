@@ -41,29 +41,45 @@
   const putFile = (name, v) => { try { const s = JSON.stringify(v); if (B && B.hrPut) B.hrPut(name, s); else localStorage.setItem(name, s); } catch (e) { /* full */ } };
   const getFile = (name, d) => { try { const s = B && B.hrGet ? B.hrGet(name) : localStorage.getItem(name); return s ? JSON.parse(s) : d; } catch (e) { return d; } };
   let D = getFile('mgmt_cache', null);
+  let M = getFile('mgmt_modules', null);   // الوحدات (من الخادم)
+  let BK = getFile('mgmt_basket', null);   // مهام السلة
   let outbox = getFile('mgmt_outbox', []);
   const saveCache = () => putFile('mgmt_cache', D);
   const saveBox = () => putFile('mgmt_outbox', outbox);
 
-  const S = { code: 0, msg: '', tab: 'dir', st: '', act: '', q: '', open: new Set(), loading: false, err: '', exp: { cid: 0, end: '', data: null, loading: false } };
+  const S = { mod: 'mgmt', bkf: 'todo', code: 0, msg: '', tab: 'dir', st: '', act: '', q: '', open: new Set(), loading: false, err: '', exp: { cid: 0, end: '', data: null, loading: false } };
   const canEdit = () => !D || !D.user || D.user.canEdit !== false;
   const actOf = (slug) => (D && D.actions.find((a) => a.slug === slug)) || { slug, label: slug, tone: 'slate', endOnly: false };
 
   /* ---------- جلب البيانات ---------- */
   let busy = false;
+  const modOn = (k) => !M || M.some((m) => m.key === k && m.enabled);
+  async function loadBasket() {
+    const r = await call('GET', 'a=basket');
+    if (r.ok && r.data && r.data.items) { BK = r.data; BK.cachedAt = Date.now(); putFile('mgmt_basket', BK); applyOutboxLocal(); return true; }
+    return false;
+  }
   async function refresh(silent) {
     if (busy) return; busy = true; S.loading = true; if (!silent) draw();
     try {
       await flush();
-      const r = await call('GET', 'a=bootstrap');
-      if (r.status === 401) { if (B && B.mgmtLogout && !(B.mgmtHasCreds && B.mgmtHasCreds())) B.mgmtLogout(); S.err = 'auth'; }
-      else if (r.ok && r.data && r.data.sessions) { D = r.data; D.cachedAt = Date.now(); saveCache(); S.err = ''; applyOutboxLocal(); }
-      else { S.err = r.status === 0 ? 'net' : r.status === 403 ? 'forbidden' : 'server'; S.code = r.status; S.msg = (r.data && r.data.error) || (r.status === 200 ? 'الرد ليس بصيغة JSON المتوقعة' : ''); }
+      // الوحدات المتاحة (خادم أقدم لا يعرفها: نكمل بوحدة الإدارة وحدها)
+      const rm = await call('GET', 'a=modules');
+      if (rm.status === 401) { if (B && B.mgmtLogout && !(B.mgmtHasCreds && B.mgmtHasCreds())) B.mgmtLogout(); S.err = 'auth'; return; }
+      if (rm.ok && rm.data && Array.isArray(rm.data.modules)) { M = rm.data.modules; putFile('mgmt_modules', M); }
+      if (!modOn(S.mod)) S.mod = (M.find((m) => m.enabled) || {}).key || 'mgmt';
+      if (modOn('mgmt')) {
+        const r = await call('GET', 'a=bootstrap');
+        if (r.status === 401) { if (B && B.mgmtLogout && !(B.mgmtHasCreds && B.mgmtHasCreds())) B.mgmtLogout(); S.err = 'auth'; }
+        else if (r.ok && r.data && r.data.sessions) { D = r.data; D.cachedAt = Date.now(); saveCache(); S.err = ''; applyOutboxLocal(); }
+        else { S.err = r.status === 0 ? 'net' : r.status === 403 ? 'forbidden' : 'server'; S.code = r.status; S.msg = (r.data && r.data.error) || (r.status === 200 ? 'الرد ليس بصيغة JSON المتوقعة' : ''); }
+      } else S.err = '';
+      if (S.mod === 'basket' && modOn('basket')) await loadBasket();
     } finally { busy = false; S.loading = false; draw(); }
   }
 
   /* ---------- الكتابة: مباشرة للنظام، وعند انقطاع الاتصال تُحفظ وتُرسل تلقائياً ---------- */
-  const QUEUEABLE = ['directive_status', 'directive_save', 'directive_delete'];
+  const QUEUEABLE = ['directive_status', 'directive_save', 'directive_delete', 'basket_item_status'];
   async function send(a, payload) {
     const body = Object.assign({ a }, payload);
     const r = await call('POST', '', body);
@@ -85,12 +101,13 @@
     return true;
   }
   function applyOutboxLocal() {
+    if (BK && outbox.length) outbox.forEach(({ body }) => { if (body.a === 'basket_item_status') { const it = BK.items.find((x) => x.id === body.id); if (it) { it.status = body.status; if (body.result_note) it.result_note = body.result_note; it.pending = true; } } });
     if (!D || !outbox.length) return;
     outbox.forEach(({ body }) => {
       D.sessions.forEach((s) => {
         if (body.a === 'directive_status') { const d = s.directives.find((x) => x.id === body.id); if (d) { d.status = body.status; if ('hr_note' in body) d.hr_note = body.hr_note || null; d.pending = true; } }
         if (body.a === 'directive_delete') s.directives = s.directives.filter((x) => x.id !== body.id);
-        if (body.a === 'directive_save' && body.id) { const d = s.directives.find((x) => x.id === body.id); if (d) { Object.assign(d, { target_name: body.target_name || d.target_name, action_type: body.action_type, start_date: body.start_date || null, end_date: body.end_date || null, details: body.details || null, project: body.project || null, pending: true }); } }
+        if (body.a === 'directive_save' && body.id) { const d = s.directives.find((x) => x.id === body.id); if (d) { Object.assign(d, { extra: Object.assign({}, d.extra || {}, body.extra || {}), target_name: body.target_name || d.target_name, action_type: body.action_type, start_date: body.start_date || null, end_date: body.end_date || null, details: body.details || null, project: body.project || null, pending: true }); } }
         if (body.a === 'directive_save' && !body.id && s.id === body.session_id) s.directives.push({ id: 'tmp' + body.__t, pending: true, session_id: s.id, target_type: body.target_type, target_name: body.target_name || '—', target_title: body.target_title || '', action_type: body.action_type, start_date: body.start_date || null, end_date: body.end_date || null, details: body.details || null, project: body.project || null, status: 'new' });
       });
     });
@@ -98,10 +115,26 @@
 
   /* ---------- الرسم ---------- */
   const root = () => $('mgBody');
+  function modBar() {
+    const list = (M || []).filter((m) => m.enabled);
+    if (list.length < 2) return null;
+    const ICONS = { mgmt: 'note', basket: 'briefcase' };
+    const bar = el('div', 'mg-mods');
+    list.forEach((m) => {
+      const b = el('button', 'mg-mod' + (S.mod === m.key ? ' on' : ''), `${icon(ICONS[m.key] || 'grid')}<span>${esc(m.label)}</span>${m.badge ? `<i class="mg-mb">${m.badge > 99 ? '99+' : m.badge}</i>` : ''}`);
+      b.type = 'button';
+      b.onclick = () => { S.mod = m.key; draw(); if (m.key === 'basket') refresh(true); };
+      bar.appendChild(b);
+    });
+    return bar;
+  }
   function draw() {
     const box = root(); if (!box) return;
     box.innerHTML = '';
     if (!connected() || S.err === 'auth') { box.appendChild(loginView()); return; }
+    const mb = modBar(); if (mb) box.appendChild(mb);
+    if (S.mod === 'basket') { drawBasket(box); return; }
+    if (S.mod !== 'mgmt') { box.appendChild(el('div', 'mg-empty', `${icon('alert')}<b>وحدة جديدة</b><small>هذه الوحدة غير مدعومة في هذا الإصدار من التطبيق. حدّث التطبيق لتظهر.</small>`)); return; }
     if (!D) {
       box.appendChild(el('div', 'mg-empty', S.err === 'net' ? `${icon('alert')}<b>لا يوجد اتصال</b><small>لم تُحمَّل البيانات بعد. تحقق من الإنترنت ثم اضغط تحديث.</small>` : S.err === 'forbidden' ? `${icon('alert')}<b>لا تملك الصلاحية</b><small>حسابك لا يملك عرض عمليات الإدارة في النظام.</small>` : S.err === 'server' ? `${icon('alert')}<b>تعذّر التحميل</b><small>رمز الخطأ: ${esc(S.code)}${S.msg ? ' — ' + esc(S.msg) : ''}</small><small>إن تكرر الخطأ أرسل هذا الرمز والرسالة للدعم.</small>` : `${icon('refresh')}<b>جارٍ التحميل…</b>`));
       return;
@@ -203,7 +236,7 @@
     card.innerHTML = `<button class="mg-mh" type="button" aria-expanded="${open}">
         <span class="mg-caret">${icon('chev')}</span>
         <span class="mg-mt"><span class="mg-ref"><bdi>${esc(s.ref)}</bdi></span><b>${esc(s.title)}</b>
-          <small>${fd(s.session_date) ? `<bdi>${fd(s.session_date)}</bdi>` : ''}${s.issued_by ? ' · ' + esc(s.issued_by) : ''} · ${all.length} توجيه${s.notes ? ' · ' + esc(s.notes) : ''}</small></span>
+          <small>${fd(s.session_date) ? `<bdi>${fd(s.session_date)}</bdi>` : ''}${s.issued_by ? ' · ' + esc(s.issued_by) : ''} · ${all.length} توجيه${s.notes ? ' · ' + esc(s.notes) : ''}${exLine('session', s.extra)}</small></span>
         <span class="mg-ms">${c.new ? `<i style="--c:${STC.new[1]}">${c.new} جديد</i>` : ''}${c.in_progress ? `<i style="--c:${STC.in_progress[1]}">${c.in_progress} قيد التنفيذ</i>` : ''}${c.done ? `<i style="--c:${STC.done[1]}">${c.done} منفّذ</i>` : ''}${closed ? `<i class="lock">${icon('lock')}مُقفلة</i>` : ''}</span>
         ${all.length ? `<span class="mg-prog"><b style="width:${pct}%"></b></span>` : ''}</button>
       <div class="mg-mb"></div>`;
@@ -235,11 +268,18 @@
     else if (from || to) facts.push(`<span class="mg-fact">${icon('cal')}${from && to ? `<b${badYear(d.start_date) ? ' class="bad"' : ''}><bdi>${from}</bdi></b> ← <b${badYear(d.end_date) ? ' class="bad"' : ''}><bdi>${to}</bdi></b>` : from ? `من <b><bdi>${from}</bdi></b>` : `حتى <b><bdi>${to}</bdi></b>`}</span>`);
     if (d.project) facts.push(`<span class="mg-fact">${icon('briefcase')}<b><bdi>${esc(d.project)}</bdi></b></span>`);
     if (d.scale_grade) facts.push(`<span class="mg-fact">${icon('chart')}درجة السلم <b><bdi>${esc(d.scale_grade)} · مستوى ${d.scale_level}${d.scale_step ? ' · درجة ' + d.scale_step : ''}${d.scale_amount != null ? ' · ' + Number(d.scale_amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + esc(String(d.scale_currency || '').split('→').pop().trim()) : ''}</bdi></b></span>`);
+    let extraText = '';
+    extraDefs('directive').forEach((f) => {
+      const v = exFmt(f, (d.extra || {})[f.k]); if (!v) return;
+      if (f.type === 'text') extraText += `<p class="mg-det"><b>${esc(exLabel(f))}:</b> ${esc(v)}</p>`;
+      else facts.push(`<span class="mg-fact">${icon('note')}${esc(exLabel(f))}: <b><bdi>${esc(v)}</bdi></b></span>`);
+    });
     const card = el('article', 'mg-dir' + (d.pending ? ' wait' : ''));
     card.style.setProperty('--tc', col);
     card.innerHTML = `<div class="mg-dtop"><span class="mg-seal">${esc(at.label)}</span><b class="mg-dname">${esc(d.target_name)}</b><span class="mg-ttag">${esc((D.targets && D.targets[d.target_type]) || d.target_type)}</span>${d.target_title ? `<span class="mg-dtitle">— ${esc(d.target_title)}</span>` : ''}${d.pending ? `<span class="mg-pend">${icon('clock')}بانتظار الإرسال</span>` : ''}</div>
       ${facts.length ? `<div class="mg-facts">${facts.join('')}</div>` : ''}
       ${d.details ? `<p class="mg-det">${esc(d.details)}</p>` : ''}
+      ${extraText}
       ${d.hr_note ? `<p class="mg-note"><b>ملاحظة الموارد البشرية:</b> ${esc(d.hr_note)}</p>` : ''}`;
     const side = el('div', 'mg-dside');
     if (canEdit() && !closed) {
@@ -267,6 +307,77 @@
     closeSheet(); toast(r.queued ? 'حُفظ على الجوال وسيُرسل للنظام عند توفر الإنترنت' : okMsg); if (!r.queued) refresh(true); return true;
   }
 
+
+  /* ----- السلة: مهام أُرسلت إليك من النظام ----- */
+  function drawBasket(box) {
+    const BKS = BK && BK.statuses && BK.statuses.length ? BK.statuses : [{ k: 'todo', label: 'للتنفيذ' }, { k: 'in_progress', label: 'قيد التنفيذ' }, { k: 'done', label: 'منفّذ' }];
+    const SC = { todo: '#8FA2B2', in_progress: '#F0A64B', done: '#4FD08B' };
+    const col = (k) => SC[k] || '#5B9DFF';
+    if (!BK) { box.appendChild(el('div', 'mg-empty', S.loading ? `${icon('refresh')}<b>جارٍ التحميل…</b>` : `${icon('briefcase')}<b>السلة</b><small>${S.err === 'net' ? 'لا يوجد اتصال. تحقق من الإنترنت ثم اضغط تحديث.' : 'اضغط تحديث لجلب مهامك.'}</small>`)); const rb = el('button', 'btn-gold wide', 'تحديث'); rb.onclick = () => refresh(); box.appendChild(rb); return; }
+    const todo = BK.items.filter((i) => i.status !== 'done'), doneN = BK.items.length - todo.length;
+    const t = today(), late = todo.filter((i) => i.due_date && i.due_date < t).length;
+    const h = el('div', 'mg-hero', `<div class="mg-hid"><span class="mg-eyebrow">مهام أُرسلت إليك</span><h2>السلة</h2><small>${todo.length} للتنفيذ${late ? ` · <b class="mg-wait">${late} متأخرة</b>` : ''} · ${doneN} منفّذة${outbox.length ? ` · <b class="mg-wait">${outbox.length} بانتظار الإرسال</b>` : ''}${BK.cachedAt ? ' · حُدّث ' + ago(BK.cachedAt) : ''}</small></div><div class="mg-hside"><button class="icon-btn mg-ref${S.loading ? ' spin' : ''}" id="bkRef" aria-label="تحديث">${icon('refresh')}</button></div>`);
+    box.appendChild(h);
+    h.querySelector('#bkRef').onclick = () => refresh();
+    const fl = el('div', 'chips mg-bkf');
+    [['todo', 'غير المنجزة (' + todo.length + ')'], ['all', 'الكل (' + BK.items.length + ')'], ['done', 'المنجزة (' + doneN + ')']].forEach(([k, n]) => { const c = el('button', 'chip sm' + (S.bkf === k ? ' on' : ''), esc(n)); c.type = 'button'; c.onclick = () => { S.bkf = k; draw(); }; fl.appendChild(c); });
+    box.appendChild(fl);
+    const items = BK.items.filter((i) => S.bkf === 'all' ? true : S.bkf === 'done' ? i.status === 'done' : i.status !== 'done');
+    if (!items.length) { box.appendChild(el('div', 'mg-empty', `${icon('check')}<b>${S.bkf === 'done' ? 'لا مهام منفّذة بعد' : 'لا مهام معلّقة'}</b><small>تظهر هنا المهام التي يرسلها لك النظام.</small>`)); return; }
+    let lastB = null;
+    items.forEach((i) => {
+      if (i.basket_id !== lastB) { lastB = i.basket_id; box.appendChild(el('div', 'mg-bkh', `<b>${esc(i.basket_title || 'مهام')}</b><small>${i.from ? 'من ' + esc(i.from) : ''}${i.sent_at ? ' · ' + fd(String(i.sent_at).slice(0, 10)) : ''}</small>${i.basket_note ? `<p>${esc(i.basket_note)}</p>` : ''}`)); }
+      const overdue = i.due_date && i.due_date < t && i.status !== 'done';
+      const c = el('article', 'mg-bk' + (i.pending ? ' wait' : '') + (i.status === 'done' ? ' done' : ''));
+      c.style.setProperty('--tc', col(i.status));
+      c.innerHTML = `<div class="mg-dtop"><b class="mg-dname">${esc(i.title)}</b>${i.pending ? `<span class="mg-pend">${icon('clock')}بانتظار الإرسال</span>` : ''}</div>
+        <div class="mg-facts">${i.subject ? `<span class="mg-fact">${icon('users')}<b>${esc(i.subject)}</b></span>` : ''}${i.due_date ? `<span class="mg-fact${overdue ? ' over' : ''}">${icon('cal')}الاستحقاق <b><bdi>${fd(i.due_date)}</bdi></b>${overdue ? ' · متأخرة' : ''}</span>` : ''}${i.source ? `<span class="mg-fact">${esc(i.source === 'directive' ? 'من توجيه' : i.source === 'manual' ? 'يدوية' : i.source)}</span>` : ''}</div>
+        ${i.details ? `<p class="mg-det">${esc(i.details)}</p>` : ''}${i.result_note ? `<p class="mg-note"><b>نتيجة التنفيذ:</b> ${esc(i.result_note)}</p>` : ''}`;
+      const sw = el('div', 'mg-sw');
+      BKS.forEach((st) => { const b = el('button', i.status === st.k ? 'on' : '', esc(st.label)); b.type = 'button'; b.style.setProperty('--c', col(st.k)); b.onclick = () => { if (i.status !== st.k) basketStatus(i, st.k); }; sw.appendChild(b); });
+      c.appendChild(sw); box.appendChild(c);
+    });
+  }
+  // «منفّذ» تطلب ملاحظة نتيجة اختيارية، وغيرها مباشرة
+  function basketStatus(i, status) {
+    const go = async (note) => {
+      const prev = i.status; i.status = status; if (note) i.result_note = note; draw();
+      const r = await send('basket_item_status', { id: i.id, status, result_note: note || undefined });
+      if (!r.ok) { i.status = prev; toast(r.error || 'تعذّر تحديث الحالة'); draw(); return; }
+      closeSheet(); toast(r.queued ? 'حُفظ على الجوال وسيُرسل عند توفر الإنترنت' : 'حُدّثت حالة المهمة'); if (!r.queued) { loadBasket().then(() => { refreshModulesBadge(); draw(); }); }
+    };
+    if (status !== 'done') { go(''); return; }
+    sheet(`<h3 class="mg-sh">إنجاز المهمة<small>${esc(i.title)}</small></h3><form id="bkF" class="mg-form"><label class="hr-f"><span>ملاحظة النتيجة (اختياري)</span><textarea id="bkN" rows="3" placeholder="ما الذي تم؟">${esc(i.result_note || '')}</textarea></label><button class="btn-gold" type="submit" id="bkGo">تأكيد الإنجاز</button></form>`);
+    $('bkF').onsubmit = (e) => { e.preventDefault(); $('bkGo').disabled = true; go($('bkN').value.trim()); };
+  }
+  async function refreshModulesBadge() { const rm = await call('GET', 'a=modules'); if (rm.ok && rm.data && Array.isArray(rm.data.modules)) { M = rm.data.modules; putFile('mgmt_modules', M); } }
+
+
+  /* ---------- الحقول الإضافية: تُقرأ من مخطط الخادم، فيظهر أي عمود جديد دون تحديث التطبيق ---------- */
+  const extraDefs = (kind) => ((D && D.schema && D.schema[kind]) || []).filter((f) => f.extra);
+  const exLabel = (f) => f.label || f.k;
+  const exFmt = (f, v) => v == null || v === '' ? '' : f.type === 'date' ? fd(String(v).slice(0, 10)) : f.type === 'datetime' ? fd(String(v).slice(0, 10)) + ' ' + String(v).slice(11, 16) : f.type === 'number' ? Number(v).toLocaleString('en', { maximumFractionDigits: 2 }) : String(v);
+  function exInputs(kind, vals) {
+    const defs = extraDefs(kind); if (!defs.length) return '';
+    vals = vals || {};
+    return `<div class="hr-sl2">حقول إضافية</div>` + defs.map((f) => {
+      const v = vals[f.k] == null ? '' : String(vals[f.k]);
+      const id = 'ex_' + kind + '_' + f.k;
+      if (f.type === 'text') return `<label class="hr-f"><span>${esc(exLabel(f))}</span><textarea id="${esc(id)}" rows="2">${esc(v)}</textarea></label>`;
+      const t = f.type === 'date' ? 'date' : f.type === 'int' || f.type === 'number' ? 'number' : 'text';
+      return `<label class="hr-f"><span>${esc(exLabel(f))}</span><input id="${esc(id)}" type="${t}"${t === 'number' ? ' step="any" inputmode="decimal"' : ''} value="${esc(f.type === 'date' ? v.slice(0, 10) : v)}"></label>`;
+    }).join('');
+  }
+  function exCollect(kind) {
+    const o = {};
+    extraDefs(kind).forEach((f) => { const e = $('ex_' + kind + '_' + f.k); if (e) o[f.k] = e.value.trim(); });
+    return o;
+  }
+  // سطر مختصر لقيم الجلسة الإضافية في رأس البطاقة
+  function exLine(kind, vals) {
+    return extraDefs(kind).map((f) => { const v = exFmt(f, (vals || {})[f.k]); return v ? ` · ${esc(exLabel(f))}: ${esc(v)}` : ''; }).join('');
+  }
+
   /* ----- نوافذ ----- */
   const sheet = (html) => { $('mgSheetBody').innerHTML = html; $('mgSheet').hidden = false; requestAnimationFrame(() => { $('mgSheet').classList.add('in'); $('mgSheetBody').scrollTop = 0; }); };
   const closeSheet = () => { $('mgSheet').classList.remove('in'); setTimeout(() => { $('mgSheet').hidden = true; }, 200); };
@@ -282,11 +393,12 @@
         <label class="hr-f"><span>تاريخ الجلسة</span><input id="msD" type="date" value="${esc(s ? s.session_date : today())}"></label>
         <label class="hr-f"><span>صادر عن</span><input id="msB" value="${esc(s ? s.issued_by || '' : '')}" placeholder="الاسم أو الجهة المصدِّرة للتوجيهات"></label>
         <label class="hr-f"><span>ملاحظات</span><textarea id="msN" rows="2">${esc(s ? s.notes || '' : '')}</textarea></label>
+        ${exInputs('session', s && s.extra)}
         <div class="hr-err" id="msErr" hidden></div>
         <button class="btn-gold" type="submit" id="msGo">${s ? 'حفظ التعديلات' : 'إنشاء الجلسة'}</button></form>`);
     $('mgSF').onsubmit = async (e) => {
       e.preventDefault(); const b = $('msGo'); b.disabled = true;
-      const r = await send('session_save', { id: s ? s.id : 0, title: $('msT').value.trim(), session_date: $('msD').value, issued_by: $('msB').value.trim(), notes: $('msN').value.trim() });
+      const r = await send('session_save', { id: s ? s.id : 0, title: $('msT').value.trim(), session_date: $('msD').value, issued_by: $('msB').value.trim(), notes: $('msN').value.trim(), extra: exCollect('session') });
       b.disabled = false;
       if (!r.ok) { const er = $('msErr'); er.hidden = false; er.textContent = r.status === 0 ? 'يلزم اتصال بالإنترنت لحفظ الجلسة' : r.error || 'تعذّر الحفظ'; return; }
       if (r.data && r.data.id) S.open.add(r.data.id);
@@ -315,6 +427,7 @@
         <select id="mdStep" class="mg-sel" aria-label="الدرجة"></select></div>
         <div class="mg-amt" id="mdAmt" hidden></div>
         <label class="hr-f"><span>التفاصيل</span><textarea id="mdDT" rows="3">${esc(d ? d.details || '' : '')}</textarea></label>
+        ${exInputs('directive', d && d.extra)}
         ${edit ? `<label class="hr-f"><span>ملاحظة الموارد البشرية</span><textarea id="mdHN" rows="2">${esc(d.hr_note || '')}</textarea></label>` : ''}
         <div class="hr-err" id="mdErr" hidden></div>
         <button class="btn-gold" type="submit" id="mdGo">${edit ? 'حفظ التعديلات' : 'إضافة التوجيه'}</button></form>`);
@@ -360,7 +473,7 @@
       const eo = (actions.find((a) => a.slug === F.at) || {}).endOnly;
       if (eo && !$('mdED').value) return fail('يرجى تحديد تاريخ انتهاء التكليف.');
       const body = { id: d ? d.id : 0, session_id: s.id, target_type: F.tt, employee_id: F.tt === 'employee' ? F.emp : 0, candidate_id: F.tt === 'candidate' ? F.cand : 0, target_name: F.name, target_title: F.title, action_type: F.at,
-        start_date: eo ? '' : $('mdSD').value, end_date: $('mdED').value, project: $('mdPJ').value.trim(), details: $('mdDT').value.trim(), scale_row_id: F.row, scale_step: F.step, __t: Date.now() };
+        start_date: eo ? '' : $('mdSD').value, end_date: $('mdED').value, project: $('mdPJ').value.trim(), details: $('mdDT').value.trim(), scale_row_id: F.row, scale_step: F.step, extra: exCollect('directive'), __t: Date.now() };
       const b = $('mdGo'); b.disabled = true;
       let r = await send('directive_save', body);
       if (r.ok && !r.queued && edit && $('mdHN') && ($('mdHN').value.trim() !== (d.hr_note || ''))) r = await send('directive_status', { id: d.id, status: d.status, hr_note: $('mdHN').value.trim() });
