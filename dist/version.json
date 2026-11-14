@@ -1,6 +1,6 @@
 {
-  "versionCode": 63,
-  "versionName": "8.17",
-  "notes": "إصلاح تنسيق شاشة النظام المساعد HR على الشاشات الضيقة والثيم الفاتح",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-63.apk"
+  "versionCode": 64,
+  "versionName": "8.18",
+  "notes": "واتساب: تبديل تلقائي بين +970 و+972 وحفظ الرقم الصحيح لكل موظف",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-64.apk"
 }

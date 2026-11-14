@@ -443,7 +443,7 @@
       ${canEdit() && !closed ? `<div class="pf-st">${D.statuses.map((st) => `<button type="button" class="${d.status === st.k ? 'on' : ''}" data-s="${esc(st.k)}" style="--c:${(STC[st.k] || [0, '#8FA2B2'])[1]}">${esc(st.label)}</button>`).join('')}</div>` : `<p class="hr-omn">حالة التوجيه: ${esc((STC[d.status] || [d.status])[0])}</p>`}
       <button class="btn-outline wide" id="pfUn" type="button">تغيير الربط</button>`);
     if ($('pfCall')) $('pfCall').onclick = () => window.hrDial(info.dial);
-    if ($('pfWa')) $('pfWa').onclick = () => window.hrWa(info.wa[0].num);
+    if ($('pfWa')) $('pfWa').onclick = () => window.hrWaOpen(e.id, e.name, e.phone, '');
     $('pfMsg').onclick = () => { closeSheet(); setTimeout(() => window.hrCompose([{ empId: e.id }], at.endOnly ? 'assignment' : 'free'), 250); };
     $('pfFull').onclick = () => { closeSheet(); App.go('hr'); setTimeout(() => window.hrOpenEmp(e.id), 350); };
     $('pfUn').onclick = () => { HR.linkEmp(sysEmp(d).id, null); pickPef(d, s, sysEmp(d), { emp: null, cands: HR.matchEmp(Object.assign({}, sysEmp(d), { id: 'x' })).cands || [] }); };

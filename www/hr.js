@@ -1198,7 +1198,7 @@
     items.forEach((it) => {
       if (seen.has(it.empId) || !emps[it.empId]) return; seen.add(it.empId);
       const e = HR.emp(emps[it.empId]);
-      recs.push({ key: it.empId, e, con: it.con || null, asg: it.asg || null, sms: smsNumber(e.phone), wa: (phoneInfo(e.phone) || { wa: [] }).wa, cc: 0 });
+      recs.push({ key: it.empId, e, con: it.con || null, asg: it.asg || null, sms: smsNumber(e.phone), wa: waOrder(it.empId, (phoneInfo(e.phone) || { wa: [] }).wa), cc: 0, noWa: !!(waPrefs()[it.empId] || {}).none });
     });
     if (!recs.length) { toast('لا يوجد موظفون للإرسال'); return; }
     const t = templates().find((x) => x.id === tplId) || templates()[0];
@@ -1209,6 +1209,7 @@
   const numOf = (r) => cmp.ch === 'sms' ? r.sms : waNum(r);
   function bodyFor(r) { const t = templates().find((x) => x.id === cmp.tplId) || { kind: 'custom' }; return fillText(cmp.text, r, t.kind); }
   function drawCompose() {
+    if (cmp) cmp.q = false;
     const tp = templates(), cur = tp.find((x) => x.id === cmp.tplId), kind = cur ? cur.kind : 'custom';
     const noNum = cmp.recs.filter((r) => !numOf(r)).length;
     const noDate = kind === 'custom' ? 0 : cmp.recs.filter((r) => !tokenMap(r, kind).date).length;
@@ -1266,19 +1267,28 @@
   function sendTo(r) {
     const n = numOf(r); if (!n) return;
     const body = bodyFor(r);
-    if (cmp.ch === 'sms') smsSend(n, body); else openExt('https://wa.me/' + n + '?text=' + encodeURIComponent(body));
-    cmp.done[r.key] = true;
+    if (cmp.ch === 'sms') { smsSend(n, body); cmp.done[r.key] = true; return; }
+    // واتساب: لا يُعدّ منجزاً حتى تؤكد وصول المحادثة، وإن لم يكن الرقم مسجّلاً يُجرَّب الرقم الآخر تلقائياً
+    waOpen(r.key, r.e.name, r.wa, r.cc, body, (ok, idx) => {
+      if (ok) { r.cc = idx; r.noWa = false; cmp.done[r.key] = true; } else r.noWa = true;
+      if (cmp && cmp.q) drawQueue();
+    });
   }
   function drawQueue() {
+    cmp.q = true;
     const list2 = cmp.recs.filter((r) => numOf(r)), done = list2.filter((r) => cmp.done[r.key]).length, next = list2.find((r) => !cmp.done[r.key]);
     sheet(`<div class="hr-ph"><span class="hr-ava big ${next ? 'info' : 'ok'}">${icon(next ? 'note' : 'check')}</span><div><b>${next ? 'قائمة الإرسال' : 'تم فتح كل الرسائل'}</b><small>${done} من ${list2.length}</small></div></div>
       <div class="hr-pbar ${next ? '' : 'ok'}"><i style="width:${list2.length ? done / list2.length * 100 : 0}%"></i></div>
       ${next ? `<button class="btn-gold hr-qnext" id="qNext" type="button">${icon('note')}<span>إرسال إلى ${esc(next.e.name)}</span></button><p class="hr-omn">يفتح ${cmp.ch === 'sms' ? 'تطبيق الرسائل' : 'واتساب'} بالرسالة جاهزة؛ اضغط إرسال هناك ثم ارجع (زر الرجوع) واضغط "التالي".</p>` : `<div class="hr-warnbox" style="color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)">اكتمل فتح الرسائل لكل الموظفين.</div>`}
       <div class="hr-rcp">${list2.map((r) => `<div class="hr-rc ${cmp.done[r.key] ? 'ok' : ''}"><span class="hr-ava ${cmp.done[r.key] ? 'ok' : ''}">${cmp.done[r.key] ? icon('check') : esc(initials(r.e.name))}</span><div class="hr-rct"><b>${esc(r.e.name)}</b><small dir="ltr">${cmp.ch === 'wa' ? '+' : ''}${esc(numOf(r))}</small></div>
-        ${cmp.ch === 'wa' && r.wa.length > 1 ? `<button class="hr-cc" data-k="${esc(r.key)}" type="button">+${esc(r.wa[r.cc].cc)}</button>` : ''}<button class="hr-qs" data-k="${esc(r.key)}" type="button">${cmp.done[r.key] ? 'إعادة' : 'إرسال'}</button></div>`).join('')}</div>
+        ${cmp.ch === 'wa' && r.wa.length > 1 ? `<button class="hr-cc" data-k="${esc(r.key)}" type="button">+${esc(r.wa[r.cc].cc)}</button>` : ''}<button class="hr-qs" data-k="${esc(r.key)}" type="button">${cmp.done[r.key] ? 'إعادة' : (cmp.ch === 'wa' && r.noWa) ? 'SMS بدلاً' : 'إرسال'}</button></div>`).join('')}</div>
       <button class="btn-outline wide" id="qBack" type="button">${icon('chev')}<span>تعديل الرسالة والمستلمين</span></button>`);
     const q = $('qNext'); if (q) q.onclick = () => { sendTo(next); setTimeout(drawQueue, 350); };
-    document.querySelectorAll('.hr-qs').forEach((b) => b.onclick = () => { sendTo(cmp.recs.find((r) => r.key === b.dataset.k)); setTimeout(drawQueue, 350); });
+    document.querySelectorAll('.hr-qs').forEach((b) => b.onclick = () => {
+      const r = cmp.recs.find((x) => x.key === b.dataset.k);
+      if (cmp.ch === 'wa' && r.noWa) { if (!r.sms) { toast('لا يوجد رقم SMS'); return; } smsSend(r.sms, bodyFor(r)); cmp.done[r.key] = true; setTimeout(drawQueue, 350); return; }
+      sendTo(r); setTimeout(drawQueue, 350);
+    });
     document.querySelectorAll('.hr-cc').forEach((b) => b.onclick = () => { const r = cmp.recs.find((x) => x.key === b.dataset.k); r.cc = (r.cc + 1) % r.wa.length; drawQueue(); });
     $('qBack').onclick = drawCompose;
   }
@@ -1500,6 +1510,46 @@
   const openExt = (url) => { if (B && B.openExternal) B.openExternal(url); else window.open(url, '_blank'); };
   window.hrDial = (n) => openExt('tel:' + n);
   window.hrWa = (n) => openExt('https://wa.me/' + n);
+  /* ---------- واتساب: تبديل تلقائي بين +970 و+972 مع تعلّم ما يعمل لكل موظف ---------- */
+  // واتساب لا يخبر التطبيقات هل الرقم مسجّل أم لا، فنسأل مرة واحدة عند العودة، ثم نجرّب الرقم الآخر تلقائياً
+  // ونحفظ الرقم الصحيح لهذا الموظف ليكون الأول في كل مرة قادمة (في كل أماكن واتساب بالتطبيق).
+  const waPrefs = () => HR.db.get('waPref', {});
+  function waOrder(empId, wa) {
+    const p = waPrefs()[empId];
+    if (!p || !p.cc || p.ok === false) return wa;
+    return wa.slice().sort((a, b) => (b.cc === p.cc) - (a.cc === p.cc));
+  }
+  const waRemember = (empId, cc, ok) => { const m = waPrefs(); m[empId] = ok === false ? { none: true, at: Date.now() } : { cc, ok: true, at: Date.now() }; HR.db.put('waPref', m); };
+  let waWait = null;
+  function waOpen(empId, name, list, idx, text, cb, tried) {
+    const w = list[idx]; if (!w) return;
+    openExt('https://wa.me/' + w.num + (text ? '?text=' + encodeURIComponent(text) : ''));
+    waWait = { empId, name, list, idx, text, cb, tried: tried || [idx], at: Date.now() };
+  }
+  function waAskHide() { const x = document.getElementById('waAsk'); if (x) x.remove(); }
+  function waAskShow() {
+    const w = waWait;
+    if (!w || Date.now() - w.at > 20 * 60e3) { waWait = null; waAskHide(); return; }
+    waAskHide();
+    const rest = w.list.map((x, i) => i).filter((i) => !w.tried.includes(i)), cur = w.list[w.idx], quick = Date.now() - w.at < 9000;
+    const box = el('div', 'wa-ask', `<b>هل فُتحت محادثة واتساب مع ${esc(w.name || 'الموظف')}؟</b>
+      <small dir="ltr">+${esc(cur.cc)} ${esc(cur.num.slice(cur.cc.length))}</small>${quick ? '<p>عدتَ بسرعة: غالباً الرقم غير مسجّل على واتساب بهذه المقدمة.</p>' : ''}
+      <div class="wa-act"><button type="button" class="btn-gold" id="waYes">نعم، وصلت</button><button type="button" class="btn-outline${quick ? ' hot' : ''}" id="waNo">${rest.length ? 'لا — جرّب <bdi dir="ltr">+' + esc(w.list[rest[0]].cc) + '</bdi>' : 'لا يوجد واتساب'}</button></div>
+      <button type="button" class="wa-skip" id="waSkip">لم أرسل بعد</button>`);
+    box.id = 'waAsk'; document.body.appendChild(box);
+    $('waYes').onclick = () => { waRemember(w.empId, cur.cc, true); waWait = null; waAskHide(); toast('حُفظ رقم واتساب الصحيح لهذا الموظف'); if (w.cb) w.cb(true, w.idx); };
+    $('waNo').onclick = () => {
+      if (rest.length) { waAskHide(); waOpen(w.empId, w.name, w.list, rest[0], w.text, w.cb, w.tried.concat(rest[0])); return; }
+      waRemember(w.empId, null, false); waWait = null; waAskHide(); toast('لا يوجد واتساب على الرقمين — أرسل رسالة SMS'); if (w.cb) w.cb(false, w.idx);
+    };
+    $('waSkip').onclick = () => { waWait = null; waAskHide(); };
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && waWait) setTimeout(waAskShow, 400); });
+  // واجهة لبقية الشاشات (النظام المساعد، الملف الشخصي)
+  window.hrWaPick = (empId, name, idx) => { const emp = HR.db.get('employees', {})[empId]; const l = emp ? window.hrWaList(empId, HR.emp(emp).phone) : []; if (l[idx]) waOpen(empId, name, l, idx, ''); };
+  window.hrWaList = (empId, phone) => { const i = phoneInfo(phone); return i ? waOrder(empId, i.wa) : []; };
+  window.hrWaOpen = (empId, name, phone, text) => { const l = window.hrWaList(empId, phone); if (!l.length) { toast('لا يوجد رقم واتساب صالح'); return; } waOpen(empId, name, l, 0, text || ''); };
+
   // الرسائل القصيرة: الرقم كما هو (0598815128)؛ إذا كُتب بلا صفر (598815128) نضيف 0؛ والدولي (+970…) يبقى كما هو
   function smsNumber(raw) {
     const s0 = String(raw || '').trim(), plus = s0.startsWith('+'), d = s0.replace(/\D/g, '');
@@ -1509,14 +1559,15 @@
   }
   const smsSend = (num, body) => { if (B && B.smsCompose) B.smsCompose(num, body || ''); else window.open('sms:' + num + (body ? '?body=' + encodeURIComponent(body) : ''), '_blank'); };
   window.hrSms = (n) => smsSend(n, '');
-  function contactBar(raw) {
+  function contactBar(raw, empId, empName) {
     const p = phoneInfo(raw);
     if (!p) return '';
+    if (empId != null) p.wa = waOrder(empId, p.wa);
     return `<div class="hr-contact">
       <button class="hr-cbtn call" onclick="hrDial('${p.dial}')">${icon('phone')}<span><b>اتصال</b><small>${esc(p.dial)}</small></span></button>
-      ${p.wa.map((w, i) => `<button class="hr-cbtn wa${i ? ' alt' : ''}" onclick="hrWa('${w.num}')"><svg viewBox="0 0 24 24" class="ic"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.1 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7a2.8 2.8 0 0 0 1.8-1.3 2.3 2.3 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg><span><b>واتساب ${i ? '(بديل)' : ''}</b><small dir="ltr">${esc(w.label)}</small></span></button>`).join('')}
+      ${p.wa.map((w, i) => `<button class="hr-cbtn wa${i ? ' alt' : ''}" onclick="${empId != null ? `hrWaPick('${esc(String(empId))}','${esc(String(empName || '').replace(/'/g, ''))}',${i}, this)` : `hrWa('${w.num}')`}"><svg viewBox="0 0 24 24" class="ic"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.1 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7a2.8 2.8 0 0 0 1.8-1.3 2.3 2.3 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg><span><b>واتساب ${i ? '(بديل)' : ''}</b><small dir="ltr">${esc(w.label)}</small></span></button>`).join('')}
       <button class="hr-cbtn sms" onclick="hrSms('${esc(smsNumber(raw))}')">${icon('note')}<span><b>رسالة</b><small dir="ltr">${esc(smsNumber(raw))}</small></span></button>
-    </div>${p.wa.length ? '<p class="hr-wanote">إذا ظهر في واتساب أن الرقم غير مسجّل، جرّب زر البديل (+970 / +972).</p>' : ''}`;
+    </div>${p.wa.length ? '<p class="hr-wanote">إن لم يكن الرقم مسجّلاً على واتساب سيسألك التطبيق عند عودتك ويجرّب المقدمة الأخرى (+970 / +972) تلقائياً ويحفظ الصحيحة.</p>' : ''}`;
   }
   const telLink = (k, v) => /mobile|phone/i.test(k) ? (phoneInfo(v) ? `<button class="hr-tel" onclick="hrDial('${phoneInfo(v).dial}')">${icon('phone')}${esc(v)}</button>` : esc(v)) : /email/i.test(k) ? `<a href="mailto:${esc(v)}">${esc(v)}</a>` : esc(v);
   function openRaw(title, o) { sheet(`<div class="hr-ph"><b>${title}</b></div>${rawTable(o)}`); }
@@ -1545,7 +1596,7 @@
         <div><b>${sm.count || cons.length}</b><small>${(sm.count || cons.length) === 1 ? 'عقد' : 'عقود'}</small></div>
         <div><b>${asgs.length}</b><small>تكليفات</small></div>
       </div>
-      ${contactBar(e.phone)}
+      ${contactBar(e.phone, e.id, e.name)}
       <button class="btn-outline wide hr-mbtn" id="hrMsgEmp">${icon('note')}<span>إرسال رسالة بقالب جاهز</span></button>
       ${groups.map(([title, ic, cells]) => `<div class="hr-grp"><div class="hr-grph">${icon(ic)}<span>${title}</span></div><div class="hr-info">${cells.map(([k, v, key]) => `<div><small>${esc(k)}</small><b>${telLink(key, v)}</b></div>`).join('')}</div></div>`).join('')}
       <div class="hr-sec"><span>الحضور آخر 14 يوماً</span><small>اضغط على يوم لعرض التفاصيل</small></div><div class="hr-cal14">${cells.join('')}</div>
