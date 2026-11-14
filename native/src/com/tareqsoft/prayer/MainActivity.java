@@ -345,6 +345,28 @@ public class MainActivity extends Activity {
             new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.send(MainActivity.this, path, json, role)); } }).start();
         }
 
+        private void mgmtReply(final String id, final ErpClient.Res r) {
+            js("window.__mgmt && window.__mgmt(" + JSONObject.quote(id) + "," + r.status + "," + JSONObject.quote(r.body) + ")");
+        }
+
+        @JavascriptInterface
+        public void mgmtLogin(final String id, final String user, final String pass, final boolean remember) {
+            new Thread(new Runnable() { public void run() {
+                ErpClient.Res r = MgmtClient.login(MainActivity.this, user, pass);
+                if (r.status == 200) { if (remember) MgmtClient.saveCreds(MainActivity.this, user, pass); else MgmtClient.forgetCreds(MainActivity.this); }
+                mgmtReply(id, r);
+            } }).start();
+        }
+
+        @JavascriptInterface
+        public void mgmtCall(final String id, final String method, final String query, final String json) {
+            new Thread(new Runnable() { public void run() { mgmtReply(id, MgmtClient.call(MainActivity.this, method, query, json)); } }).start();
+        }
+
+        @JavascriptInterface public boolean mgmtSession() { return MgmtClient.hasSession(MainActivity.this) || MgmtClient.hasCreds(MainActivity.this); }
+        @JavascriptInterface public boolean mgmtHasCreds() { return MgmtClient.hasCreds(MainActivity.this); }
+        @JavascriptInterface public void mgmtLogout() { MgmtClient.forgetCreds(MainActivity.this); MgmtClient.logout(MainActivity.this); }
+
         @JavascriptInterface
         public void erpLogout() {
             new Thread(new Runnable() { public void run() { ErpClient.logout(MainActivity.this); } }).start();

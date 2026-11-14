@@ -208,7 +208,7 @@
   window.appBack = () => {
     const v = document.getElementById('hrMapView');
     if (v && !v.hidden) { close(); return true; }
-    for (const id of ['hrSheet', 'agSheet', 'wxSheet']) {
+    for (const id of ['mgSheet', 'hrSheet', 'agSheet', 'wxSheet']) {
       const sh = document.getElementById(id);
       if (sh && !sh.hidden) { const c = sh.querySelector('[data-close]'); if (c) c.click(); else sh.hidden = true; return true; }
     }

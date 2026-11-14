@@ -1,6 +1,6 @@
 {
-  "versionCode": 47,
-  "versionName": "8.1",
-  "notes": "الموافقة على الطلبات من التطبيق (إجازات، مغادرات، مهام عمل)",
+  "versionCode": 48,
+  "versionName": "8.2",
+  "notes": "تنبيهات الإدارة: جلسات وتوجيهات الإدارة مرتبطة بنظام tarsof.top",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

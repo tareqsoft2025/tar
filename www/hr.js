@@ -1014,9 +1014,9 @@
     const ni = HR.netInfo(), slow = HR.isSlow(), ws0 = HR.watchState();
     body.appendChild(el('div', 'hr2-status' + (ni.online ? '' : ' off'), `${icon('refresh')}<div><b>${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</b><small>${!ni.online ? 'لا يوجد اتصال: يعمل التطبيق من البيانات المحفوظة' : slow ? 'اتصال ضعيف (2G): تُجلب البيانات الصغيرة فقط' : ni.wifi ? 'متصل عبر Wi‑Fi' : 'متصل ببيانات الجوال'}${ws0.min ? ' · المتابعة الخلفية كل ' + ws0.min + ' د' : ''}</small></div>`));
     const quick = el('div', 'hr2-tiles');
-    [['note', 'العقود', () => { tab = 'con'; }], ['briefcase', 'التكليفات', () => { tab = 'asg'; }], ['cal', 'الأرصدة', () => { tab = 'lv'; f.lv = 'bal'; }], ['chart', 'ساعات الأسبوع', () => { tab = 'wk'; }]].forEach(([ic, n, go]) => {
+    [['note', 'العقود', () => { tab = 'con'; }], ['briefcase', 'التكليفات', () => { tab = 'asg'; }], ['cal', 'الأرصدة', () => { tab = 'lv'; f.lv = 'bal'; }], ['chart', 'ساعات الأسبوع', () => { tab = 'wk'; }], ['note', 'تنبيهات الإدارة', () => { App.go('mgmt'); }]].forEach(([ic, n, go]) => {
       const b = el('button', 'hr2-tile', `${icon(ic)}<b>${n}</b>`); b.type = 'button';
-      b.onclick = () => { go(); store.set('hrTab', tab); render(); }; quick.appendChild(b);
+      b.onclick = () => { go(); if (!App.isActive('hr')) return; store.set('hrTab', tab); render(); }; quick.appendChild(b);
     });
     body.appendChild(quick);
     // المزامنة
