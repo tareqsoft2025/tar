@@ -330,7 +330,7 @@
   const events = (ds) => (db.get(monthKey(ds), {})[ds]) || null;
   const leaveOf = (eid, ds) => db.get('leaves', {})[eid + ':' + ds] || null;
   // auto: off | open (عند الفتح) ؛ every: كل كم دقيقة؛ bg: المزامنة في الخلفية
-  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
+  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, dayHours: 8, weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
 
   const minutesOf = (iso) => { const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso)).forEach((x) => { p[x.type] = x.value; }); return (+p.hour % 24) * 60 + +p.minute; };
   const hmToMin = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };

@@ -1,6 +1,6 @@
 {
-  "versionCode": 39,
-  "versionName": "6.8",
-  "notes": "إصلاح الخريطة: خرائط تعمل بدون مفتاح (رمادية أنيقة، شوارع، قمر صناعي) مع انتقال تلقائي لمصدر بديل",
+  "versionCode": 40,
+  "versionName": "6.9",
+  "notes": "ساعات الأسبوع: قائمة لكل موظف بعدد ساعاته خلال الأسبوع مقابل المطلوب، وتفاصيل كل يوم عند الضغط عليه",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }
