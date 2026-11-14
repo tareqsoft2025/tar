@@ -1,6 +1,6 @@
 {
-  "versionCode": 44,
-  "versionName": "7.3",
-  "notes": "متابعة الحضور والتطبيق مغلق، وكفاءة على الإنترنت الضعيف (2G)",
+  "versionCode": 45,
+  "versionName": "7.4",
+  "notes": "تفصيل الحضور: PEF وHHO والمكتبي والميداني في لوحة المعلومات وتبويب الحضور",
   "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer.apk"
 }

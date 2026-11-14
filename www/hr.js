@@ -187,6 +187,25 @@
     if (B && B.share) B.share(text); else if (navigator.share) navigator.share({ text }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(text); toast('تم النسخ'); }
   }
 
+  // تفصيل الحضور حسب الجهة (PEF/HHO) ونوع الدوام (مكتبي/ميداني)
+  function breakdown(body, rows, ds, apply) {
+    const groups = [['PEF', 'PEF', (r) => r.e.org === 'PEF', { org: 'PEF', type: 'all' }], ['HHO', 'HHO', (r) => r.e.org === 'HHO', { org: 'HHO', type: 'all' }],
+      ['office', 'المكتبي', (r) => r.e.type !== 'field', { org: 'all', type: 'office' }], ['field', 'الميداني', (r) => r.e.type === 'field', { org: 'all', type: 'field' }]];
+    const box = el('div', 'hr-bd');
+    box.appendChild(el('div', 'hr-bd-h', '<span></span><span>الكل</span><span>حاضر</span><span>متأخر</span><span>بلا تسجيل</span><span>إجازة</span>'));
+    groups.forEach(([key, label, test, flt], i) => {
+      const g = rows.filter(test);
+      const n = (fn) => g.filter(fn).length;
+      const present = n((r) => r.list.length), late = n((r) => r.status === 'late'), absent = n((r) => r.status === 'absent'), leave = n((r) => r.status === 'leave');
+      const pct = g.length ? Math.round(present * 100 / g.length) : 0;
+      const row = el('button', 'hr-bd-r' + (i === 2 ? ' sep' : ''), `<span class="hr-bd-n"><b>${label}</b><i style="--p:${pct}%"></i></span><span>${g.length}</span><span class="ok">${present}</span><span class="warn">${late}</span><span class="bad">${absent}</span><span class="info">${leave}</span>`);
+      row.type = 'button';
+      row.onclick = () => apply(flt);
+      box.appendChild(row);
+    });
+    body.appendChild(box);
+  }
+
   /* ---------- لوحة اليوم ---------- */
   function renderDash(body) {
     const t = today();
@@ -214,6 +233,10 @@
       const seg = ['present', 'late', 'leave', 'absent', 'noin'].map((s) => [s, cnt(s)]).filter((x) => x[1]);
       body.appendChild(el('div', 'hr-bar', seg.map(([s, n]) => `<i class="${STATUS[s][1]}" style="flex:${n}" title="${STATUS[s][0]}"></i>`).join('')));
     }
+    if (rows.length) {
+      body.appendChild(el('div', 'hr-sec', '<span>تفصيل حضور اليوم</span>'));
+      breakdown(body, rows, t, (flt) => { f.org = flt.org; f.type = flt.type; f.st = 'all'; f.day = t; f.q = ''; tab = 'att'; render(); });
+    }
     const sec = (title, arr, empty, more) => {
       const h = el('div', 'hr-sec', `<span>${title}</span>${more ? '<button>عرض الكل</button>' : ''}`);
       if (more) h.querySelector('button').onclick = () => { more(); f.q = ''; render(); };
@@ -238,6 +261,7 @@
       b.onclick = async () => { b.disabled = true; try { await HR.sync(null, { from: f.day }); } catch (e) { toast(e.message); } render(); };
       m.appendChild(b); body.appendChild(m); return;
     }
+    breakdown(body, rep.rows, f.day, (flt) => { f.org = flt.org; f.type = flt.type; render(); });
     const base = rep.rows.filter((r) => orgOk(r.e) && typeOk(r.e));
     filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
     filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
