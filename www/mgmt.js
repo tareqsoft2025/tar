@@ -45,7 +45,7 @@
   const saveCache = () => putFile('mgmt_cache', D);
   const saveBox = () => putFile('mgmt_outbox', outbox);
 
-  const S = { tab: 'dir', st: '', act: '', q: '', open: new Set(), loading: false, err: '', exp: { cid: 0, end: '', data: null, loading: false } };
+  const S = { code: 0, msg: '', tab: 'dir', st: '', act: '', q: '', open: new Set(), loading: false, err: '', exp: { cid: 0, end: '', data: null, loading: false } };
   const canEdit = () => !D || !D.user || D.user.canEdit !== false;
   const actOf = (slug) => (D && D.actions.find((a) => a.slug === slug)) || { slug, label: slug, tone: 'slate', endOnly: false };
 
@@ -58,7 +58,7 @@
       const r = await call('GET', 'a=bootstrap');
       if (r.status === 401) { if (B && B.mgmtLogout && !(B.mgmtHasCreds && B.mgmtHasCreds())) B.mgmtLogout(); S.err = 'auth'; }
       else if (r.ok && r.data && r.data.sessions) { D = r.data; D.cachedAt = Date.now(); saveCache(); S.err = ''; applyOutboxLocal(); }
-      else S.err = r.status === 0 ? 'net' : r.status === 403 ? 'forbidden' : 'server';
+      else { S.err = r.status === 0 ? 'net' : r.status === 403 ? 'forbidden' : 'server'; S.code = r.status; S.msg = (r.data && r.data.error) || (r.status === 200 ? 'الرد ليس بصيغة JSON المتوقعة' : ''); }
     } finally { busy = false; S.loading = false; draw(); }
   }
 
@@ -103,7 +103,7 @@
     box.innerHTML = '';
     if (!connected() || S.err === 'auth') { box.appendChild(loginView()); return; }
     if (!D) {
-      box.appendChild(el('div', 'mg-empty', S.err === 'net' ? `${icon('alert')}<b>لا يوجد اتصال</b><small>لم تُحمَّل البيانات بعد. تحقق من الإنترنت ثم اضغط تحديث.</small>` : S.err === 'forbidden' ? `${icon('alert')}<b>لا تملك الصلاحية</b><small>حسابك لا يملك عرض عمليات الإدارة في النظام.</small>` : S.err === 'server' ? `${icon('alert')}<b>تعذّر التحميل</b><small>تأكد أن ملف api.php مرفوع على السيرفر في /hrnew/mgmt/.</small>` : `${icon('refresh')}<b>جارٍ التحميل…</b>`));
+      box.appendChild(el('div', 'mg-empty', S.err === 'net' ? `${icon('alert')}<b>لا يوجد اتصال</b><small>لم تُحمَّل البيانات بعد. تحقق من الإنترنت ثم اضغط تحديث.</small>` : S.err === 'forbidden' ? `${icon('alert')}<b>لا تملك الصلاحية</b><small>حسابك لا يملك عرض عمليات الإدارة في النظام.</small>` : S.err === 'server' ? `${icon('alert')}<b>تعذّر التحميل</b><small>رمز الخطأ: ${esc(S.code)}${S.msg ? ' — ' + esc(S.msg) : ''}</small><small>إن تكرر الخطأ أرسل هذا الرمز والرسالة للدعم.</small>` : `${icon('refresh')}<b>جارٍ التحميل…</b>`));
       return;
     }
     box.appendChild(hero());
