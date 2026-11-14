@@ -1522,3 +1522,14 @@ html:has(#tab-times.active){overflow:hidden}
 .st-m{display:grid;gap:2px;padding:10px 12px;border-radius:16px;background:var(--card);border:1px solid var(--line);color:var(--text);font:inherit;text-align:start;cursor:pointer}
 .st-m b{font-size:1.5rem;color:var(--gold);line-height:1.1}.st-m.outside b{color:#F2716A}.st-m.unknown b{color:var(--muted)}
 .st-m small{color:var(--muted);font-size:.72rem;line-height:1.35}
+
+/* ---- إرسال الرسائل من التطبيق ---- */
+.sm-box{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin:6px 0}
+.sm-box div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;gap:2px}.sm-box b{font-size:1.5rem;line-height:1.1}.sm-box small{color:var(--muted);font-size:.72rem}
+.sm-list{display:grid;gap:5px;margin:6px 0}
+.sm-list div{display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 11px}.sm-list b{font-size:.86rem}.sm-list small{color:var(--muted);font-size:.74rem}.sm-list .more{justify-content:center;color:var(--muted);font-size:.78rem;border:0;background:none}
+.sm-r{display:grid!important;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
+.sm-log{display:grid;gap:7px;margin-top:8px}
+.sm-lr{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 12px;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+.sm-lr b{font-size:.88rem}.sm-lr small{color:var(--muted);font-size:.72rem;display:block}.sm-lt{display:grid;justify-items:end;gap:2px}
+.sm-lr p{grid-column:1/-1;margin:4px 0 0;color:var(--muted);font-size:.78rem;line-height:1.5;white-space:pre-wrap;max-height:4.5em;overflow:hidden}

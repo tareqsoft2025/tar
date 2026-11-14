@@ -1,6 +1,6 @@
 {
-  "versionCode": 60,
-  "versionName": "8.14",
-  "notes": "فحص تكيّفي لتقليل الطلبات + ميزة الحضور في المواقع",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-60.apk"
+  "versionCode": 61,
+  "versionName": "8.15",
+  "notes": "إرسال الرسائل النصية من داخل التطبيق مع تأكيد وسجل",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-61.apk"
 }

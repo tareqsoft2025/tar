@@ -283,6 +283,126 @@
     });
   }
 
+
+  /* ---------- إرسال الرسائل النصية من داخل التطبيق ---------- */
+  const appSmsOn = () => !!(B && B.smsSend && (!B.smsAvailable || B.smsAvailable()) && store.get('hrAppSms', true));
+  const smsLog = () => HR.db.get('smsLog', []);
+  const putSmsLog = (l) => HR.db.put('smsLog', l.slice(0, 500));
+  // عدد الرسائل الفعلية (تقريبي): العربية 70 حرفاً للرسالة (67 إن تعدّدت)، واللاتينية 160 (153)
+  const smsSegs = (t) => { const uni = /[^\x00-\x7F -ÿ]/.test(t), one = uni ? 70 : 160, mul = uni ? 67 : 153; return t.length <= one ? 1 : Math.ceil(t.length / mul); };
+  const SMS_ERR = { 1: 'خطأ عام من الشبكة', 2: 'الراديو مغلق (وضع الطيران؟)', 3: 'تعذّر تجهيز الرسالة', 4: 'لا توجد تغطية شبكة', perm: 'لا توجد صلاحية الإرسال', exc: 'تعذّر الإرسال' };
+  const smsStTxt = (s) => s === 'sent' ? 'أُرسلت' : s === 'sending' || s === 'queued' ? 'قيد الإرسال…' : String(s).startsWith('failed') ? 'فشلت: ' + (SMS_ERR[String(s).split(':')[1]] || 'رمز ' + String(s).split(':')[1]) : 'غير معروفة';
+  const smsTone = (s) => s === 'sent' ? 'ok' : String(s).startsWith('failed') ? 'bad' : 'warn';
+  const simsList = () => { try { return JSON.parse(B.smsSims() || '[]'); } catch (e) { return []; } };
+  let smsBatch = null;
+
+  function askSmsPerm(next) {
+    sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('note')}</span><div><b>السماح بإرسال الرسائل</b><small>مرة واحدة فقط</small></div></div>
+      <p class="hr-omn" style="margin:6px 0 10px">لإرسال الرسائل من التطبيق يلزم السماح بإرسال الرسائل النصية من شريحتك. لا يقرأ التطبيق رسائلك، ولا يرسل شيئاً قبل أن تؤكد كل دفعة.</p>
+      <button class="btn-gold" id="spGo" type="button">منح الصلاحية</button>
+      <p class="hr-omn" id="spMsg" style="margin:8px 0 0">إن لم تظهر نافذة الصلاحية في أندرويد 13 وما بعده: افتح إعدادات التطبيق ← ⋮ ← «السماح بالإعدادات المقيّدة»، ثم الأذونات ← الرسائل القصيرة ← السماح.</p>
+      <button class="btn-outline wide" id="spSet" type="button">فتح إعدادات التطبيق</button>`);
+    window.smsPerm = (ok) => { if (ok) { toast('تم منح الصلاحية'); next(); } else { $('spMsg') && ($('spMsg').style.color = '#F2716A'); toast('لم تُمنح الصلاحية'); } };
+    $('spGo').onclick = () => B.smsAsk();
+    $('spSet').onclick = () => B.openAppSettings && B.openAppSettings();
+  }
+
+  function startAppSms() {
+    if (!B.smsCan()) { askSmsPerm(startAppSms); return; }
+    const recs = cmp.recs.filter((r) => numOf(r));
+    if (!recs.length) { toast('لا يوجد موظفون بأرقام صالحة'); return; }
+    const items = recs.map((r) => ({ key: r.key, name: r.e.name, to: r.sms, body: bodyFor(r) }));
+    confirmAppSms(items, () => drawCompose());
+  }
+
+  // تأكيد قبل كل دفعة: العدد، التكلفة التقريبية بالرسائل، اختيار الشريحة
+  function confirmAppSms(items, back) {
+    const segs = items.reduce((n, i) => n + smsSegs(i.body), 0), sims = simsList();
+    let sim = store.get('hrSmsSim', -1);
+    if (!sims.some((x) => x.id === sim)) sim = (sims.find((x) => x.def) || sims[0] || { id: -1 }).id;
+    const draw = () => {
+      sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('note')}</span><div><b>تأكيد الإرسال</b><small>${items.length} مستلم</small></div></div>
+        <div class="sm-box"><div><b>${items.length}</b><small>رسالة نصية</small></div><div><b>≈ ${segs}</b><small>رسائل بحسب الطول</small></div></div>
+        <p class="hr-omn" style="margin:6px 0">ستُرسل مباشرة من شريحتك وتُخصم من رصيدك. العربية تتسع 70 حرفاً للرسالة الواحدة، والأطول يُقسَّم.</p>
+        ${sims.length > 1 ? `<div class="ag-lbl">الشريحة</div><div class="chips" id="spSims">${sims.map((x) => `<button type="button" class="chip sm${x.id === sim ? ' on' : ''}" data-id="${x.id}">SIM ${x.slot} · ${esc(x.name)}</button>`).join('')}</div>` : ''}
+        <div class="ag-lbl">المستلمون</div><div class="sm-list">${items.slice(0, 5).map((i) => `<div><b>${esc(i.name)}</b><small dir="ltr">${esc(i.to)}</small></div>`).join('')}${items.length > 5 ? `<div class="more">و${items.length - 5} آخرين</div>` : ''}</div>
+        <div class="ag-lbl">نص أول رسالة</div><div class="hr-bubble">${esc(items[0].body)}</div>
+        ${items.length > 30 ? `<div class="hr-warnbox warn">أندرويد يطلب تأكيداً إضافياً بعد نحو 30 رسالة في نصف ساعة.</div>` : ''}
+        <button class="btn-gold" id="spYes" type="button">تأكيد الإرسال (${items.length})</button>
+        <button class="btn-outline wide" id="spNo" type="button">رجوع</button>`);
+      document.querySelectorAll('#spSims button').forEach((b) => b.onclick = () => { sim = +b.dataset.id; store.set('hrSmsSim', sim); draw(); });
+      $('spNo').onclick = back;
+      $('spYes').onclick = () => runAppSms(items, sim);
+    };
+    draw();
+  }
+
+  function runAppSms(items, sim) {
+    let seq = store.get('hrSmsSeq', 1); const base = seq; seq += items.length + 1; store.set('hrSmsSeq', seq);
+    const batch = items.map((i, n) => Object.assign({ id: base + n }, i));
+    const log = smsLog(), at = Date.now();
+    batch.slice().reverse().forEach((i) => log.unshift({ id: i.id, name: i.name, to: i.to, text: i.body, at, st: 'queued' }));
+    putSmsLog(log);
+    B.smsSend(JSON.stringify({ sim, items: batch.map((i) => ({ id: i.id, to: i.to, body: i.body })) }));
+    smsBatch = { items: batch, sim };
+    drawSmsProgress();
+  }
+
+  // يقرأ حالات الرسائل المعلّقة من الطبقة الأصلية ويحدّث السجل
+  function syncSmsLog() {
+    if (!B || !B.smsStatus) return false;
+    const log = smsLog(), pend = log.filter((x) => x.st === 'queued' || x.st === 'sending');
+    if (!pend.length) return false;
+    let st = {}; try { st = JSON.parse(B.smsStatus(JSON.stringify(pend.map((x) => x.id))) || '{}'); } catch (e) { return false; }
+    let ch = false;
+    log.forEach((x) => { const s2 = st[x.id]; if (s2 && s2 !== x.st && s2 !== 'unknown') { x.st = s2; ch = true; } else if (s2 === 'unknown' && Date.now() - x.at > 10 * 60e3) { x.st = 'failed:exc'; ch = true; } });
+    if (ch) putSmsLog(log);
+    return ch;
+  }
+
+  let smsTimer = null;
+  function drawSmsProgress() {
+    clearInterval(smsTimer);
+    const ids = new Set(smsBatch.items.map((i) => i.id));
+    const paint = () => {
+      syncSmsLog();
+      const rows = smsLog().filter((x) => ids.has(x.id)).sort((a, z) => a.id - z.id);
+      const sent = rows.filter((x) => x.st === 'sent').length, failed = rows.filter((x) => String(x.st).startsWith('failed')).length, wait = rows.length - sent - failed;
+      if (!$('spList')) return;
+      $('spCnt').innerHTML = `<div><b>${sent}</b><small>أُرسلت</small></div><div><b>${wait}</b><small>قيد الإرسال</small></div><div><b>${failed}</b><small>فشلت</small></div>`;
+      $('spList').innerHTML = rows.map((x) => `<div class="sm-r"><span class="hr-b ${smsTone(x.st)}">${esc(smsStTxt(x.st))}</span><b>${esc(x.name)}</b><small dir="ltr">${esc(x.to)}</small></div>`).join('');
+      $('spRetry').hidden = !(failed && !wait);
+      $('spRetry').textContent = `إعادة إرسال الفاشلة (${failed})`;
+      if (!wait) { clearInterval(smsTimer); $('spTitle').textContent = failed ? 'اكتمل مع رسائل فاشلة' : 'اكتمل الإرسال'; }
+    };
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('note')}</span><div><b id="spTitle">جارٍ الإرسال…</b><small>لا تُغلق التطبيق حتى تكتمل الدفعة</small></div></div>
+      <div class="sm-box" id="spCnt"></div><div class="sm-list" id="spList"></div>
+      <button class="btn-gold" id="spRetry" type="button" hidden></button>
+      <button class="btn-outline wide" id="spLog" type="button">سجل الرسائل</button>`);
+    $('spRetry').onclick = () => {
+      const failedIds = new Set(smsLog().filter((x) => ids.has(x.id) && String(x.st).startsWith('failed')).map((x) => x.id));
+      const again = smsBatch.items.filter((i) => failedIds.has(i.id)).map((i) => ({ key: i.key, name: i.name, to: i.to, body: i.body }));
+      if (again.length) confirmAppSms(again, () => drawSmsProgress());
+    };
+    $('spLog').onclick = () => { clearInterval(smsTimer); openSmsLog(); };
+    paint(); smsTimer = setInterval(paint, 1000);
+  }
+
+  let smsLogF = 'all';
+  function openSmsLog() {
+    syncSmsLog();
+    const all = smsLog(), failed = all.filter((x) => String(x.st).startsWith('failed'));
+    const rows = all.filter((x) => smsLogF === 'all' ? true : smsLogF === 'failed' ? String(x.st).startsWith('failed') : x.st === 'sent');
+    const dt = (ms) => `${fd(new Date(ms).toISOString().slice(0, 10))} ${tf.format(new Date(ms))}`;
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('note')}</span><div><b>سجل الرسائل النصية</b><small>${all.length} رسالة · ${failed.length} فاشلة</small></div></div>
+      <div class="chips" id="slF"></div>
+      <div class="nt-bar"><button class="btn-outline" id="slRe" type="button" ${failed.length ? '' : 'disabled'}>إعادة إرسال الفاشلة (${failed.length})</button><button class="btn-outline" id="slClr" type="button">مسح السجل</button></div>
+      <div class="sm-log">${rows.map((x) => `<div class="sm-lr"><div><b>${esc(x.name)}</b><small dir="ltr">${esc(x.to)}</small></div><div class="sm-lt"><span class="hr-b ${smsTone(x.st)}">${esc(smsStTxt(x.st))}</span><small>${dt(x.at)}</small></div><p>${esc(x.text)}</p></div>`).join('') || '<div class="hr-none">لا رسائل في هذا العرض</div>'}</div>`);
+    [['all', 'الكل'], ['sent', 'أُرسلت'], ['failed', 'فشلت']].forEach(([k, n]) => { const c = el('button', 'chip sm' + (smsLogF === k ? ' on' : ''), n); c.type = 'button'; c.onclick = () => { smsLogF = k; openSmsLog(); }; $('slF').appendChild(c); });
+    $('slClr').onclick = () => { putSmsLog([]); openSmsLog(); };
+    $('slRe').onclick = () => { confirmAppSms(failed.map((x) => ({ key: x.id, name: x.name, to: x.to, body: x.text })), () => openSmsLog()); };
+  }
+
   /* ---------- مركز الإشعارات ---------- */
   const NT = { att: ['clock', 'ok'], req: ['inbox', 'info'], digest: ['bell', 'warn'] };
   function updateBell() {
@@ -1110,8 +1230,10 @@
           ${cmp.ch === 'wa' && r.wa.length > 1 ? `<button class="hr-cc" data-i="${i}" type="button">+${esc(r.wa[r.cc].cc)}</button>` : ''}<button class="hr-rx" data-i="${i}" type="button" aria-label="إزالة">${icon('x')}</button></div>`;
       }).join('')}</div>
       ${noNum ? `<div class="hr-warnbox bad">${noNum} موظف بلا رقم جوال صالح، سيُتخطّون.</div>` : ''}
-      <button class="btn-gold" id="cmGo" type="button" ${cmp.recs.length - noNum ? '' : 'disabled'}>بدء الإرسال (${cmp.recs.length - noNum})</button>
-      <p class="hr-omn">تُفتح الرسائل واحدة تلو الأخرى في تطبيق ${cmp.ch === 'sms' ? 'الرسائل' : 'واتساب'} بنص مخصّص لكل موظف، وتضغط "إرسال" فيه ثم ترجع إلى هنا للتالي.</p>`);
+      ${cmp.ch === 'sms' && appSmsOn() ? `<button class="btn-gold" id="cmApp" type="button" ${cmp.recs.length - noNum ? '' : 'disabled'}>${icon('note')}<span>إرسال الكل من التطبيق (${cmp.recs.length - noNum})</span></button>
+      <button class="btn-outline wide" id="cmGo" type="button" ${cmp.recs.length - noNum ? '' : 'disabled'}>عبر برنامج الرسائل (واحداً واحداً)</button>
+      <p class="hr-omn">«إرسال الكل من التطبيق» يرسل مباشرة من شريحتك بعد تأكيدك ويسجّل النتيجة في سجل الرسائل، وتُخصم الرسائل من رصيدك.</p>` : `<button class="btn-gold" id="cmGo" type="button" ${cmp.recs.length - noNum ? '' : 'disabled'}>بدء الإرسال (${cmp.recs.length - noNum})</button>
+      <p class="hr-omn">تُفتح الرسائل واحدة تلو الأخرى في تطبيق ${cmp.ch === 'sms' ? 'الرسائل' : 'واتساب'} بنص مخصّص لكل موظف، وتضغط "إرسال" فيه ثم ترجع إلى هنا للتالي.</p>`}`);
     const ta = $('cmText'); ta.value = cmp.text;
     const prev = () => { $('cmPrev').textContent = first ? bodyFor(first) : ''; };
     ta.oninput = () => { cmp.text = ta.value; prev(); }; prev();
@@ -1139,6 +1261,7 @@
     document.querySelectorAll('.hr-cc').forEach((b) => b.onclick = () => { const r = cmp.recs[+b.dataset.i]; r.cc = (r.cc + 1) % r.wa.length; drawCompose(); });
     document.querySelectorAll('.hr-rx').forEach((b) => b.onclick = () => { cmp.recs.splice(+b.dataset.i, 1); if (!cmp.recs.length) { closeSheet(); return; } drawCompose(); });
     $('cmGo').onclick = () => { cmp.done = {}; drawQueue(); };
+    if ($('cmApp')) $('cmApp').onclick = () => startAppSms();
   }
   function sendTo(r) {
     const n = numOf(r); if (!n) return;
@@ -1208,6 +1331,21 @@
     chipSet('hsWatch', [[0, 'إيقاف'], [2, 'كل 2 د'], [5, 'كل 5 د'], [10, 'كل 10 د'], [15, 'كل 15 د']], wst.min || 0, (v) => { HR.setWatch(v); toast(v ? 'بدأت المتابعة في الخلفية (إشعار دائم صغير)' : 'أُوقفت المتابعة في الخلفية'); });
     if ($('wBat')) $('wBat').onclick = () => B.batteryAsk();
     // إشعارات الحضور المنبثقة
+    // الرسائل النصية من التطبيق
+    if (B && B.smsSend && (!B.smsAvailable || B.smsAvailable())) {
+      const can = B.smsCan(), sims = can ? simsList() : [], selSim = store.get('hrSmsSim', -1);
+      const sc = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('note')}الرسائل النصية</div>
+        <label class="hr-srow"><span>الإرسال من داخل التطبيق<small>يرسل مباشرة من شريحتك بعد تأكيدك لكل دفعة</small></span><input type="checkbox" id="smOn" class="hr-tog" ${store.get('hrAppSms', true) ? 'checked' : ''}></label>
+        <div class="hr-srow"><span>الصلاحية</span><b>${can ? 'ممنوحة' : 'غير ممنوحة'}</b></div>
+        ${can ? '' : `<button class="btn-outline wide" id="smPerm" type="button">منح صلاحية الرسائل</button>`}
+        ${sims.length > 1 ? `<div class="hr-sl2">الشريحة المستعملة</div><div id="smSims" class="chips">${sims.map((x) => `<button type="button" class="chip sm${x.id === selSim || (selSim === -1 && x.def) ? ' on' : ''}" data-id="${x.id}">SIM ${x.slot} · ${esc(x.name)}</button>`).join('')}</div>` : ''}
+        <button class="btn-outline wide" id="smLog" type="button">${icon('note')}<span>سجل الرسائل (${smsLog().length})</span></button>`);
+      body.appendChild(sc);
+      $('smOn').onchange = (e) => { store.set('hrAppSms', e.target.checked); toast(e.target.checked ? 'فُعّل الإرسال من التطبيق' : 'أُوقف الإرسال من التطبيق'); };
+      if ($('smPerm')) $('smPerm').onclick = () => askSmsPerm(() => { closeSheet(); render(); });
+      document.querySelectorAll('#smSims button').forEach((b) => b.onclick = () => { store.set('hrSmsSim', +b.dataset.id); toast('تم اختيار الشريحة'); render(); });
+      $('smLog').onclick = () => openSmsLog();
+    }
     // الملخص الصباحي
     const dg = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('bell')}الملخص الصباحي</div>
       <p class="hr-omn" style="margin:0 0 8px">إشعار واحد كل يوم عمل يلخّص: المتأخرين، وغير المسجلين، والطلبات المعلّقة، والعقود والتكليفات التي تنتهي هذا الأسبوع. يصل حتى والتطبيق مغلق (مع تفعيل المتابعة الخلفية).</p>
