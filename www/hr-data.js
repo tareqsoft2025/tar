@@ -504,7 +504,9 @@
   const events = (ds) => (db.get(monthKey(ds), {})[ds]) || null;
   const leaveOf = (eid, ds) => db.get('leaves', {})[eid + ':' + ds] || null;
   // auto: off | open (عند الفتح) ؛ every: كل كم دقيقة؛ bg: المزامنة في الخلفية
-  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, dayHours: 8, attAlert: 'all', digestOn: true, digestAt: '08:45', weekend: [5], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
+  // الافتراضي الجديد: عطلة الجمعة والسبت؛ ومن بقي على الافتراضي القديم [الجمعة] يُرقّى مرة واحدة
+  (function migWeekend() { try { const st = db.get('settings', {}); if (!st.wkMig) { if (!st.weekend || (st.weekend.length === 1 && st.weekend[0] === 5)) st.weekend = [5, 6]; st.wkMig = 1; db.put('settings', st); } } catch (e) { /* ignore */ } })();
+  const settings = () => Object.assign({ office: '08:00', field: '08:00', grace: 10, dayHours: 8, attAlert: 'all', digestOn: true, digestAt: '08:45', weekend: [5, 6], attStart: '2026-11-01', auto: 'open', every: 60, bg: true }, db.get('settings', {}));
 
   const minutesOf = (iso) => { const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso)).forEach((x) => { p[x.type] = x.value; }); return (+p.hour % 24) * 60 + +p.minute; };
   const hmToMin = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
@@ -557,11 +559,12 @@
         const leave = leaveOf(e.id, ds) || (dayLeave ? String(dayLeave.nature || 'leave').toLowerCase() : null);
         const hasAsg = asgs.some((a) => a.empId === e.id && (!a.start || a.start <= ds) && (!a.end || a.end >= ds));
         let lateMin = 0;
-        if (firstIn) { const start = hmToMin(e.type === 'field' ? cfg.field : cfg.office); lateMin = Math.max(0, minutesOf(firstIn) - start - cfg.grace); }
+        if (firstIn && !weekend) { const start = hmToMin(e.type === 'field' ? cfg.field : cfg.office); lateMin = Math.max(0, minutesOf(firstIn) - start - cfg.grace); }
         let status = 'present';
         if (!list.length) status = leave ? 'leave' : weekend ? 'off' : 'absent';
         else if (lateMin > 0) status = 'late';
         if (list.length && !ins.length) status = 'noin';
+        if (list.length && weekend && !leave) status = 'hwork';   // دوام في يوم عطلة: لا يُحسب تأخراً
         const w = worked(list, ds);
         const outside = list.some((x) => place(x).st === 'outside');
         return { e, list, firstIn, lastOut, lateMin, leave, hasAsg, status, workMin: w.min, openShift: w.open, live: w.live, outside, reqs };
