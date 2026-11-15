@@ -1666,3 +1666,4 @@ html:has(#tab-times.active){overflow:hidden}
 .rv-d b{font-size:.9em}.rv-d small{opacity:.7}
 .rv-d span{display:grid;gap:3px;min-width:0}.rv-d em{font-style:normal;font-size:.85em;opacity:.85}
 .rv-d span{justify-items:start}.rv-d .hr-b{width:auto}.hr-rvtop button{white-space:nowrap}
+.hr-live{display:block;color:#4fbf8a;font-size:.8em;min-height:1em}.hr-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4fbf8a;margin-inline-end:5px;animation:hrpulse 1.6s infinite}.hr-dot.bad{background:#e0a03c;animation:none}@keyframes hrpulse{0%,100%{opacity:1}50%{opacity:.35}}
