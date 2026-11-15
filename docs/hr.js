@@ -47,7 +47,7 @@
     updateBell();
     if (!HR.hasSession()) { renderLogin(box); return; }
     const meta = HR.meta();
-    const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
+    const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small><small id="hrLive" class="hr-live"></small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
     box.appendChild(acc);
     // خمسة أقسام ثابتة، وتحتها شرائح فرعية لقسم التقارير
     const secOf = () => tab === 'dash' ? 'today' : tab === 'emp' ? 'team' : (tab === 'set' || tab === 'rev') ? 'more' : (tab === 'lv' && f.lv === 'req') ? 'req' : 'rep';
@@ -1502,6 +1502,7 @@
       <button type="button" class="btn-outline wide" id="rvOpen">${icon('alert')}<span>المراجعة الشهرية السرية</span></button>
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
+      <label class="hr-srow"><span>الوضع المباشر (تحديث الحضور كل ~20 ثانية وقت الدوام والشاشة مفتوحة)</span><input type="checkbox" id="lvOn" class="hr-tog" ${s.live === false ? '' : 'checked'}></label>
       <label class="hr-srow"><span>السماح بإضافة/تعديل سجلات الحضور من التطبيق</span><input type="checkbox" id="atOn" class="hr-tog" ${s.attEdit === false ? '' : 'checked'}></label>
       <button type="button" class="btn-outline wide" id="atLog">${icon('note')}<span>سجل تعديلات الحضور (${HR.attAudit().length})</span></button>
       <label class="hr-srow"><span>تفعيل الملخص الصباحي</span><input type="checkbox" id="dgOn" class="hr-tog" ${s.digestOn === false ? '' : 'checked'}></label>
@@ -1511,6 +1512,7 @@
     $('wkRep').onclick = () => openWeekly('prev');
     $('wnLog').onclick = openWarnLog;
     $('rvOpen').onclick = () => { tab = 'rev'; store.set('hrTab', 'set'); revFlt = 'need'; render(); };
+    $('lvOn').onchange = (e) => { put({ live: e.target.checked }); liveMark(); toast(e.target.checked ? 'فُعّل الوضع المباشر' : 'أُوقف الوضع المباشر'); };
     $('atOn').onchange = (e) => { put({ attEdit: e.target.checked }); toast(e.target.checked ? 'فُعّل تعديل الحضور' : 'أُوقف تعديل الحضور'); };
     $('atLog').onclick = openAttLog;
     $('dgOn').onchange = (e) => { put({ digestOn: e.target.checked }); toast(e.target.checked ? 'فُعّل الملخص الصباحي' : 'أُوقف الملخص الصباحي'); };
@@ -2029,6 +2031,47 @@
     const am = $('hrDayMap'); if (am) am.onclick = () => openDayMap(id, ds);
     $('hrToEmp').onclick = () => openEmp(id);
   }
+
+  /* ---------- الوضع المباشر: تحديث الحضور كل بضع ثوانٍ ما دامت الشاشة مفتوحة ---------- */
+  // منصة PEF لا توفّر قناة دفع (webhook/SSE/WebSocket)، فالبديل الأقرب: طلب صغير تراكمي واحد في الدورة، وفقط والشاشة ظاهرة.
+  let liveT = null, liveFail = 0, liveLast = 0;
+  const liveOn = () => HR.hasSession() && HR.settings().live !== false && !document.hidden && App.isActive('hr') && !!HR.meta().lastSync;
+  function liveDelay() {
+    const h = HR.pollHint(2);
+    let sec = h <= 2 ? 20 : h <= 20 ? 60 : 180;   // وقت الحضور والانصراف: 20 ث، بقية الدوام: دقيقة، الليل والعطلة: 3 دقائق
+    if (HR.isSlow()) sec *= 3;
+    return Math.min(300, sec * (1 + Math.min(liveFail, 4))) * 1000;
+  }
+  function liveMark() {
+    const m = $('hrLive'); if (!m) return;
+    if (!liveOn()) { m.textContent = ''; return; }
+    const sec = liveLast ? Math.max(0, Math.round((Date.now() - liveLast) / 1000)) : null;
+    m.innerHTML = `<i class="hr-dot${liveFail ? ' bad' : ''}"></i>${liveFail ? 'المباشر متعثّر — إعادة المحاولة' : 'مباشر' + (sec != null ? ' · قبل ' + (sec < 60 ? sec + ' ث' : Math.round(sec / 60) + ' د') : '')}`;
+  }
+  function liveSchedule(idle) { clearTimeout(liveT); liveT = setTimeout(liveRun, idle ? 5000 : liveDelay()); }
+  async function liveRun() {
+    if (!liveOn()) { liveMark(); liveSchedule(true); return; }
+    if (!HR.isSyncing() && HR.netInfo().online !== false) {
+      try {
+        const st = await HR.sync(null, { quick: true });
+        if (st) {
+          liveFail = 0; liveLast = Date.now();
+          if (st.fresh && st.fresh.length) showAttPopup(st.fresh);
+          // لا نعيد الرسم إن كان المستخدم يكتب أو داخل نافذة، حتى لا نقطع عمله
+          const busy = !$('hrSheet').hidden || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '');
+          if (st.attendance && st.attendance.changed && App.isActive('hr') && !busy) render();
+          updateBell();
+        }
+      } catch (e) {
+        if (e && e.res && e.res.status === 401) { toast('انتهت الجلسة، سجّل الدخول من جديد'); HR.logout(); return; }
+        liveFail++;
+      }
+    }
+    liveMark(); liveSchedule(false);
+  }
+  setInterval(liveMark, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { liveFail = 0; clearTimeout(liveT); liveT = setTimeout(liveRun, 1500); } });
+  liveSchedule(true);
 
   /* ---------- الربط ---------- */
   let omDraw = null;
