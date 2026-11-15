@@ -1,6 +1,6 @@
 {
-  "versionCode": 72,
-  "versionName": "8.26",
-  "notes": "إشعارات أنيقة: أيقونات وألوان وتجميع، وتنبيهات داخلية بأنواع",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-72.apk"
+  "versionCode": 73,
+  "versionName": "8.27",
+  "notes": "الإشعارات في منتصف الشاشة (طلبات وملخص) حتى مع التطبيق مغلقاً",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-73.apk"
 }

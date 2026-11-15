@@ -128,5 +128,33 @@
     if (navigator.vibrate) navigator.vibrate([90, 60, 90]);
   }
 
-  window.RemindUI = { show, showAttendance, markDone, left };
+  // نافذة إشعار عامة في منتصف الشاشة (طلبات جديدة، الملخص الصباحي…)
+  // d = { kind:'req'|'digest'|'info', title, body (أسطر متعددة = قائمة), go, label }
+  const NT = {
+    req: { c: '#5B9DF0', label: 'طلب جديد', ic: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H4.99C3.89 3 3 3.9 3 5l.01 14c0 1.1.89 2 1.99 2H19c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H4.99V5H19v10z"/></svg>', btn: 'عرض الطلبات' },
+    digest: { c: '#D9B56B', label: 'ملخص اليوم', ic: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>', btn: 'فتح الملخص' },
+    info: { c: '#2FBF71', label: 'إشعار', ic: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>', btn: 'عرض' }
+  };
+  function showNotice(host, d, h) {
+    h = h || {};
+    clearInterval(timer);
+    const k = NT[d.kind] || NT.info, lines = String(d.body || '').split('\n').map((x) => x.trim()).filter(Boolean);
+    const list = lines.length > 1 ? `<ul class="ap-list">${lines.slice(0, 7).map((x) => `<li style="--ac:${k.c}"><span class="nt-dot"></span><div><b>${esc(x)}</b></div></li>`).join('')}</ul>` : `<p class="rp-body">${esc(lines[0] || '')}</p>`;
+    host.innerHTML = `<div class="rp ap ntp" role="alertdialog" aria-modal="true" style="--rc:${k.c}">
+      <div class="rp-scrim"></div>
+      <div class="rp-card ap-card">
+        <div class="rp-glow"></div>
+        <div class="ap-body"><div class="ap-top"><span class="ap-pill"><i></i>${esc(d.label || k.label)}</span><span class="ap-time">${tf.format(new Date())}</span></div>
+          <div class="ap-av"><span class="ap-ring"></span><span class="ap-ring r2"></span><span class="ap-ini">${k.ic}</span></div>
+          <h2 class="rp-title">${esc(d.title || '')}</h2>${list}</div>
+        <div class="ap-btns"><button type="button" class="ap-view" data-a="view">${esc(d.btn || k.btn)}</button><button type="button" class="ap-x" data-a="close">إغلاق</button></div>
+      </div></div>`;
+    const root = host.firstElementChild;
+    requestAnimationFrame(() => root.classList.add('in'));
+    const finish = (fn) => { root.classList.remove('in'); root.classList.add('out'); setTimeout(() => { host.innerHTML = ''; if (fn) fn(); }, 260); };
+    root.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === 'view') finish(() => h.view && h.view(d)); else finish(h.close); });
+    if (navigator.vibrate) navigator.vibrate([90, 60, 90]);
+  }
+
+  window.RemindUI = { show, showAttendance, showNotice, markDone, left };
 })();

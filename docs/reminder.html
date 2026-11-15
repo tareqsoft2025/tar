@@ -25,6 +25,13 @@
     });
     return;
   }
+  if (data.type === 'notice') {
+    RemindUI.showNotice(document.getElementById('host'), data, {
+      close: close,
+      view: function () { if (R && R.openGo) R.openGo(data.go || 'inbox'); else close(); }
+    });
+    return;
+  }
   RemindUI.show(document.getElementById('host'), data, {
     done: function () { RemindUI.markDone(data.tid, data.ds); if (R) R.done(); else close(); },
     snooze: function (m) { if (R) R.snooze(m); else close(); },

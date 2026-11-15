@@ -125,12 +125,17 @@
   }
 
   /* ---------- المزامنة ---------- */
+  // نافذة إشعار في منتصف الشاشة داخل التطبيق (نفس تصميم النافذة الخارجية)
+  function showNotice(d, tries) {
+    const host = $('remPop');
+    if (host.firstChild) { if ((tries || 0) < 8) setTimeout(() => showNotice(d, (tries || 0) + 1), 4000); return; }
+    RemindUI.showNotice(host, d, { view: (x) => window.hrGo(x.go || 'inbox'), close: () => {} });
+  }
   // تنبيه داخل التطبيق بالطلبات الجديدة (النسخة الأصلية للخلفية في hr-sync.html)
   function newReqToast(st) {
     const l = st && st.newReqs; if (!l || !l.length) return;
-    const q = l[0];
-    toast(l.length === 1 ? `طلب جديد — ${q.label}: ${q.name || ''}` : `${l.length} طلبات جديدة: ${l.slice(0, 3).map((x) => x.name || '—').join('، ')}`);
-    try { if (navigator.vibrate) navigator.vibrate(120); } catch (e) { /* ignore */ }
+    const one = (q) => { const d = q.from ? (q.to && q.to !== q.from ? fd(q.from) + ' ← ' + fd(q.to) : fd(q.from)) : ''; return [q.name || '—', d, q.hours ? q.hours + ' ساعة' : '', q.reason].filter(Boolean).join(' · '); };
+    showNotice({ kind: 'req', title: l.length === 1 ? `طلب جديد — ${l[0].label}` : `${l.length} طلبات جديدة`, body: l.slice(0, 6).map((q) => (l.length > 1 ? q.label + ': ' : '') + one(q)).join('\n'), go: 'req' });
     if (App.isActive('hr') && $('hrSheet').hidden) render();
   }
   async function doSync(silent) {
@@ -151,7 +156,7 @@
       else if (!silent || parts.length) toast(parts.length ? 'تمت المزامنة — ' + parts.join('، ') : 'تمت المزامنة، لا تغييرات جديدة');
       if (st.fresh && st.fresh.length) showAttPopup(st.fresh);
       newReqToast(st);
-      const dg = HR.maybeDigest(); if (dg) toast('ملخص اليوم: ' + dg.body);
+      const dg = HR.maybeDigest(); if (dg) showNotice({ kind: 'digest', title: 'ملخص اليوم', body: dg.body.split(' · ').join('\n'), go: dg.first || 'inbox' });
     } catch (e) {
       if (e.res && e.res.status === 401) { toast('انتهت الجلسة، سجّل الدخول من جديد'); HR.logout(); }
       else if (!silent) toast(e.message || 'تعذّرت المزامنة');

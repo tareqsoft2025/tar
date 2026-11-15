@@ -19,6 +19,7 @@
       if (st && st.newReqs && st.newReqs.length && AndroidBridge.reqNotify) {
         const one = (q) => { const d = q.from ? (q.to && q.to !== q.from ? q.from + ' ← ' + q.to : q.from) : ''; return [q.name || '—', d, q.hours ? q.hours + ' ساعة' : '', q.reason].filter(Boolean).join(' · '); };
         st.newReqs.slice(0, 5).forEach((q) => AndroidBridge.reqNotify('طلب جديد — ' + q.label, one(q), 'req', q.id));
+        if (AndroidBridge.reqPopup) AndroidBridge.reqPopup(st.newReqs.length === 1 ? 'طلب جديد — ' + st.newReqs[0].label : st.newReqs.length + ' طلبات جديدة', st.newReqs.slice(0, 6).map((q) => (st.newReqs.length > 1 ? q.label + ': ' : '') + one(q)).join('\n'), 'req');
         if (st.newReqs.length > 5) AndroidBridge.reqNotify(st.newReqs.length + ' طلبات جديدة', st.newReqs.map((q) => q.name || '—').slice(0, 8).join('، '), 'req', 'many');
       }
       if (ev.length && AndroidBridge.attAlert) {

@@ -126,6 +126,19 @@ public class ReminderActivity extends Activity {
           .setAutoCancel(true);
         NotifStyle.apply(nb, c, R.drawable.ic_stat_digest, "الملخص الصباحي", true);
         nm.notify(5600, nb.build());
+        popup(c, "digest", title, body, go);
+    }
+
+    /** نافذة إشعار في منتصف الشاشة فوق أي تطبيق (تتطلب إذن العرض فوق التطبيقات، وإلا يكفي الإشعار). */
+    static void popup(Context c, String kind, String title, String body, String go) {
+        try {
+            if (!OverlayService.canDraw(c)) return;
+            JSONObject o = new JSONObject().put("type", "notice").put("kind", kind).put("title", title).put("body", body).put("go", go == null ? "" : go);
+            Intent show = new Intent(c, ReminderActivity.class)
+                .putExtra("data", o.toString()).putExtra("title", title).putExtra("body", body)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            c.startActivity(show);
+        } catch (Exception e) { /* الإشعار العادي يكفي */ }
     }
 
     /** إشعار طلب جديد (إجازة/مغادرة/مهمة/عمل إضافي/عمل بعطلة): لكل طلب إشعار مستقل، ويفتح قائمة الطلبات المعلّقة. */
@@ -227,6 +240,10 @@ public class ReminderActivity extends Activity {
         }
         @JavascriptInterface public void openTab(final String tab) {
             startActivity(new Intent(ReminderActivity.this, MainActivity.class).putExtra("tab", tab).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            close();
+        }
+        @JavascriptInterface public void openGo(final String go) {
+            startActivity(new Intent(ReminderActivity.this, MainActivity.class).putExtra("tab", "hr").putExtra("go", go == null || go.isEmpty() ? "inbox" : go).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
             close();
         }
         @JavascriptInterface public void open() {
