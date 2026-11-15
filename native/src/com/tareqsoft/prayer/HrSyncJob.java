@@ -66,6 +66,7 @@ public class HrSyncJob extends JobService {
                 @JavascriptInterface public String hrGet(String name) { return ErpClient.read(HrSyncJob.this, name); }
                 @JavascriptInterface public void attAlert(String data, String title, String body) { ReminderActivity.fireAtt(getApplicationContext(), data, title, body); }
             @JavascriptInterface public void digestNotify(String title, String body, String go) { ReminderActivity.fireDigest(getApplicationContext(), title, body, go); }
+            @JavascriptInterface public void reqNotify(String title, String body, String go, String key) { ReminderActivity.fireReq(getApplicationContext(), title, body, go, key); }
                 @JavascriptInterface public void done() { h.post(finish); }
                 @JavascriptInterface public void done(boolean ok) { h.post(finish); }
             }, "AndroidBridge");

@@ -164,6 +164,7 @@ public class HrWatchService extends Service {
             @JavascriptInterface public String hrGet(String name) { return ErpClient.read(HrWatchService.this, name); }
             @JavascriptInterface public void attAlert(String data, String title, String body) { ReminderActivity.fireAtt(getApplicationContext(), data, title, body); }
             @JavascriptInterface public void digestNotify(String title, String body, String go) { ReminderActivity.fireDigest(getApplicationContext(), title, body, go); }
+            @JavascriptInterface public void reqNotify(String title, String body, String go, String key) { ReminderActivity.fireReq(getApplicationContext(), title, body, go, key); }
             @JavascriptInterface public void done(boolean ok) {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putLong("watch_last", System.currentTimeMillis()).putBoolean("watch_ok", ok).apply();
                 h.post(finish);

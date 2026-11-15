@@ -375,17 +375,12 @@
       if (mode !== 'quick') {
         progress && progress('الإجازات والمهام…');
         await stage('leaves', async () => { st.leaves = await syncLeaves(addDays(mode === 'full' ? from : t, -1), addDays(t, mode === 'full' ? 30 : 3)); });
-        if (reqDue) {
-          st.requests = {};
-          for (const [k, path] of REQ_SRC) {
-            progress && progress('الطلبات: ' + REQ_LABEL[k] + '…');
-            await stage('req:' + k, async () => { const r = await get(path); if (!r.ok) throw new Error(k); st.requests[k] = merge('req_' + k, listOf(r.data)); reqCache = null; });
-          }
-          if (!st.errors.some((x) => x.startsWith('req:'))) { meta.reqAt = Date.now(); noticeNewRequests(); }
-        }
+        if (reqDue) await fetchReqs(st, progress, meta, stage);
         const bm = db.get('balMeta', {});
         if (heavyDue && (opts.balances || mode === 'full' || !bm.at || Date.now() - bm.at > (slow ? 48 : 24) * 3600e3)) await stage('balances', async () => { st.balances = await syncBalances(progress); });
       }
+      // وضع المراقبة السريع: فحص الطلبات الجديدة كل 5 دقائق (10 على الشبكة الضعيفة) ليصل إشعار كل طلب دون انتظار المزامنة الكاملة
+      if (mode === 'quick' && haveEmps && (!meta.reqAt || Date.now() - meta.reqAt >= (slow ? 10 : 5) * 60e3)) await fetchReqs(st, progress, meta, stage);
       if (!st.ok) throw Object.assign(new Error('تعذّر الاتصال بالنظام، تحقق من الإنترنت'), { res: { status: 0 } });
       if (heavyDue && !st.errors.some((x) => x === 'employees' || x === 'contracts')) meta.heavyAt = Date.now();
       if (mode !== 'quick' || !meta.attUntil) { meta.attUntil = t; meta.attFrom = meta.attFrom && meta.attFrom < from ? meta.attFrom : from; }
@@ -398,6 +393,19 @@
   }
 
   /* ---------- الطلبات والأرصدة ---------- */
+  // جلب قوائم الطلبات الخمس (كل نوع قسم مستقل لا يُسقط الباقي) ثم إشعار الجديد منها
+  async function fetchReqs(st, progress, meta, stage) {
+    st.requests = {};
+    for (const [k, path] of REQ_SRC) {
+      progress && progress('الطلبات: ' + REQ_LABEL[k] + '…');
+      await stage('req:' + k, async () => { const r = await get(path); if (!r.ok) throw new Error(k); st.requests[k] = merge('req_' + k, listOf(r.data)); reqCache = null; });
+    }
+    if (!st.errors.some((x) => x.startsWith('req:'))) {
+      meta.reqAt = Date.now();
+      const fresh = noticeNewRequests();
+      if (fresh.length && settings().reqNotify !== false) st.newReqs = fresh.map((q) => ({ id: q.id, kind: q.kind, label: REQ_LABEL[q.kind] || 'طلب', name: q.name || '', from: q.from, to: q.to, hours: q.hours, reason: q.reason || '' }));
+    }
+  }
   const REQ_SRC = [
     ['daily', '/api/hr/leaves/requests?search=&view=active'],
     ['hourly', '/api/hr/leaves/requests/hourly?scope=personal_hourly&search=&view=active'],
@@ -595,11 +603,12 @@
   function noticeNewRequests() {
     const pend = pendingReqs(), seen = db.get('reqSeen', null);
     db.put('reqSeen', pend.map((q) => q.id).slice(-400));
-    if (seen === null) return;
+    if (seen === null) return [];
     const have = new Set(seen), fresh = pend.filter((q) => !have.has(q.id));
-    if (!fresh.length) return;
-    if (fresh.length > 3) { addNotice({ key: 'reqs:' + Date.now(), type: 'req', title: fresh.length + ' طلبات جديدة قيد الاعتماد', body: fresh.slice(0, 3).map((q) => q.name || '—').join('، ') + '…', data: { many: true } }); return; }
+    if (!fresh.length) return [];
+    if (fresh.length > 3) { addNotice({ key: 'reqs:' + Date.now(), type: 'req', title: fresh.length + ' طلبات جديدة قيد الاعتماد', body: fresh.slice(0, 3).map((q) => q.name || '—').join('، ') + '…', data: { many: true } }); return fresh; }
     fresh.forEach((q) => addNotice({ key: 'req:' + q.id, type: 'req', title: (q.name || 'طلب جديد') + ' — ' + (q.kind === 'daily' ? 'إجازة' : q.kind === 'hourly' ? 'مغادرة ساعية' : q.kind === 'mission' ? 'مهمة عمل' : q.kind === 'overtime' ? 'عمل إضافي' : 'عمل في عطلة'), body: 'طلب جديد قيد الاعتماد', data: { reqId: q.id, empId: q.empId } }));
+    return fresh;
   }
 
   /* ---------- الملخص الصباحي ---------- */

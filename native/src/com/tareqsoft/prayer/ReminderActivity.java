@@ -124,6 +124,30 @@ public class ReminderActivity extends Activity {
         nm.notify(5600, nb.build());
     }
 
+    /** إشعار طلب جديد (إجازة/مغادرة/مهمة/عمل إضافي/عمل بعطلة): لكل طلب إشعار مستقل، ويفتح قائمة الطلبات المعلّقة. */
+    static void fireReq(Context c, String title, String body, String go, String key) {
+        Intent show = new Intent(c, MainActivity.class).putExtra("tab", "hr").putExtra("go", go == null || go.isEmpty() ? "req" : go)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int id = 5700 + Math.abs((key == null ? title : key).hashCode() % 250);
+        int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
+        PendingIntent pi = PendingIntent.getActivity(c, id, show, f | PendingIntent.FLAG_UPDATE_CURRENT);
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        Notification.Builder nb;
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel ch = new NotificationChannel("hr_requests", "الطلبات الجديدة", NotificationManager.IMPORTANCE_HIGH);
+            nm.createNotificationChannel(ch);
+            nb = new Notification.Builder(c, "hr_requests");
+        } else {
+            nb = new Notification.Builder(c).setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+        }
+        nb.setContentTitle(title).setContentText(body)
+          .setStyle(new Notification.BigTextStyle().bigText(body))
+          .setSmallIcon(android.R.drawable.ic_dialog_email)
+          .setContentIntent(pi)
+          .setAutoCancel(true);
+        nm.notify(id, nb.build());
+    }
+
     static int nid(String data) {
         try { JSONObject o = new JSONObject(data); if ("att".equals(o.optString("type"))) return 5500; return 4000 + Math.abs((o.optString("tid") + o.optString("ds")).hashCode() % 1000); }
         catch (Exception e) { return 4000; }
