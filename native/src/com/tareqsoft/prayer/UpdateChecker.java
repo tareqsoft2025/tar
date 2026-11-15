@@ -142,7 +142,7 @@ public class UpdateChecker extends BroadcastReceiver {
         nb.setContentTitle("تحديث جديد جاهز" + (name.isEmpty() ? "" : " (الإصدار " + name + ")"))
           .setContentText(body)
           .setStyle(new Notification.BigTextStyle().bigText(body))
-          .setSmallIcon(android.R.drawable.stat_sys_download_done)
+          .setSmallIcon(R.drawable.ic_stat_update).setColor(NotifStyle.GOLD).setCategory(Notification.CATEGORY_RECOMMENDATION)
           .setContentIntent(PendingIntent.getActivity(c, 9501, open, f | PendingIntent.FLAG_UPDATE_CURRENT))
           .setAutoCancel(true);
         nm.notify(NOTIF_ID, nb.build());

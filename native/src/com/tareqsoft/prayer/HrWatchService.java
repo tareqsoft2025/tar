@@ -115,7 +115,7 @@ public class HrWatchService extends Service {
         int fl = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
         return nb.setContentTitle("متابعة حضور الموظفين مفعّلة")
             .setContentText(txt)
-            .setSmallIcon(android.R.drawable.ic_popup_sync)
+            .setSmallIcon(R.drawable.ic_stat_hr).setColor(NotifStyle.GOLD)
             .setOngoing(true)
             .setContentIntent(PendingIntent.getActivity(this, 3, new Intent(this, MainActivity.class).putExtra("tab", "hr"), fl))
             .build();
