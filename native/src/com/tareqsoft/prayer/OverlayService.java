@@ -76,7 +76,7 @@ public class OverlayService extends Service {
         int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
         return nb.setContentTitle("عرض الوقت المتبقي فوق الشاشات مفعّل")
             .setContentText("يمكن إيقافه من إعدادات التطبيق")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_stat_bell).setColor(NotifStyle.GOLD)
             .setContentIntent(PendingIntent.getActivity(this, 2, new Intent(this, MainActivity.class), f))
             .setOngoing(true).build();
     }

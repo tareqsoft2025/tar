@@ -8,12 +8,16 @@
   const state = Object.assign(Core.loadState(), { coords: null, place: '', next: null, prev: null });
   if (state.city !== GPS && !Core.cityCoords(state.city)) state.city = GPS;
 
-  function toast(msg) {
-    const t = $('toast');
-    t.textContent = msg;
+  // نغمة التنبيه تُستنتج من النص: خطأ / نجاح / معلومة، وتظهر بأيقونة ولون وانزلاق ناعم
+  function toast(msg, tone) {
+    const t = $('toast'), m = String(msg == null ? '' : msg);
+    tone = tone || (/تعذّر|تعذر|فشل|خطأ|غير صحيح|انتهت الجلسة|ليست لديك|لا يمكن/.test(m) ? 'bad' : /^تم|فُعّل|أُوقف|أُضيف|تمت|حُفظ|نُسخ|أُزيل/.test(m) ? 'ok' : /جديد|وصل|تسجيل|طلب|مباشر/.test(m) ? 'info' : '');
+    t.dataset.tone = tone;
+    t.innerHTML = '<i class="tz-ic" aria-hidden="true"></i><span></span>';
+    t.lastChild.textContent = m;
     t.classList.add('show');
     clearTimeout(toast.h);
-    toast.h = setTimeout(() => t.classList.remove('show'), 4500);
+    toast.h = setTimeout(() => t.classList.remove('show'), Math.min(7000, 3200 + m.length * 45));
   }
   window.toast = toast;
 

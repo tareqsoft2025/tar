@@ -56,11 +56,12 @@ public class ReminderActivity extends Activity {
         nb.setContentTitle("⏰ " + title)
           .setContentText(body)
           .setStyle(new Notification.BigTextStyle().bigText(body))
-          .setSmallIcon(android.R.drawable.ic_popup_reminder)
+          .setSmallIcon(R.drawable.ic_stat_bell)
           .setCategory(Notification.CATEGORY_REMINDER)
           .setContentIntent(pi)
           .setFullScreenIntent(pi, true)
           .setAutoCancel(true);
+        NotifStyle.apply(nb, c, R.drawable.ic_stat_bell, "تذكير", true);
         nm.notify(nid, nb.build());
         // مع إذن "العرض فوق التطبيقات" يُسمح بفتح النافذة مباشرة فوق أي تطبيق
         if (OverlayService.canDraw(c)) {
@@ -90,11 +91,13 @@ public class ReminderActivity extends Activity {
         }
         nb.setContentTitle(title).setContentText(body)
           .setStyle(new Notification.BigTextStyle().bigText(body))
-          .setSmallIcon(android.R.drawable.ic_dialog_info)
+          .setSmallIcon(R.drawable.ic_stat_att)
           .setCategory(Notification.CATEGORY_EVENT)
           .setContentIntent(pi)
           .setFullScreenIntent(pi, true)
           .setAutoCancel(true);
+        NotifStyle.apply(nb, c, R.drawable.ic_stat_att, "حضور الموظفين", true);
+        NotifStyle.group(c, nm, nb, "hr_att", 5499, "hr_attendance", "حضور الموظفين", R.drawable.ic_stat_att);
         nm.notify(5500, nb.build());
         if (OverlayService.canDraw(c)) {
             try { c.startActivity(show); } catch (Exception e) { /* الإشعار العاجل يكفي */ }
@@ -118,9 +121,10 @@ public class ReminderActivity extends Activity {
         }
         nb.setContentTitle(title).setContentText(body)
           .setStyle(new Notification.BigTextStyle().bigText(body))
-          .setSmallIcon(android.R.drawable.ic_dialog_info)
+          .setSmallIcon(R.drawable.ic_stat_digest)
           .setContentIntent(pi)
           .setAutoCancel(true);
+        NotifStyle.apply(nb, c, R.drawable.ic_stat_digest, "الملخص الصباحي", true);
         nm.notify(5600, nb.build());
     }
 
@@ -142,9 +146,12 @@ public class ReminderActivity extends Activity {
         }
         nb.setContentTitle(title).setContentText(body)
           .setStyle(new Notification.BigTextStyle().bigText(body))
-          .setSmallIcon(android.R.drawable.ic_dialog_email)
+          .setSmallIcon(R.drawable.ic_stat_req)
+          .setCategory(Notification.CATEGORY_MESSAGE)
           .setContentIntent(pi)
           .setAutoCancel(true);
+        NotifStyle.apply(nb, c, R.drawable.ic_stat_req, "الموارد البشرية · طلب", true);
+        NotifStyle.group(c, nm, nb, "hr_req", 5699, "hr_requests", "الطلبات الجديدة", R.drawable.ic_stat_req);
         nm.notify(id, nb.build());
     }
 

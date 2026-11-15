@@ -182,7 +182,7 @@ final class Scheduler {
             nb.setContentTitle(next.getString("n") + " · " + clock(at))
               .setContentText(line.toString())
               .setStyle(new Notification.BigTextStyle().bigText(sb.toString()))
-              .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+              .setSmallIcon(R.drawable.ic_stat_bell).setColor(NotifStyle.GOLD)
               .setContentIntent(PendingIntent.getActivity(c, 1, new Intent(c, MainActivity.class), f))
               .setOngoing(true)
               .setOnlyAlertOnce(true)
@@ -271,7 +271,7 @@ final class Scheduler {
         nb.setContentTitle(title)
           .setContentText(body)
           .setStyle(new Notification.BigTextStyle().bigText(body))
-          .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+          .setSmallIcon(R.drawable.ic_stat_bell).setColor(NotifStyle.GOLD)
           .setContentIntent(PendingIntent.getActivity(c, 1000 + id, open, f | PendingIntent.FLAG_UPDATE_CURRENT))
           .setAutoCancel(true);
         nm.notify(id, nb.build());
