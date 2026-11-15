@@ -15,6 +15,12 @@
       const quick = location.hash === '#quick';
       const st = await HR.sync(null, quick ? { quick: true, background: true } : { background: true });
       const ev = st ? HR.alertFilter(st.fresh) : [];
+      // إشعار مستقل لكل طلب جديد (حتى 5)، وما زاد يُجمَّع في إشعار واحد
+      if (st && st.newReqs && st.newReqs.length && AndroidBridge.reqNotify) {
+        const one = (q) => { const d = q.from ? (q.to && q.to !== q.from ? q.from + ' ← ' + q.to : q.from) : ''; return [q.name || '—', d, q.hours ? q.hours + ' ساعة' : '', q.reason].filter(Boolean).join(' · '); };
+        st.newReqs.slice(0, 5).forEach((q) => AndroidBridge.reqNotify('طلب جديد — ' + q.label, one(q), 'req', q.id));
+        if (st.newReqs.length > 5) AndroidBridge.reqNotify(st.newReqs.length + ' طلبات جديدة', st.newReqs.map((q) => q.name || '—').slice(0, 8).join('، '), 'req', 'many');
+      }
       if (ev.length && AndroidBridge.attAlert) {
         const tf = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: Core.TZ });
         const last = ev[ev.length - 1], t = tf.format(new Date(last.ts));

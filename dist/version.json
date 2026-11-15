@@ -1,6 +1,6 @@
 {
-  "versionCode": 70,
-  "versionName": "8.24",
-  "notes": "الوضع المباشر: تحديث الحضور كل ~20 ثانية والشاشة مفتوحة",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-70.apk"
+  "versionCode": 71,
+  "versionName": "8.25",
+  "notes": "إشعار لكل طلب جديد (كل الأنواع) وفحص الطلبات كل 5 دقائق",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-71.apk"
 }

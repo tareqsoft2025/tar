@@ -125,6 +125,14 @@
   }
 
   /* ---------- المزامنة ---------- */
+  // تنبيه داخل التطبيق بالطلبات الجديدة (النسخة الأصلية للخلفية في hr-sync.html)
+  function newReqToast(st) {
+    const l = st && st.newReqs; if (!l || !l.length) return;
+    const q = l[0];
+    toast(l.length === 1 ? `طلب جديد — ${q.label}: ${q.name || ''}` : `${l.length} طلبات جديدة: ${l.slice(0, 3).map((x) => x.name || '—').join('، ')}`);
+    try { if (navigator.vibrate) navigator.vibrate(120); } catch (e) { /* ignore */ }
+    if (App.isActive('hr') && $('hrSheet').hidden) render();
+  }
   async function doSync(silent) {
     if (HR.isSyncing()) return;
     silent = silent === true;
@@ -142,6 +150,7 @@
       if (bad) toast('تمت المزامنة جزئياً بسبب ضعف الاتصال (' + bad + ' قسم متبقٍ) — سيُستكمل تلقائياً' + (parts.length ? ' — ' + parts.join('، ') : ''));
       else if (!silent || parts.length) toast(parts.length ? 'تمت المزامنة — ' + parts.join('، ') : 'تمت المزامنة، لا تغييرات جديدة');
       if (st.fresh && st.fresh.length) showAttPopup(st.fresh);
+      newReqToast(st);
       const dg = HR.maybeDigest(); if (dg) toast('ملخص اليوم: ' + dg.body);
     } catch (e) {
       if (e.res && e.res.status === 401) { toast('انتهت الجلسة، سجّل الدخول من جديد'); HR.logout(); }
@@ -1502,6 +1511,7 @@
       <button type="button" class="btn-outline wide" id="rvOpen">${icon('alert')}<span>المراجعة الشهرية السرية</span></button>
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
+      <label class="hr-srow"><span>إشعار لكل طلب جديد (إجازة، مغادرة، مهمة، عمل إضافي، عمل بعطلة)</span><input type="checkbox" id="rqOn" class="hr-tog" ${s.reqNotify === false ? '' : 'checked'}></label>
       <label class="hr-srow"><span>الوضع المباشر (تحديث الحضور كل ~20 ثانية وقت الدوام والشاشة مفتوحة)</span><input type="checkbox" id="lvOn" class="hr-tog" ${s.live === false ? '' : 'checked'}></label>
       <label class="hr-srow"><span>السماح بإضافة/تعديل سجلات الحضور من التطبيق</span><input type="checkbox" id="atOn" class="hr-tog" ${s.attEdit === false ? '' : 'checked'}></label>
       <button type="button" class="btn-outline wide" id="atLog">${icon('note')}<span>سجل تعديلات الحضور (${HR.attAudit().length})</span></button>
@@ -1512,6 +1522,7 @@
     $('wkRep').onclick = () => openWeekly('prev');
     $('wnLog').onclick = openWarnLog;
     $('rvOpen').onclick = () => { tab = 'rev'; store.set('hrTab', 'set'); revFlt = 'need'; render(); };
+    $('rqOn').onchange = (e) => { put({ reqNotify: e.target.checked }); toast(e.target.checked ? 'فُعّلت إشعارات الطلبات' : 'أُوقفت إشعارات الطلبات'); };
     $('lvOn').onchange = (e) => { put({ live: e.target.checked }); liveMark(); toast(e.target.checked ? 'فُعّل الوضع المباشر' : 'أُوقف الوضع المباشر'); };
     $('atOn').onchange = (e) => { put({ attEdit: e.target.checked }); toast(e.target.checked ? 'فُعّل تعديل الحضور' : 'أُوقف تعديل الحضور'); };
     $('atLog').onclick = openAttLog;
@@ -2057,6 +2068,7 @@
         if (st) {
           liveFail = 0; liveLast = Date.now();
           if (st.fresh && st.fresh.length) showAttPopup(st.fresh);
+          newReqToast(st);
           // لا نعيد الرسم إن كان المستخدم يكتب أو داخل نافذة، حتى لا نقطع عمله
           const busy = !$('hrSheet').hidden || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '');
           if (st.attendance && st.attendance.changed && App.isActive('hr') && !busy) render();
