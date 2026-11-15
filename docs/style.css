@@ -1678,3 +1678,12 @@ html:has(#tab-times.active){overflow:hidden}
 .toast[data-tone=info]{border-inline-start-color:#6aa7e0}.toast[data-tone=info] .tz-ic{background:#6aa7e0}
 .toast[data-tone=ok] .tz-ic::after{width:9px;height:5px;border-radius:0;background:transparent;border:2px solid var(--card-2);border-top:0;border-inline-end:0;transform:rotate(-45deg);margin-top:5px}
 .toast[data-tone=bad] .tz-ic::after{width:3px;height:10px;border-radius:2px}
+
+/* نافذة الإشعار العامة: نص كامل بلا اقتطاع وأيقونة واضحة */
+.rp.ntp .ap-ini svg{width:40px;height:40px}
+.rp.ntp .rp-title{margin:6px 0 12px}
+.rp.ntp .ap-list{max-height:300px}
+.rp.ntp .ap-list b{white-space:normal;overflow:visible;text-overflow:clip;font-size:.9rem;font-weight:700;line-height:1.55}
+.rp.ntp .ap-list li{padding:10px 14px 10px 14px}
+.nt-dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px var(--ac)}
+.rp.ntp .rp-body{font-size:1rem;line-height:1.7;color:var(--text);margin:4px 2px 10px}
