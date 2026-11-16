@@ -1,6 +1,6 @@
 {
-  "versionCode": 74,
-  "versionName": "8.28",
-  "notes": "سجل متابعة مهام السلة وإضافة ملاحظة، ومزامنة api.php",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-74.apk"
+  "versionCode": 75,
+  "versionName": "8.29",
+  "notes": "لمسات السلة: حالة new وانتقالها بعد أول ملاحظة",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-75.apk"
 }
