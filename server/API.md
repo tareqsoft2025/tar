@@ -47,6 +47,8 @@ JSON دائماً: `{"ok":true,...}` أو `{"ok":false,"error":"رسالة عر�
 ## الوحدات والسلة (لأي مستخدم مسجَّل دخوله)
 - `GET ?a=modules` ← `modules[{key,label,icon,enabled,badge}]`: الوحدات التي يعرضها التطبيق في شريطه (`mgmt` و`basket` حالياً). وحدة جديدة تظهر في التطبيق دون تحديثه، وغير المعروفة تُعرض برسالة «غير مدعومة في هذا الإصدار».
 - `GET ?a=basket` ← `items[]` (`id, basket_id, source, source_ref, title, subject, details, due_date, status, result_note, done_at, basket_title, basket_note, sent_at, from`) و`statuses[{k,label}]`.
+- كل عنصر في `items[]` يحمل `logs[{kind('note'|'status'), text, at, by}]` (سجل متابعة المهمة، الأقدم أولاً).
+- `POST {a:'basket_item_log', id, text}` ← تسجيل ملاحظة متابعة على مهمة تخصّ المستخدم (تُلحَق «(من التطبيق)»، وإن كانت المهمة `new` تصير `in_progress`).
 - `POST {a:'basket_item_status', id, status, result_note?}` ← تحديث حالة مهمة تخصّ المستخدم (والحالة `done` تُغلق السلة إن لم يبقَ شيء).
 
 ## الحقول الإضافية والمخطط

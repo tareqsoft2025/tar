@@ -79,7 +79,7 @@
   }
 
   /* ---------- الكتابة: مباشرة للنظام، وعند انقطاع الاتصال تُحفظ وتُرسل تلقائياً ---------- */
-  const QUEUEABLE = ['directive_status', 'directive_save', 'directive_delete', 'basket_item_status'];
+  const QUEUEABLE = ['directive_status', 'directive_save', 'directive_delete', 'basket_item_status', 'basket_item_log'];
   async function send(a, payload) {
     const body = Object.assign({ a }, payload);
     const r = await call('POST', '', body);
@@ -101,7 +101,7 @@
     return true;
   }
   function applyOutboxLocal() {
-    if (BK && outbox.length) outbox.forEach(({ body }) => { if (body.a === 'basket_item_status') { const it = BK.items.find((x) => x.id === body.id); if (it) { it.status = body.status; if (body.result_note) it.result_note = body.result_note; it.pending = true; } } });
+    if (BK && outbox.length) outbox.forEach(({ body }) => { if (body.a === 'basket_item_log') { const it = BK.items.find((x) => x.id === body.id); if (it) { it.logs = (it.logs || []).concat([{ kind: 'note', text: body.text + ' (من التطبيق)', at: new Date().toISOString().slice(0, 19).replace('T', ' '), by: 'أنا', pending: true }]); it.pending = true; } } if (body.a === 'basket_item_status') { const it = BK.items.find((x) => x.id === body.id); if (it) { it.status = body.status; if (body.result_note) it.result_note = body.result_note; it.pending = true; } } });
     if (!D || !outbox.length) return;
     outbox.forEach(({ body }) => {
       D.sessions.forEach((s) => {
@@ -339,10 +339,31 @@
       c.innerHTML = `<div class="mg-dtop"><b class="mg-dname">${esc(i.title)}</b>${i.pending ? `<span class="mg-pend">${icon('clock')}بانتظار الإرسال</span>` : ''}</div>
         <div class="mg-facts">${i.subject ? `<span class="mg-fact">${icon('users')}<b>${esc(i.subject)}</b></span>` : ''}${i.due_date ? `<span class="mg-fact${overdue ? ' over' : ''}">${icon('cal')}الاستحقاق <b><bdi>${fd(i.due_date)}</bdi></b>${overdue ? ' · متأخرة' : ''}</span>` : ''}${i.source ? `<span class="mg-fact">${esc(i.source === 'directive' ? 'من توجيه' : i.source === 'manual' ? 'يدوية' : i.source)}</span>` : ''}</div>
         ${i.details ? `<p class="mg-det">${esc(i.details)}</p>` : ''}${i.result_note ? `<p class="mg-note"><b>نتيجة التنفيذ:</b> ${esc(i.result_note)}</p>` : ''}`;
+      if ((i.logs || []).length) {
+        const L = i.logs.slice().reverse();
+        const row = (l) => `<div class="mg-lg${l.kind === 'status' ? ' st' : ''}${l.pending ? ' wait' : ''}"><i></i><span>${l.by ? `<b>${esc(l.by)}</b> ` : ''}${esc(l.text)}<small>${l.at ? fd(String(l.at).slice(0, 10)) + ' ' + String(l.at).slice(11, 16) : ''}${l.pending ? ' · بانتظار الإرسال' : ''}</small></span></div>`;
+        const det = el('details', 'mg-bkl', `<summary>${icon('clock')}سجل المتابعة (${L.length})</summary><div class="mg-lgl">${L.map(row).join('')}</div>`);
+        if (L.length <= 2) det.open = true;
+        c.appendChild(det);
+      }
       const sw = el('div', 'mg-sw');
       BKS.forEach((st) => { const b = el('button', i.status === st.k ? 'on' : '', esc(st.label)); b.type = 'button'; b.style.setProperty('--c', col(st.k)); b.onclick = () => { if (i.status !== st.k) basketStatus(i, st.k); }; sw.appendChild(b); });
-      c.appendChild(sw); box.appendChild(c);
+      const nb = el('button', 'mg-bknote', `${icon('note')}إضافة ملاحظة`); nb.type = 'button'; nb.onclick = () => basketNote(i);
+      const act = el('div', 'mg-bkact'); act.appendChild(sw); act.appendChild(nb);
+      c.appendChild(act); box.appendChild(c);
     });
+  }
+  // ملاحظة متابعة على المهمة (تُسجَّل في سجلها بالنظام وتُرسل لاحقاً عند انقطاع الاتصال)
+  function basketNote(i) {
+    sheet(`<h3 class="mg-sh">ملاحظة على المهمة<small>${esc(i.title)}</small></h3><form id="bnF" class="mg-form"><label class="hr-f"><span>ما تريد تسجيله</span><textarea id="bnT" rows="3" placeholder="مثال: تواصلت مع الموظف وننتظر المستند"></textarea></label><button class="btn-gold" id="bnGo" type="submit">حفظ الملاحظة</button></form>`);
+    $('bnF').onsubmit = async (e) => {
+      e.preventDefault(); const text = $('bnT').value.trim(); if (!text) { toast('اكتب الملاحظة'); return; }
+      $('bnGo').disabled = true;
+      const r = await send('basket_item_log', { id: i.id, text });
+      if (!r.ok) { $('bnGo').disabled = false; toast(r.error || 'تعذّر الحفظ'); return; }
+      closeSheet(); toast(r.queued ? 'حُفظت على الجوال وستُرسل عند توفر الإنترنت' : 'سُجّلت الملاحظة');
+      if (!r.queued) loadBasket().then(() => draw());
+    };
   }
   // «منفّذ» تطلب ملاحظة نتيجة اختيارية، وغيرها مباشرة
   function basketStatus(i, status) {
