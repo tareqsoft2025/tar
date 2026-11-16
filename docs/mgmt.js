@@ -317,7 +317,7 @@
   /* ----- السلة: مهام أُرسلت إليك من النظام ----- */
   function drawBasket(box) {
     const BKS = BK && BK.statuses && BK.statuses.length ? BK.statuses : [{ k: 'todo', label: 'للتنفيذ' }, { k: 'in_progress', label: 'قيد التنفيذ' }, { k: 'done', label: 'منفّذ' }];
-    const SC = { todo: '#8FA2B2', in_progress: '#F0A64B', done: '#4FD08B' };
+    const SC = { new: '#8FA2B2', todo: '#8FA2B2', in_progress: '#F0A64B', done: '#4FD08B' };
     const col = (k) => SC[k] || '#5B9DFF';
     if (!BK) { box.appendChild(el('div', 'mg-empty', S.loading ? `${icon('refresh')}<b>جارٍ التحميل…</b>` : `${icon('briefcase')}<b>السلة</b><small>${S.err === 'net' ? 'لا يوجد اتصال. تحقق من الإنترنت ثم اضغط تحديث.' : 'اضغط تحديث لجلب مهامك.'}</small>`)); const rb = el('button', 'btn-gold wide', 'تحديث'); rb.onclick = () => refresh(); box.appendChild(rb); return; }
     const todo = BK.items.filter((i) => i.status !== 'done'), doneN = BK.items.length - todo.length;
@@ -361,6 +361,7 @@
       $('bnGo').disabled = true;
       const r = await send('basket_item_log', { id: i.id, text });
       if (!r.ok) { $('bnGo').disabled = false; toast(r.error || 'تعذّر الحفظ'); return; }
+      if (!r.queued && i.status === 'new') i.status = 'in_progress';
       closeSheet(); toast(r.queued ? 'حُفظت على الجوال وستُرسل عند توفر الإنترنت' : 'سُجّلت الملاحظة');
       if (!r.queued) loadBasket().then(() => draw());
     };
