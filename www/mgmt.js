@@ -43,17 +43,24 @@
   let D = getFile('mgmt_cache', null);
   let M = getFile('mgmt_modules', null);   // الوحدات (من الخادم)
   let BK = getFile('mgmt_basket', null);   // مهام السلة
+  let SENT = getFile('mgmt_sent', null);   // ما كلّفتُ به غيري
+  let TEAM = null;                         // أعضاء الفريق القابلون للتكليف
   let outbox = getFile('mgmt_outbox', []);
   const saveCache = () => putFile('mgmt_cache', D);
   const saveBox = () => putFile('mgmt_outbox', outbox);
 
-  const S = { mod: 'mgmt', bkf: 'todo', code: 0, msg: '', tab: 'dir', st: '', act: '', q: '', open: new Set(), loading: false, err: '', exp: { cid: 0, end: '', data: null, loading: false } };
+  const S = { mod: 'mgmt', bkf: 'todo', bkv: 'mine', code: 0, msg: '', tab: 'dir', st: '', act: '', q: '', open: new Set(), loading: false, err: '', exp: { cid: 0, end: '', data: null, loading: false } };
   const canEdit = () => !D || !D.user || D.user.canEdit !== false;
   const actOf = (slug) => (D && D.actions.find((a) => a.slug === slug)) || { slug, label: slug, tone: 'slate', endOnly: false };
 
   /* ---------- جلب البيانات ---------- */
   let busy = false;
   const modOn = (k) => !M || M.some((m) => m.key === k && m.enabled);
+  async function loadSent() {
+    const r = await call('GET', 'a=basket_sent');
+    if (r.ok && r.data && r.data.items) { SENT = r.data; SENT.cachedAt = Date.now(); putFile('mgmt_sent', SENT); return true; }
+    return false;
+  }
   async function loadBasket() {
     const r = await call('GET', 'a=basket');
     if (r.ok && r.data && r.data.items) { BK = r.data; BK.cachedAt = Date.now(); putFile('mgmt_basket', BK); applyOutboxLocal(); return true; }
@@ -74,7 +81,7 @@
         else if (r.ok && r.data && r.data.sessions) { D = r.data; D.cachedAt = Date.now(); saveCache(); S.err = ''; applyOutboxLocal(); }
         else { S.err = r.status === 0 ? 'net' : r.status === 403 ? 'forbidden' : 'server'; S.code = r.status; S.msg = (r.data && r.data.error) || (r.status === 200 ? 'الرد ليس بصيغة JSON المتوقعة' : ''); }
       } else S.err = '';
-      if (S.mod === 'basket' && modOn('basket')) await loadBasket();
+      if (S.mod === 'basket' && modOn('basket')) { await loadBasket(); if (S.bkv === 'sent') await loadSent(); }
     } finally { busy = false; S.loading = false; draw(); }
   }
 
@@ -298,7 +305,43 @@
       const row = side.querySelector('.mg-dtools'); if (row) { row.prepend(mb); row.prepend(pf); } else { side.appendChild(pf); side.appendChild(mb); }
     }
     card.appendChild(side);
+    // التكليف: شارة «مكلَّف: فلان · الحالة» إن كُلِّف التوجيه، وإلا زر «كلّف» لمن يملك الصلاحية
+    if (d.assignment) {
+      const a = d.assignment, stl = ASG_ST[a.status] || a.status || '';
+      const b = el('div', 'mg-asg', `${icon('briefcase')}<span>مكلَّف: <b>${esc(a.to || '—')}</b> · ${esc(stl)}${a.due_date ? ' · حتى <bdi>' + fd(a.due_date) + '</bdi>' : ''}</span>`);
+      card.appendChild(b);
+    } else if (canEdit() && !closed && modOn('basket')) {
+      const ab = el('button', 'mg-pefb asg', `${icon('briefcase')}كلّف`); ab.type = 'button'; ab.onclick = () => openAssign({ d, s });
+      side.appendChild(ab);
+    }
     return card;
+  }
+  const ASG_ST = { new: 'جديدة', todo: 'للتنفيذ', in_progress: 'قيد التنفيذ', done: 'منفّذة', cancelled: 'ملغاة' };
+
+  /* ---------- التكليف: إسناد توجيه أو مهمة حرّة إلى عضو في الفريق ---------- */
+  async function openAssign(o) {
+    const d = o.d || null;
+    sheet(`<h3 class="mg-sh">${d ? 'تكليف توجيه' : 'تكليف بمهمة'}<small>${d ? esc(actOf(d.action_type).label + ': ' + d.target_name) : 'تظهر في «السلة» لدى المكلَّف'}</small></h3><div id="asBody" class="mg-empty">${icon('refresh')}<b>جارٍ تحميل الفريق…</b></div>`);
+    if (!TEAM) { const r = await call('GET', 'a=team'); if (r.ok && r.data && r.data.members) TEAM = r.data.members; else { $('asBody').innerHTML = `<b>${esc((r.data && r.data.error) || (r.status === 0 ? 'لا يوجد اتصال بالإنترنت' : 'تعذّر تحميل الفريق'))}</b>`; return; } }
+    if (!TEAM.length) { $('asBody').innerHTML = '<b>لا أعضاء متاحون للتكليف.</b>'; return; }
+    const due = d && d.end_date ? String(d.end_date).slice(0, 10) : '';
+    $('asBody').outerHTML = `<form id="asF" class="mg-form">
+      <label class="hr-f"><span>المكلَّف</span><select id="asWho" class="hr-in">${TEAM.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label>
+      ${d ? '' : `<label class="hr-f"><span>عنوان المهمة</span><input id="asTitle" class="hr-in" maxlength="200" placeholder="مثال: تجهيز ملف التجديد"></label><label class="hr-f"><span>الموظف أو الموضوع (اختياري)</span><input id="asSubj" class="hr-in" maxlength="200"></label><label class="hr-f"><span>التفاصيل (اختياري)</span><textarea id="asDet" rows="2"></textarea></label>`}
+      <label class="hr-f"><span>الموعد (اختياري)</span><input id="asDue" type="date" value="${esc(due)}"></label>
+      <label class="hr-f"><span>ملاحظة للمكلَّف (اختياري)</span><textarea id="asNote" rows="2" placeholder="توجيه أو تعليمات"></textarea></label>
+      <div id="asErr" class="hr-err" hidden></div>
+      <button class="btn-gold" id="asGo" type="submit">تكليف الآن</button></form>`;
+    $('asF').onsubmit = async (e) => {
+      e.preventDefault();
+      const body = { assignee: +$('asWho').value, due_date: $('asDue').value || '', note: $('asNote').value.trim() };
+      if (d) body.directive_id = d.id; else { body.title = $('asTitle').value.trim(); body.subject = $('asSubj').value.trim(); body.details = $('asDet').value.trim(); if (!body.title) { toast('اكتب عنوان المهمة'); return; } }
+      $('asGo').disabled = true; $('asGo').textContent = 'جارٍ التكليف…';
+      const r = await send('basket_assign', body);
+      if (!r.ok) { $('asGo').disabled = false; $('asGo').textContent = 'تكليف الآن'; const er = $('asErr'); er.textContent = r.status === 0 ? 'لا يوجد اتصال بالإنترنت، حاول لاحقاً' : (r.error || 'تعذّر التكليف'); er.hidden = false; return; }
+      closeSheet(); toast((r.data && r.data.message) || 'تم التكليف');
+      if (S.mod === 'basket') { S.bkv = 'sent'; await loadSent(); draw(); } else refresh(true);
+    };
   }
 
   async function setStatus(d, status) {
@@ -315,7 +358,56 @@
 
 
   /* ----- السلة: مهام أُرسلت إليك من النظام ----- */
+  // ما كلّفتُ به غيري: متابعة الحالة والسجل، وتعليق، وإلغاء
+  function drawSent(box) {
+    const t = today();
+    if (!SENT) { box.appendChild(el('div', 'mg-empty', S.loading ? `${icon('refresh')}<b>جارٍ التحميل…</b>` : `${icon('briefcase')}<b>ما كلّفتَ به</b><small>اضغط تحديث لجلب المهام التي كلّفت بها غيرك.</small>`)); }
+    const top = el('div', 'mg-sentbar', `<small>${SENT ? SENT.items.length + ' مهمة' : ''}</small>${canEdit() ? `<button type="button" class="mg-pefb asg" id="snNew">${icon('plus')}تكليف بمهمة</button>` : ''}`);
+    box.appendChild(top); if ($('snNew')) $('snNew').onclick = () => openAssign({});
+    if (!SENT) return;
+    if (!SENT.items.length) { box.appendChild(el('div', 'mg-empty', `${icon('check')}<b>لم تكلّف أحداً بعد</b><small>من بطاقة أي توجيه اضغط «كلّف»، أو «تكليف بمهمة» لمهمة حرّة.</small>`)); return; }
+    SENT.items.forEach((i) => {
+      const over = i.due_date && i.due_date < t && !['done', 'cancelled'].includes(i.status);
+      const c = el('article', 'mg-bk' + (['done', 'cancelled'].includes(i.status) ? ' done' : ''));
+      c.style.setProperty('--tc', i.status === 'done' ? '#4FD08B' : i.status === 'cancelled' ? '#8FA2B2' : i.status === 'in_progress' ? '#F0A64B' : '#5B9DFF');
+      c.innerHTML = `<div class="mg-dtop"><b class="mg-dname">${esc(i.title)}</b><span class="mg-ttag">${esc(ASG_ST[i.status] || i.status)}</span></div>
+        <div class="mg-facts"><span class="mg-fact">${icon('users')}المكلَّف: <b>${esc(i.assignee || '—')}</b></span>${i.due_date ? `<span class="mg-fact${over ? ' over' : ''}">${icon('cal')}الموعد <b><bdi>${fd(i.due_date)}</bdi></b>${over ? ' · متأخرة' : ''}</span>` : ''}</div>
+        ${i.details ? `<p class="mg-det">${esc(i.details)}</p>` : ''}${i.result_note ? `<p class="mg-note"><b>نتيجة التنفيذ:</b> ${esc(i.result_note)}</p>` : ''}`;
+      if ((i.logs || []).length) {
+        const L = i.logs.slice().reverse();
+        const det = el('details', 'mg-bkl', `<summary>${icon('clock')}سجل المتابعة (${L.length})</summary><div class="mg-lgl">${L.map((l) => `<div class="mg-lg${l.kind === 'status' ? ' st' : ''}"><i></i><span>${l.by ? `<b>${esc(l.by)}</b> ` : ''}${esc(l.text)}<small>${l.at ? fd(String(l.at).slice(0, 10)) + ' ' + String(l.at).slice(11, 16) : ''}</small></span></div>`).join('')}</div>`);
+        if (L.length <= 3) det.open = true;
+        c.appendChild(det);
+      }
+      const act = el('div', 'mg-bkact');
+      if (i.can_cancel) {
+        const cm = el('button', 'mg-bknote', `${icon('note')}تعليق للمنفّذ`); cm.type = 'button'; cm.onclick = () => sentComment(i);
+        const cx = el('button', 'mg-bknote danger', `${icon('trash')}إلغاء التكليف`); cx.type = 'button';
+        cx.onclick = () => confirmSheet('إلغاء التكليف', `سيُلغى تكليف «${i.assignee || ''}» بـ «${i.title}»، ويبقى السجل.`, 'إلغاء التكليف', async () => {
+          const r = await send('basket_cancel', { id: i.id });
+          if (!r.ok) { toast(r.error || 'تعذّر الإلغاء'); return false; }
+          closeSheet(); toast('أُلغي التكليف'); await refresh(true);
+        }, true);
+        act.appendChild(cm); act.appendChild(cx);
+      }
+      c.appendChild(act); box.appendChild(c);
+    });
+  }
+  function sentComment(i) {
+    sheet(`<h3 class="mg-sh">تعليق على المهمة<small>${esc(i.title)}</small></h3><form id="scF" class="mg-form"><label class="hr-f"><span>توجيه أو تعليق للمنفّذ</span><textarea id="scT" rows="3"></textarea></label><button class="btn-gold" id="scGo" type="submit">إرسال</button></form>`);
+    $('scF').onsubmit = async (e) => {
+      e.preventDefault(); const text = $('scT').value.trim(); if (!text) { toast('اكتب التعليق'); return; }
+      $('scGo').disabled = true;
+      const r = await send('basket_comment', { id: i.id, text });
+      if (!r.ok) { $('scGo').disabled = false; toast(r.status === 0 ? 'لا يوجد اتصال بالإنترنت' : (r.error || 'تعذّر الإرسال')); return; }
+      closeSheet(); toast('أُضيف التعليق'); await loadSent(); draw();
+    };
+  }
   function drawBasket(box) {
+    const seg = el('div', 'chips mg-bkseg');
+    [['mine', 'مهامّي'], ['sent', 'ما كلّفتُ به']].forEach(([k, n]) => { const b = el('button', 'chip sm' + (S.bkv === k ? ' on' : ''), n); b.type = 'button'; b.onclick = async () => { S.bkv = k; draw(); if (k === 'sent') { await loadSent(); draw(); } }; seg.appendChild(b); });
+    box.appendChild(seg);
+    if (S.bkv === 'sent') { drawSent(box); return; }
     const BKS = BK && BK.statuses && BK.statuses.length ? BK.statuses : [{ k: 'todo', label: 'للتنفيذ' }, { k: 'in_progress', label: 'قيد التنفيذ' }, { k: 'done', label: 'منفّذ' }];
     const SC = { new: '#8FA2B2', todo: '#8FA2B2', in_progress: '#F0A64B', done: '#4FD08B' };
     const col = (k) => SC[k] || '#5B9DFF';

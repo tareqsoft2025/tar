@@ -66,7 +66,7 @@ $a = (string) ($method === 'POST' ? ($body['a'] ?? '') : ($_GET['a'] ?? 'bootstr
  *          (إن كان يرسم شريطه من هذه القائمة ويعرف فتح الوحدة من مفتاحها).
  * basket: مهامّ السلة المُرسلة إلى المستخدم. basket_item_status: تحديث حالة مهمة ومتابعتها.
  */
-if (in_array($a, ['modules', 'basket', 'basket_item_status', 'basket_item_log'], true)) {
+if (in_array($a, ['modules', 'basket', 'basket_item_status', 'basket_item_log', 'team', 'basket_assign', 'basket_sent', 'basket_comment', 'basket_cancel'], true)) {
     require_once __DIR__ . '/../includes/basket.php';
     basket_ensure($pdo);
     $uid = (int) $user['id'];
@@ -100,6 +100,80 @@ if (in_array($a, ['modules', 'basket', 'basket_item_status', 'basket_item_log'],
         $sts = [];
         foreach (basket_statuses() as $k => $v) { $sts[] = ['k' => $k, 'label' => $v[0]]; }
         api_out(200, ['ok' => true, 'at' => time(), 'items' => $items, 'statuses' => $sts]);
+    }
+    /* ── التكليف والمتابعة (لمن يملك صلاحية تعديل عمليات الإدارة) ── */
+    if ($a === 'team') {
+        if (!$canEdit) api_fail('لا تملك صلاحية التكليف.', 403);
+        $members = [];
+        foreach ($pdo->query('SELECT id, full_name, username FROM users WHERE is_active = 1 ORDER BY full_name') as $u) {
+            if ((int) $u['id'] !== $uid) { $members[] = ['id' => (int) $u['id'], 'name' => (string) ($u['full_name'] ?: $u['username'])]; }
+        }
+        api_out(200, ['ok' => true, 'members' => $members]);
+    }
+    if ($a === 'basket_assign') {
+        if ($method !== 'POST') api_fail('إجراء غير معروف.', 400);
+        if (!$canEdit) api_fail('لا تملك صلاحية التكليف.', 403);
+        $in = ['source' => 'mgmt_ops', 'source_ref' => '', 'title' => trim((string) ($body['title'] ?? '')), 'subject' => trim((string) ($body['subject'] ?? '')),
+            'details' => trim((string) ($body['details'] ?? '')), 'due_date' => trim((string) ($body['due_date'] ?? '')), 'source_url' => '/hrnew/mgmt/index.php'];
+        $did = (int) ($body['directive_id'] ?? 0);
+        if ($did > 0) {            // تكليف توجيه موجود: العنوان والموظف والتفاصيل والموعد تُشتقّ من الخادم
+            $dq = $pdo->prepare('SELECT action_type, target_name, details, end_date FROM mgmt_directives WHERE id = :i');
+            $dq->execute(['i' => $did]);
+            $dr = $dq->fetch();
+            if (!$dr) api_fail('التوجيه غير موجود.', 404);
+            $acts = mgmt_action_types(false);
+            $in['source_ref'] = 'dir:' . $did;
+            $in['title'] = ($acts[$dr['action_type']]['label'] ?? $dr['action_type']) . ': ' . $dr['target_name'];
+            $in['subject'] = (string) $dr['target_name'];
+            $in['details'] = trim((string) ($dr['details'] ?? ''));
+            if ($in['due_date'] === '') { $in['due_date'] = (string) ($dr['end_date'] ?? ''); }
+        }
+        [$ok, $msg] = basket_assign($pdo, $user, $in, (int) ($body['assignee'] ?? 0), trim((string) ($body['note'] ?? '')));
+        if (!$ok) api_fail($msg);
+        logAction('create', 'basket', 'basket_item', null, 'assign (app) ' . $in['title']);
+        api_out(200, ['ok' => true, 'message' => $msg]);
+    }
+    if ($a === 'basket_sent') {      // ما كلّفتُ به غيري: للمتابعة
+        $q = $pdo->prepare("SELECT i.id, i.basket_id, i.source, i.source_ref, i.title, i.subject, i.details, i.due_date, i.status, i.result_note, i.done_at,
+                b.sent_at, ua.full_name assignee_name, b.assignee_user_id
+            FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id LEFT JOIN users ua ON ua.id = b.assignee_user_id
+            WHERE b.owner_user_id = :u AND b.status IN ('sent','closed') ORDER BY (i.status IN ('done','cancelled')), i.id DESC LIMIT 300");
+        $q->execute(['u' => $uid]);
+        $rows = $q->fetchAll();
+        $logs = [];
+        if ($rows) {
+            $lq = $pdo->query('SELECT l.item_id, l.kind, l.text, l.created_at, u.full_name FROM hr_basket_logs l LEFT JOIN users u ON u.id = l.user_id WHERE l.item_id IN ('
+                . implode(',', array_map(static fn ($r) => (int) $r['id'], $rows)) . ') ORDER BY l.id');
+            foreach ($lq->fetchAll() as $l) { $logs[(int) $l['item_id']][] = ['kind' => $l['kind'], 'text' => $l['text'], 'at' => $l['created_at'], 'by' => $l['full_name']]; }
+        }
+        $items = [];
+        foreach ($rows as $r) {
+            $items[] = ['id' => (int) $r['id'], 'basket_id' => (int) $r['basket_id'], 'source' => $r['source'], 'source_ref' => $r['source_ref'], 'title' => $r['title'], 'subject' => $r['subject'],
+                'details' => $r['details'], 'due_date' => $r['due_date'], 'status' => $r['status'], 'result_note' => $r['result_note'], 'done_at' => $r['done_at'], 'sent_at' => $r['sent_at'],
+                'assignee_id' => $r['assignee_user_id'] !== null ? (int) $r['assignee_user_id'] : null, 'assignee' => $r['assignee_name'],
+                'can_cancel' => !in_array($r['status'], ['done', 'cancelled'], true), 'logs' => $logs[(int) $r['id']] ?? []];
+        }
+        $sts = [['k' => 'cancelled', 'label' => 'ملغاة']];
+        foreach (basket_statuses() as $k => $v) { $sts[] = ['k' => $k, 'label' => $v[0]]; }
+        api_out(200, ['ok' => true, 'at' => time(), 'items' => $items, 'statuses' => $sts]);
+    }
+    if ($a === 'basket_comment') {   // تعليق/توجيه من المكلِّف أو تسجيل من المنفّذ على المهمة نفسها
+        if ($method !== 'POST') api_fail('إجراء غير معروف.', 400);
+        $iid = (int) ($body['id'] ?? 0);
+        $text = trim((string) ($body['text'] ?? ''));
+        if ($text === '') api_fail('اكتب ما تريد تسجيله.');
+        $q = $pdo->prepare("SELECT i.id FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id WHERE i.id = :i AND b.status = 'sent' AND i.status NOT IN ('done','cancelled') AND (b.owner_user_id = :u OR b.assignee_user_id = :u2)");
+        $q->execute(['i' => $iid, 'u' => $uid, 'u2' => $uid]);
+        if (!$q->fetchColumn()) api_fail('المهمة غير موجودة أو لا تخصّك.', 404);
+        basket_log($pdo, $iid, $uid, 'note', $text . ' (من التطبيق)');
+        api_out(200, ['ok' => true, 'id' => $iid]);
+    }
+    if ($a === 'basket_cancel') {
+        if ($method !== 'POST') api_fail('إجراء غير معروف.', 400);
+        [$ok, $msg] = basket_cancel($pdo, $uid, isAdmin(), (int) ($body['id'] ?? 0));
+        if (!$ok) api_fail($msg, 403);
+        logAction('update', 'basket', 'basket_item', (int) ($body['id'] ?? 0), 'cancelled (app)');
+        api_out(200, ['ok' => true, 'id' => (int) ($body['id'] ?? 0)]);
     }
     if ($a === 'basket_item_log') {
         if ($method !== 'POST') api_fail('إجراء غير معروف.', 400);
@@ -228,6 +302,8 @@ if ($a === 'bootstrap') {
     $ACTIVE  = mgmt_action_types(true);
     $ENDONLY = mgmt_end_only_slugs($ACTIONS);
 
+    require_once __DIR__ . '/../includes/basket.php';
+    $asg = basket_assign_map('mgmt_ops');      // تكليفات التوجيهات: dir:<id> ← آخر تكليف غير ملغى
     $sessions = $pdo->query('SELECT * FROM mgmt_sessions ORDER BY session_date DESC, id DESC')->fetchAll();
     $dirs = [];
     foreach ($pdo->query('SELECT * FROM mgmt_directives ORDER BY id ASC') as $d) {
@@ -242,6 +318,8 @@ if ($a === 'bootstrap') {
             'scale_step' => $d['scale_step'] !== null ? (int) $d['scale_step'] : null,
             'scale_amount' => $d['scale_amount'] !== null ? (float) $d['scale_amount'] : null, 'scale_currency' => $d['scale_currency'],
             'extra' => api_extra($pdo, 'mgmt_directives', API_KNOWN_DIR, $d),
+            'assignment' => isset($asg['dir:' . $d['id']]) ? ['item_id' => (int) $asg['dir:' . $d['id']]['id'], 'to' => $asg['dir:' . $d['id']]['assignee_name'], 'status' => $asg['dir:' . $d['id']]['status'],
+                'due_date' => $asg['dir:' . $d['id']]['due_date'], 'sent_at' => $asg['dir:' . $d['id']]['sent_at']] : null,
         ];
     }
     $outSessions = [];
