@@ -66,7 +66,7 @@ $a = (string) ($method === 'POST' ? ($body['a'] ?? '') : ($_GET['a'] ?? 'bootstr
  *          (إن كان يرسم شريطه من هذه القائمة ويعرف فتح الوحدة من مفتاحها).
  * basket: مهامّ السلة المُرسلة إلى المستخدم. basket_item_status: تحديث حالة مهمة ومتابعتها.
  */
-if (in_array($a, ['modules', 'basket', 'basket_item_status'], true)) {
+if (in_array($a, ['modules', 'basket', 'basket_item_status', 'basket_item_log'], true)) {
     require_once __DIR__ . '/../includes/basket.php';
     basket_ensure($pdo);
     $uid = (int) $user['id'];
@@ -81,33 +81,58 @@ if (in_array($a, ['modules', 'basket', 'basket_item_status'], true)) {
         $q = $pdo->prepare("SELECT i.id, i.basket_id, i.source, i.source_ref, i.title, i.subject, i.details, i.due_date, i.status, i.result_note, i.done_at,
                 b.title basket_title, b.note basket_note, b.sent_at, b.status basket_status, uo.full_name from_name
             FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id LEFT JOIN users uo ON uo.id = b.owner_user_id
-            WHERE b.assignee_user_id = :u AND b.status IN ('sent','closed') ORDER BY (i.status = 'done'), b.id DESC, i.id");
+            WHERE b.assignee_user_id = :u AND b.status IN ('sent','closed') AND i.status <> 'cancelled' ORDER BY (i.status = 'done'), b.id DESC, i.id");
         $q->execute(['u' => $uid]);
+        $rows = $q->fetchAll();
+        $logs = [];
+        if ($rows) {
+            $lq = $pdo->query('SELECT l.item_id, l.kind, l.text, l.created_at, u.full_name FROM hr_basket_logs l LEFT JOIN users u ON u.id = l.user_id WHERE l.item_id IN ('
+                . implode(',', array_map(static fn ($r) => (int) $r['id'], $rows)) . ') ORDER BY l.id');
+            foreach ($lq->fetchAll() as $l) { $logs[(int) $l['item_id']][] = ['kind' => $l['kind'], 'text' => $l['text'], 'at' => $l['created_at'], 'by' => $l['full_name']]; }
+        }
         $items = [];
-        foreach ($q->fetchAll() as $r) {
+        foreach ($rows as $r) {
             $items[] = ['id' => (int) $r['id'], 'basket_id' => (int) $r['basket_id'], 'source' => $r['source'], 'source_ref' => $r['source_ref'], 'title' => $r['title'],
                 'subject' => $r['subject'], 'details' => $r['details'], 'due_date' => $r['due_date'], 'status' => $r['status'], 'result_note' => $r['result_note'],
-                'done_at' => $r['done_at'], 'basket_title' => $r['basket_title'], 'basket_note' => $r['basket_note'], 'sent_at' => $r['sent_at'], 'from' => $r['from_name']];
+                'done_at' => $r['done_at'], 'basket_title' => $r['basket_title'], 'basket_note' => $r['basket_note'], 'sent_at' => $r['sent_at'], 'from' => $r['from_name'],
+                'logs' => $logs[(int) $r['id']] ?? []];
         }
         $sts = [];
         foreach (basket_statuses() as $k => $v) { $sts[] = ['k' => $k, 'label' => $v[0]]; }
         api_out(200, ['ok' => true, 'at' => time(), 'items' => $items, 'statuses' => $sts]);
+    }
+    if ($a === 'basket_item_log') {
+        if ($method !== 'POST') api_fail('إجراء غير معروف.', 400);
+        $iid = (int) ($body['id'] ?? 0);
+        $text = trim((string) ($body['text'] ?? ''));
+        if ($text === '') api_fail('اكتب ما تريد تسجيله.');
+        $q = $pdo->prepare("SELECT i.id, i.status FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id WHERE i.id = :i AND b.assignee_user_id = :u AND b.status = 'sent' AND i.status <> 'cancelled'");
+        $q->execute(['i' => $iid, 'u' => $uid]);
+        $row = $q->fetch();
+        if (!$row) api_fail('المهمة غير موجودة أو ليست لك.', 404);
+        basket_log($pdo, $iid, $uid, 'note', $text . ' (من التطبيق)');
+        if ($row['status'] === 'new') {
+            $pdo->prepare("UPDATE hr_basket_items SET status = 'in_progress' WHERE id = :i")->execute(['i' => $iid]);
+            basket_log($pdo, $iid, $uid, 'status', 'بدأ التنفيذ (قيد التنفيذ)');
+        }
+        api_out(200, ['ok' => true, 'id' => $iid]);
     }
     // basket_item_status
     if ($method !== 'POST') api_fail('إجراء غير معروف.', 400);
     $iid = (int) ($body['id'] ?? 0);
     $st = (string) ($body['status'] ?? '');
     if (!isset(basket_statuses()[$st])) api_fail('حالة غير صالحة.');
-    $q = $pdo->prepare("SELECT i.id, b.id bid FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id WHERE i.id = :i AND b.assignee_user_id = :u AND b.status = 'sent'");
+    $q = $pdo->prepare("SELECT i.id, b.id bid FROM hr_basket_items i JOIN hr_baskets b ON b.id = i.basket_id WHERE i.id = :i AND b.assignee_user_id = :u AND b.status = 'sent' AND i.status <> 'cancelled'");
     $q->execute(['i' => $iid, 'u' => $uid]);
     $row = $q->fetch();
     if (!$row) api_fail('المهمة غير موجودة أو ليست لك.', 404);
     $note = array_key_exists('result_note', $body) ? (trim((string) $body['result_note']) ?: null) : null;
     $pdo->prepare('UPDATE hr_basket_items SET status = :s, result_note = COALESCE(:n, result_note), done_at = :d, done_by = :b WHERE id = :i')
         ->execute(['s' => $st, 'n' => $note, 'd' => $st === 'done' ? date('Y-m-d H:i:s') : null, 'b' => $st === 'done' ? $uid : null, 'i' => $iid]);
-    $left = $pdo->prepare("SELECT COUNT(*) FROM hr_basket_items WHERE basket_id = :b AND status <> 'done'");
+    $left = $pdo->prepare("SELECT COUNT(*) FROM hr_basket_items WHERE basket_id = :b AND status NOT IN ('done','cancelled')");
     $left->execute(['b' => (int) $row['bid']]);
     if ((int) $left->fetchColumn() === 0) { $pdo->prepare("UPDATE hr_baskets SET status = 'closed' WHERE id = :b")->execute(['b' => (int) $row['bid']]); }
+    basket_log($pdo, $iid, $uid, 'status', 'غيّر الحالة إلى «' . basket_statuses()[$st][0] . '» (من التطبيق)' . ($note !== null ? ' — ' . $note : ''));
     logAction('update', 'basket', 'basket_item', $iid, 'status=' . $st . ' (app)');
     api_out(200, ['ok' => true, 'id' => $iid, 'status' => $st]);
 }

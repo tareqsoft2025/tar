@@ -1,6 +1,6 @@
 {
-  "versionCode": 73,
-  "versionName": "8.27",
-  "notes": "الإشعارات في منتصف الشاشة (طلبات وملخص) حتى مع التطبيق مغلقاً",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-73.apk"
+  "versionCode": 74,
+  "versionName": "8.28",
+  "notes": "سجل متابعة مهام السلة وإضافة ملاحظة، ومزامنة api.php",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-74.apk"
 }
