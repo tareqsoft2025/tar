@@ -362,6 +362,60 @@ public class MainActivity extends Activity {
             new Thread(new Runnable() { public void run() { erpReply(id, ErpClient.write(MainActivity.this, path, json, role)); } }).start();
         }
 
+        /** هل خدمة الإرسال التلقائي مفعّلة في «إمكانية الوصول»؟ */
+        @JavascriptInterface
+        public boolean waAutoEnabled() {
+            try {
+                String v = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+                return v != null && v.contains(getPackageName() + "/" + WaAutoService.class.getName());
+            } catch (Exception e) { return false; }
+        }
+
+        @JavascriptInterface
+        public void waAutoSettings() {
+            runOnUiThread(new Runnable() { public void run() {
+                try { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); } catch (Exception e) { /* ignore */ }
+            } });
+        }
+
+        /** "wa" أو "w4b" أو "" بحسب المثبَّت. */
+        @JavascriptInterface
+        public String waInstalled() {
+            String[] ps = { "com.whatsapp", "com.whatsapp.w4b" };
+            for (int i = 0; i < ps.length; i++) { try { getPackageManager().getPackageInfo(ps[i], 0); return i == 0 ? "wa" : "w4b"; } catch (Exception e) { /* next */ } }
+            return "";
+        }
+
+        @JavascriptInterface
+        public String waAutoStatus() { return WaAutoService.status(); }
+
+        /** يفتح محادثة الرقم في واتساب والملف مرفق، ويُسلّح الخدمة لتضغط «إرسال» تلقائياً. */
+        @JavascriptInterface
+        public boolean waAutoSend(final String number, final String b64, final String name, final String mime, final String caption) {
+            try {
+                String digits = number.replaceAll("[^0-9]", "");
+                if (digits.length() < 8) return false;
+                String pkg = "wa".equals(waInstalled()) ? "com.whatsapp" : "com.whatsapp.w4b";
+                if (waInstalled().isEmpty()) return false;
+                byte[] data = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                java.io.File dir = new java.io.File(getCacheDir(), "share"); dir.mkdirs();
+                String fn = name.replaceAll("[^A-Za-z0-9._-]", "_");
+                java.io.FileOutputStream o = new java.io.FileOutputStream(new java.io.File(dir, fn)); o.write(data); o.close();
+                final android.net.Uri u = android.net.Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setPackage(pkg);
+                i.setType(mime == null || mime.isEmpty() ? "application/pdf" : mime);
+                i.putExtra(Intent.EXTRA_STREAM, u);
+                if (caption != null && caption.length() > 0) i.putExtra(Intent.EXTRA_TEXT, caption);
+                i.putExtra("jid", digits + "@s.whatsapp.net");
+                i.setClipData(android.content.ClipData.newRawUri("", u));
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                WaAutoService.arm(60000);
+                startActivity(i);
+                return true;
+            } catch (Exception e) { return false; }
+        }
+
         @JavascriptInterface
         public void shareFile(final String b64, final String name, final String mime) {
             try {

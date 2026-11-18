@@ -33,7 +33,9 @@ public class ShareProvider extends ContentProvider {
     }
     @Override public String getType(Uri u) {
         String n = u.getLastPathSegment();
-        return n != null && n.endsWith(".pdf") ? "application/pdf" : "image/png";
+        if (n != null && n.endsWith(".pdf")) return "application/pdf";
+        if (n != null && n.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return "image/png";
     }
     @Override public Uri insert(Uri u, ContentValues v) { return null; }
     @Override public int delete(Uri u, String s, String[] a) { return 0; }

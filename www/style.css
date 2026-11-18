@@ -1731,3 +1731,8 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-dayimg{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--gold,#d9b56b) 55%,transparent);background:color-mix(in srgb,var(--gold,#d9b56b) 14%,transparent);color:var(--text,#fff);font:inherit;font-size:.82rem;font-weight:700}
 .hr-dayimg svg{width:18px;height:18px;color:var(--gold,#d9b56b)}
 .hr-pgn{display:block;text-align:center;opacity:.75;margin:4px 0}
+.hr-rvtop button{min-width:70px}
+
+/* واتساب تلقائي */
+.hr-wa-st{display:grid;gap:4px;margin:8px 0;font-size:.92rem}.hr-wa-st .ok{color:#4fbf8a}.hr-wa-st .bad{color:#e0a03c}
+.hr-glist .hr-grow .hr-sgx{margin-inline-start:auto}
