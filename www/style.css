@@ -1736,3 +1736,10 @@ html:has(#tab-times.active){overflow:hidden}
 /* واتساب تلقائي */
 .hr-wa-st{display:grid;gap:4px;margin:8px 0;font-size:.92rem}.hr-wa-st .ok{color:#4fbf8a}.hr-wa-st .bad{color:#e0a03c}
 .hr-glist .hr-grow .hr-sgx{margin-inline-start:auto}
+
+/* قائمة الاستثناء: الاسم كاملاً بأكثر من سطر */
+.hr-ex .hr-grow{align-items:center}
+.hr-exn{flex:1;min-width:0;display:grid;gap:2px;text-align:start}
+.hr-exn b{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.45}
+.hr-exn small{max-width:none!important;white-space:normal!important}
+#exF .chip em{font-style:normal;opacity:.75;margin-inline-start:6px;font-size:.8em}

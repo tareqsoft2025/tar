@@ -352,21 +352,32 @@
   const repOk = (e) => !repExcl().has(String(e.id));
   function openRepExcl(back) {
     const ex = repExcl(), emps = HR.employees().filter((e) => e.active || ex.has(String(e.id))).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-    let q = '', only = false;
+    let q = '', flt = 'all';   // all | PEF | HHO | ex
     sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('x')}</span><div><b>أسماء مستثناة من تسجيل الحضور</b><small id="exCnt"></small></div></div>
-      <p class="hr-omn">الأسماء المؤشَّر عليها مستثناة من تسجيل الحضور: لا تُحسب غياباً ولا تأخراً في التطبيق والتنبيهات، ولا تظهر في صور وملفات التقارير ولا تُحسب في أرقامها (وتُسرد أسماؤها في ورقة «المستثنون» بملف Excel).</p>
-      <input id="exQ" class="hr-in" type="search" placeholder="ابحث باسم الموظف">
-      <div class="chips hr-fc"><button type="button" class="chip sm on" data-o="0">الكل</button><button type="button" class="chip sm" data-o="1">المستثنون فقط</button></div>
-      <div id="exList" class="hr-glist" style="max-height:44vh"></div>
+      <p class="hr-omn">الأسماء المؤشَّر عليها مستثناة من تسجيل الحضور: لا تُحسب غياباً ولا تأخراً في التطبيق والتنبيهات، ولا تظهر في صور وملفات التقارير ولا تُحسب في أرقامها (وتُسرد أسماؤها في ورقة «المستثنون» بملف Excel). القائمة محفوظة على الجوال.</p>
+      <input id="exQ" class="hr-in" type="search" placeholder="ابحث باسم الموظف أو القسم">
+      <div class="chips hr-fc" id="exF"></div>
+      <div id="exList" class="hr-glist hr-ex" style="max-height:44vh"></div>
+      <div class="hr-gact" id="exBulk"></div>
       <div class="hr-gact"><button type="button" class="btn-primary" id="exDone">تم</button></div>`);
+    const inF = (e) => flt === 'all' || (flt === 'ex' ? ex.has(String(e.id)) : e.org === flt);
+    const drawChips = () => {
+      const cnt = (f) => emps.filter((e) => (f === 'all' ? true : f === 'ex' ? ex.has(String(e.id)) : e.org === f)).length;
+      $('exF').innerHTML = [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['ex', 'المستثنون']].map(([k, n]) => `<button type="button" class="chip sm${flt === k ? ' on' : ''}" data-f="${k}">${n}<em>${cnt(k)}</em></button>`).join('');
+      $('exF').querySelectorAll('[data-f]').forEach((b) => { b.onclick = () => { flt = b.dataset.f; draw(); }; });
+    };
     const draw = () => {
       $('exCnt').textContent = `${ex.size} مستثنى`;
-      const rows = emps.filter((e) => (!only || ex.has(String(e.id))) && match(q, e.name, e.empId, e.dept)).slice(0, 150);
-      $('exList').innerHTML = rows.map((e) => `<button type="button" class="hr-grow${ex.has(String(e.id)) ? ' on' : ''}" data-id="${esc(e.id)}"><span class="hr-chk${ex.has(String(e.id)) ? ' on' : ''}">${icon('check')}</span><b>${esc(e.name)}</b><small>${esc([e.org, e.dept].filter(Boolean).join(' · '))}</small></button>`).join('') || '<small>لا نتائج</small>';
+      drawChips();
+      const rows = emps.filter((e) => inF(e) && match(q, e.name, e.empId, e.dept));
+      $('exList').innerHTML = rows.slice(0, 200).map((e) => `<button type="button" class="hr-grow${ex.has(String(e.id)) ? ' on' : ''}" data-id="${esc(e.id)}"><span class="hr-chk${ex.has(String(e.id)) ? ' on' : ''}">${icon('check')}</span><span class="hr-exn"><b>${esc(e.name)}</b><small>${esc([e.org, e.dept].filter(Boolean).join(' · '))}</small></span></button>`).join('') || '<small>لا نتائج</small>';
       $('exList').querySelectorAll('.hr-grow').forEach((b) => { b.onclick = () => { const k = b.dataset.id; if (ex.has(k)) ex.delete(k); else ex.add(k); HR.db.put('repExcl', [...ex]); draw(); }; });
+      // تأشير/إلغاء كل الظاهر (بحسب الفرز والبحث الحاليين)
+      const allOn = rows.length && rows.every((e) => ex.has(String(e.id)));
+      $('exBulk').innerHTML = rows.length > 1 ? `<button type="button" class="btn-outline" id="exAll">${allOn ? 'إلغاء استثناء الظاهرين' : 'استثناء كل الظاهرين'} (${rows.length})</button>` : '';
+      if ($('exAll')) $('exAll').onclick = () => { rows.forEach((e) => { if (allOn) ex.delete(String(e.id)); else ex.add(String(e.id)); }); HR.db.put('repExcl', [...ex]); draw(); };
     };
     $('exQ').oninput = (ev) => { q = ev.target.value; draw(); };
-    document.querySelectorAll('#hrSheetBody [data-o]').forEach((b) => { b.onclick = () => { only = b.dataset.o === '1'; document.querySelectorAll('#hrSheetBody [data-o]').forEach((x) => x.classList.toggle('on', x === b)); draw(); }; });
     $('exDone').onclick = () => { if (back) back(); else closeSheet(); };
     draw();
   }
