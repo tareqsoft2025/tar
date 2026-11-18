@@ -1,6 +1,6 @@
 {
-  "versionCode": 83,
-  "versionName": "8.37",
-  "notes": "تفريق PEF/HHO بحسب سلم العقد، Excel أغنى، ومستثنون من تسجيل الحضور",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-83.apk"
+  "versionCode": 84,
+  "versionName": "8.38",
+  "notes": "حفظ قائمة المستثنين والمجموعات والإعدادات بعد تسجيل الخروج وانتهاء الجلسة",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-84.apk"
 }
