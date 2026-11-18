@@ -118,5 +118,117 @@
     return cv;
   }
 
-  window.HRReport = { range, build, toText, toCanvas };
+
+  /* ---------- الصورة اليومية: حالة الدوام + حسب السلم + من بلا تسجيل ---------- */
+  // opt = { filter(e), band(e) → اسم السلم، group, syncedAt }
+  function daily(ds, opt) {
+    opt = opt || {};
+    const rep = HR.dayReport(ds), ok = (e) => !opt.filter || opt.filter(e);
+    const rows = rep.rows.filter((r) => ok(r.e));
+    const c = { total: rows.length, present: 0, late: 0, leave: 0, mission: 0, hwork: 0, unreg: 0, off: 0 };
+    const bands = {}, late = [], unreg = [];
+    rows.forEach((r) => {
+      const band = (opt.band && opt.band(r.e)) || r.e.org || '—';
+      const B = bands[band] = bands[band] || { name: band, total: 0, present: 0, late: 0, leave: 0, unreg: 0 };
+      const other = (r.reqs || []).filter((q) => q.kind !== 'daily');          // مهمة/مغادرة/عمل إضافي…
+      B.total++;
+      if (r.status === 'late') { c.late++; B.late++; late.push({ name: r.e.name, min: r.lateMin || 0, at: r.firstIn }); }
+      else if (r.status === 'present' || r.status === 'noin') { c.present++; B.present++; }
+      else if (r.status === 'hwork') { c.hwork++; }
+      else if (r.status === 'leave') { c.leave++; B.leave++; }
+      else if (r.status === 'off') { c.off++; }
+      else if (r.status === 'absent') {
+        if (other.length) { c.mission++; B.leave++; }                              // لديه مهمة أو طلب ذلك اليوم
+        else { c.unreg++; B.unreg++; unreg.push({ name: r.e.name, dept: r.e.dept || '', band }); }
+      }
+    });
+    const expected = c.total - c.off - c.hwork;
+    const here = c.present + c.late;
+    return {
+      ds, synced: rep.synced, weekend: !!rep.weekend, group: opt.group || '', syncedAt: opt.syncedAt || null, c,
+      rate: expected > 0 ? Math.round(here * 100 / expected) : null,
+      bands: Object.values(bands).sort((a, b) => b.total - a.total),
+      late: late.sort((a, b) => b.min - a.min), unreg: unreg.sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+    };
+  }
+  const dfull = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const tmf = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
+  const dataStamp = (D) => D.syncedAt ? `بيانات حتى ${tmf.format(new Date(D.syncedAt))}` : '';
+  function dailyText(D) {
+    const c = D.c, L = [];
+    L.push(`*حالة الدوام — ${dfull.format(noon(D.ds))}*${D.group ? ' — ' + D.group : ''}`);
+    if (dataStamp(D)) L.push(dataStamp(D));
+    L.push('');
+    L.push(`نسبة الحضور: *${D.rate == null ? '—' : D.rate + '%'}* (${c.present + c.late} من ${c.total - c.off - c.hwork})`);
+    L.push(`• حاضر: ${c.present} · متأخر: ${c.late} · إجازة: ${c.leave} · مهام: ${c.mission} · بلا تسجيل: ${c.unreg}${c.hwork ? ' · دوام في عطلة: ' + c.hwork : ''}`);
+    if (D.bands.length > 1) { L.push(''); L.push('*حسب السلم*'); D.bands.forEach((b) => L.push(`• ${b.name}: ${b.present + b.late}/${b.total} حضور · ${b.late} متأخر · ${b.unreg} بلا تسجيل`)); }
+    if (D.late.length) { L.push(''); L.push('*المتأخرون*'); D.late.slice(0, 10).forEach((x, i) => L.push(`${i + 1}. ${x.name} — ${x.min} د`)); }
+    if (D.unreg.length) { L.push(''); L.push('*بلا تسجيل (لا مهام ولا إجازة)*'); D.unreg.slice(0, 20).forEach((x, i) => L.push(`${i + 1}. ${x.name}`)); if (D.unreg.length > 20) L.push(`+${D.unreg.length - 20} آخرون`); }
+    return L.join('\n');
+  }
+  function dailyCanvas(D) {
+    const W = 1080, pad = 56, c = D.c;
+    const nB = Math.min(D.bands.length, 6), nL = Math.min(D.late.length, 8), nU = Math.min(D.unreg.length, 16);
+    const uRows = Math.ceil(nU / 2);
+    const H = 150 + 40 + 330 + 30 + (nB ? 90 + nB * 62 + 34 : 0) + (nL ? 90 + nL * 52 + 44 : 0) + 20 + (D.unreg.length ? 90 + uRows * 52 + (D.unreg.length > nU ? 46 : 0) : 90) + 14 + 110;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'); g.direction = 'rtl'; g.textBaseline = 'alphabetic';
+    const FF = (getComputedStyle(document.body).fontFamily || 'sans-serif');
+    const BG = '#0e1c20', CARD = '#162a2f', LINE = '#22393f', GOLD = '#d9b56b', TXT = '#eef3f2', MUT = '#8fa7a8', OK = '#4fbf8a', WARN = '#e0a03c', BAD = '#e0645a', INFO = '#6aa7e0';
+    const font = (w, sz) => { g.font = `${w} ${sz}px ${FF}`; };
+    const T = (s, x, y, col, w, sz, al) => { font(w || 500, sz || 28); g.fillStyle = col || TXT; g.textAlign = al || 'right'; g.fillText(String(s), x, y); };
+    const rr = (x, y, w, h, r, fill, stroke) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } };
+    g.fillStyle = BG; g.fillRect(0, 0, W, H);
+    // رأس
+    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#1d3a3f'); gr.addColorStop(1, '#2b4a3c'); g.fillStyle = gr; g.fillRect(0, 0, W, 150);
+    g.fillStyle = GOLD; g.fillRect(0, 146, W, 4);
+    T('حالة الدوام اليومية', W - pad, 66, TXT, 800, 44);
+    T(`${dfull.format(noon(D.ds))}${D.group ? '  ·  ' + D.group : ''}`, W - pad, 116, GOLD, 600, 28);
+    const stamp = D.synced ? dataStamp(D) : 'حضور هذا اليوم غير مزامَن';
+    if (stamp) T(stamp, pad, 116, '#bcd0cf', 500, 24, 'left');
+    let y = 190;
+    // دائرة نسبة الحضور + مؤشرات
+    rr(pad, y, W - pad * 2, 330, 26, CARD, LINE);
+    const cx = pad + 180, cy = y + 165, R = 112, rate = D.rate == null ? 0 : D.rate / 100;
+    g.lineWidth = 26; g.lineCap = 'round';
+    g.strokeStyle = LINE; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
+    const parts = [[c.present, OK], [c.late, WARN]]; let a0 = -Math.PI / 2; const tot = Math.max(1, c.total - c.off - c.hwork);
+    parts.forEach(([v, col]) => { if (!v) return; const a1 = a0 + (v / tot) * Math.PI * 2; g.strokeStyle = col; g.beginPath(); g.arc(cx, cy, R, a0, a1 - 0.02); g.stroke(); a0 = a1; });
+    T(D.rate == null ? '—' : D.rate + '%', cx, cy + 14, TXT, 800, 62, 'center'); T('نسبة الحضور', cx, cy + 56, MUT, 500, 24, 'center');
+    const kp = [['حاضر', c.present, OK], ['متأخر', c.late, WARN], ['إجازة', c.leave, INFO], ['مهام/طلبات', c.mission, '#b388e0'], ['بلا تسجيل', c.unreg, BAD], ['دوام بعطلة', c.hwork, GOLD]];
+    const kx0 = pad + 400, kw = (W - pad - kx0 - 20) / 3 - 14;
+    kp.forEach(([n, v, col], i) => { const col_ = i % 3, row_ = Math.floor(i / 3); const x = W - pad - 24 - (col_ + 1) * kw - col_ * 14, yy = y + 36 + row_ * 140; rr(x, yy, kw, 122, 18, 'rgba(255,255,255,.04)', LINE); T(v, x + kw / 2, yy + 66, col, 800, 50, 'center'); T(n, x + kw / 2, yy + 104, MUT, 500, 22, 'center'); });
+    y += 360;
+    // حسب السلم
+    if (nB) {
+      rr(pad, y, W - pad * 2, 90 + nB * 62 + 4, 22, CARD, LINE);
+      T('حسب السلم', W - pad - 24, y + 52, GOLD, 700, 30);
+      D.bands.slice(0, nB).forEach((b, i) => {
+        const yy = y + 100 + i * 62, bw = 420, bx = pad + 24 + 300;
+        T(b.name.length > 18 ? b.name.slice(0, 17) + '…' : b.name, W - pad - 24, yy + 30, TXT, 600, 26);
+        const sc = b.total || 1; let x = bx;
+        [[b.present, OK], [b.late, WARN], [b.leave, INFO], [b.unreg, BAD]].forEach(([v, col]) => { if (!v) return; const w = v / sc * bw; rr(x, yy + 6, Math.max(w - 2, 4), 26, 8, col); x += w; });
+        T(`${b.present + b.late}/${b.total}`, pad + 24 + 220, yy + 30, TXT, 700, 26, 'left');
+        T(b.unreg ? `${b.unreg} بلا تسجيل` : '', pad + 24 + 190, yy + 30, BAD, 600, 22, 'right');
+      });
+      y += 90 + nB * 62 + 34;
+    }
+    // المتأخرون
+    if (nL) {
+      rr(pad, y, W - pad * 2, 90 + nL * 52 + 14, 22, CARD, LINE);
+      T(`المتأخرون (${D.late.length})`, W - pad - 24, y + 52, WARN, 700, 30);
+      D.late.slice(0, nL).forEach((x, i) => { const yy = y + 90 + i * 52; T(`${i + 1}. ${x.name}`, W - pad - 24, yy + 26, TXT, 500, 26); T(`${x.min} دقيقة${x.at ? '  ·  ' + tmf.format(new Date(x.at)) : ''}`, pad + 24, yy + 26, MUT, 500, 24, 'left'); });
+      y += 90 + nL * 52 + 44;
+    }
+    // بلا تسجيل
+    rr(pad, y, W - pad * 2, (D.unreg.length ? 90 + uRows * 52 + (D.unreg.length > nU ? 46 : 0) : 90) + 14, 22, CARD, LINE);
+    T(`بلا تسجيل — لا مهام ولا إجازة (${D.unreg.length})`, W - pad - 24, y + 52, BAD, 700, 30);
+    if (!D.unreg.length) T('الجميع مسجَّل أو لديه إجازة/مهمة ✔', W - pad - 24, y + 92, OK, 600, 26);
+    D.unreg.slice(0, nU).forEach((x, i) => { const colI = i % 2, rowI = Math.floor(i / 2); const colW = (W - pad * 2 - 48) / 2; const xr = W - pad - 24 - colI * colW; T(`${i + 1}. ${x.name}`, xr, y + 108 + rowI * 52, TXT, 500, 25); });
+    if (D.unreg.length > nU) T(`+${D.unreg.length - nU} آخرون`, W - pad - 24, y + 100 + uRows * 52 + 20, MUT, 600, 24);
+    T(`أُعدّ بتطبيق الموارد البشرية${dataStamp(D) ? ' · ' + dataStamp(D) : ''}`, W / 2, H - 38, MUT, 500, 22, 'center');
+    return cv;
+  }
+
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas };
 })();
