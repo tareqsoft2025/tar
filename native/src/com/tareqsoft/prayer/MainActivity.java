@@ -363,6 +363,25 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void shareFile(final String b64, final String name, final String mime) {
+            try {
+                byte[] data = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                java.io.File dir = new java.io.File(getCacheDir(), "share"); dir.mkdirs();
+                String fn = name.replaceAll("[^A-Za-z0-9._-]", "_");
+                java.io.FileOutputStream o = new java.io.FileOutputStream(new java.io.File(dir, fn)); o.write(data); o.close();
+                final android.net.Uri u = android.net.Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
+                final String mt = mime == null || mime.isEmpty() ? "application/pdf" : mime;
+                runOnUiThread(new Runnable() { public void run() {
+                    Intent i = new Intent(Intent.ACTION_SEND);
+                    i.setType(mt);
+                    i.putExtra(Intent.EXTRA_STREAM, u);
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(i, "مشاركة"));
+                } });
+            } catch (Exception e) { js("window.toast && window.toast('تعذّرت المشاركة')"); }
+        }
+
+        @JavascriptInterface
         public void shareImages(final String json) {
             try {
                 org.json.JSONArray arr = new org.json.JSONArray(json);

@@ -31,7 +31,10 @@ public class ShareProvider extends ContentProvider {
             return c;
         } catch (Exception e) { return null; }
     }
-    @Override public String getType(Uri u) { return "image/png"; }
+    @Override public String getType(Uri u) {
+        String n = u.getLastPathSegment();
+        return n != null && n.endsWith(".pdf") ? "application/pdf" : "image/png";
+    }
     @Override public Uri insert(Uri u, ContentValues v) { return null; }
     @Override public int delete(Uri u, String s, String[] a) { return 0; }
     @Override public int update(Uri u, ContentValues v, String s, String[] a) { return 0; }
