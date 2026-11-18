@@ -230,5 +230,95 @@
     return cv;
   }
 
-  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas };
+
+  /* ---------- التقرير التفصيلي لجهة واحدة (PEF أو HHO): كل الأسماء ---------- */
+  // opt = { exclude:Set, leaveLbl(n), placeName(pl), syncedAt, cfg:{office,field,grace} }
+  function detail(ds, org, opt) {
+    opt = opt || {};
+    const rep = HR.dayReport(ds), ex = opt.exclude || new Set();
+    const all = rep.rows.filter((r) => r.e.org === org);
+    const rows = all.filter((r) => !ex.has(String(r.e.id)));
+    const byName = (a, b) => a.name.localeCompare(b.name, 'ar');
+    const att = [], leave = [], mis = [], unreg = [], late = [];
+    rows.forEach((r) => {
+      const nm = r.e.name, tm = (iso) => (iso ? tmf.format(new Date(iso)) : '');
+      if (r.list && r.list.length) {
+        const ins = r.list.filter((x) => x.eventType === 'check_in'), outs = r.list.filter((x) => x.eventType === 'check_out');
+        const fi = ins[0] || r.list[0], lo = outs[outs.length - 1];
+        const pl = HR.place(fi), pn = opt.placeName ? opt.placeName(pl) : (pl.name || '');
+        const lpl = lo ? HR.place(lo) : null, lpn = lo && opt.placeName ? opt.placeName(lpl) : '';
+        att.push({ name: nm, in: tm(r.firstIn), out: lo ? tm(r.lastOut) : (r.live ? 'مستمر' : ''), place: pn, outPlace: lpn && lpn !== pn ? lpn : '', st: pl.st, late: r.status === 'late' ? r.lateMin : 0, hwork: r.status === 'hwork' });
+        if (r.status === 'late') late.push({ name: nm, min: r.lateMin || 0, in: tm(r.firstIn), type: r.e.type });
+      }
+      if (r.status === 'leave') leave.push({ name: nm, label: opt.leaveLbl ? opt.leaveLbl(r.leave) : 'إجازة' });
+      (r.reqs || []).filter((q) => q.kind === 'mission' || q.kind === 'hourly').forEach((q) => {
+        const t = q.planned || (q.start && q.end ? q.start + ' ← ' + q.end : q.start || '');
+        mis.push({ name: nm, kind: q.kind === 'mission' ? 'مهمة عمل' : 'مغادرة', time: t, what: q.project || q.reason || '' });
+      });
+      const other = (r.reqs || []).filter((q) => q.kind !== 'daily');
+      if (r.status === 'absent' && !other.length) unreg.push({ name: nm, dept: r.e.dept || '' });
+    });
+    att.sort(byName); leave.sort(byName); mis.sort(byName); unreg.sort(byName); late.sort((a, b) => b.min - a.min);
+    return {
+      ds, org, synced: rep.synced, weekend: !!rep.weekend, syncedAt: opt.syncedAt || null, cfg: opt.cfg || {},
+      total: rows.length, excluded: all.length - rows.length, att, leave, mis, unreg, late
+    };
+  }
+  function detailCanvas(D) {
+    const W = 1080, pad = 48, RH = 46;
+    const sec = (n) => 84 + Math.max(n, 1) * RH + 18;
+    const H = 170 + 120 + sec(D.att.length) + sec(D.leave.length) + sec(D.mis.length) + sec(D.unreg.length) + sec(D.late.length) + 90;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'); g.direction = 'rtl'; g.textBaseline = 'alphabetic';
+    const FF = (getComputedStyle(document.body).fontFamily || 'sans-serif');
+    const BG = '#0e1c20', CARD = '#162a2f', LINE = '#22393f', GOLD = '#d9b56b', TXT = '#eef3f2', MUT = '#8fa7a8', OK = '#4fbf8a', WARN = '#e0a03c', BAD = '#e0645a', INFO = '#6aa7e0', PUR = '#b388e0';
+    const font = (w, sz) => { g.font = `${w} ${sz}px ${FF}`; };
+    const fit = (s, maxW, w, sz) => { font(w, sz); s = String(s); if (g.measureText(s).width <= maxW) return s; while (s.length > 1 && g.measureText(s + '…').width > maxW) s = s.slice(0, -1); return s + '…'; };
+    const T = (s, x, y, col, w, sz, al, maxW) => { const t = maxW ? fit(s, maxW, w || 500, sz || 24) : String(s); font(w || 500, sz || 24); g.fillStyle = col || TXT; g.textAlign = al || 'right'; g.fillText(t, x, y); };
+    const rr = (x, y, w, h, r, fill, stroke) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } };
+    g.fillStyle = BG; g.fillRect(0, 0, W, H);
+    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#1d3a3f'); gr.addColorStop(1, '#2b4a3c'); g.fillStyle = gr; g.fillRect(0, 0, W, 170);
+    g.fillStyle = GOLD; g.fillRect(0, 166, W, 4);
+    T(`كشف الدوام — ${D.org}`, W - pad, 72, TXT, 800, 46);
+    T(dfull.format(noon(D.ds)), W - pad, 122, GOLD, 600, 28);
+    const stamp = D.synced ? dataStamp(D) : 'حضور هذا اليوم غير مزامَن';
+    if (stamp) T(stamp, pad, 122, '#bcd0cf', 500, 23, 'left');
+    // ملخص
+    let y = 196;
+    const sm = [['الموظفون', D.total, TXT], ['حضور', D.att.length, OK], ['متأخرون', D.late.length, WARN], ['إجازة', D.leave.length, INFO], ['مهام/مغادرات', D.mis.length, PUR], ['بلا تسجيل', D.unreg.length, BAD]];
+    const cw = (W - pad * 2 - 5 * 10) / 6;
+    sm.forEach(([n, v, col], i) => { const x = W - pad - (i + 1) * cw - i * 10; rr(x, y, cw, 96, 16, CARD, LINE); T(v, x + cw / 2, y + 52, col, 800, 38, 'center'); T(n, x + cw / 2, y + 82, MUT, 500, 19, 'center'); });
+    y += 120;
+    const section = (title, col, items, draw, emptyMsg) => {
+      rr(pad, y, W - pad * 2, sec(items.length) - 18, 20, CARD, LINE);
+      g.fillStyle = col; g.fillRect(W - pad - 6, y + 22, 6, 36);
+      T(`${title} (${items.length})`, W - pad - 24, y + 52, col, 800, 30);
+      if (!items.length) T(emptyMsg || '—', W - pad - 24, y + 84 + 30, MUT, 500, 24);
+      items.forEach((it, i) => { const yy = y + 78 + i * RH; if (i % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.035)'; g.fillRect(pad + 12, yy, W - pad * 2 - 24, RH); } draw(it, yy + 31, i); });
+      y += sec(items.length);
+    };
+    const R = W - pad - 24;   // الحافة اليمنى للنص
+    section('الحضور — الوقت والموقع', OK, D.att, (x, yy, i) => {
+      T(`${i + 1}. ${x.name}`, R, yy, x.late ? WARN : TXT, 600, 24, 'right', 330);
+      T(`${x.in}${x.out ? ' ← ' + x.out : ''}`, R - 360, yy, x.late ? WARN : OK, 700, 23, 'right', 230);
+      T(`${x.place || '—'}${x.outPlace ? ' · خروج: ' + x.outPlace : ''}`, pad + 24, yy, x.st === 'outside' ? BAD : MUT, 500, 22, 'left', 380);
+    }, 'لا تسجيلات حضور');
+    section('الإجازات', INFO, D.leave, (x, yy, i) => { T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 520); T(x.label, pad + 24, yy, INFO, 600, 23, 'left'); }, 'لا إجازات');
+    section('مهام العمل والمغادرات', PUR, D.mis, (x, yy, i) => {
+      T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 330);
+      T(x.kind, R - 360, yy, PUR, 700, 22, 'right');
+      T(`${x.time}${x.what ? ' · ' + x.what : ''}`, pad + 24, yy, MUT, 500, 21, 'left', 400);
+    }, 'لا مهام ولا مغادرات');
+    section('بلا تسجيل — لا إجازة ولا مهمة ولا حضور', BAD, D.unreg, (x, yy, i) => { T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 560); T(x.dept, pad + 24, yy, MUT, 500, 21, 'left', 300); }, 'الجميع مسجَّل أو لديه إجازة/مهمة ✔');
+    const c = D.cfg || {};
+    section(`كشف المتأخرين${c.office ? ` — الدوام ${c.office} + سماح ${c.grace || 0} د` : ''}`, WARN, D.late, (x, yy, i) => {
+      T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 440);
+      T(`دخل ${x.in}`, R - 480, yy, MUT, 500, 22, 'right');
+      T(`${x.min} دقيقة`, pad + 24, yy, WARN, 800, 24, 'left');
+    }, 'لا متأخرين ✔');
+    T(`أُعدّ بتطبيق الموارد البشرية${dataStamp(D) ? ' · ' + dataStamp(D) : ''}${D.excluded ? ' · استُثني ' + D.excluded + ' من التقرير' : ''}`, W / 2, H - 34, MUT, 500, 21, 'center');
+    return cv;
+  }
+
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailCanvas };
 })();

@@ -288,30 +288,69 @@
 
   /* ---------- صورة حالة الدوام اليومية (للمشاركة) ---------- */
   const bandOf = (e) => { const c = bestContract(e.id); return (c && (c.scale || (c.grade ? 'درجة ' + c.grade : ''))) || e.org || '—'; };
-  function openDaily(ds) {
-    ds = ds || today();
-    const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null;
-    const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e), band: bandOf, group: g ? g.name : '', syncedAt: HR.meta().lastSync });
-    const cv = HRReport.dailyCanvas(D), url = cv.toDataURL('image/png');
-    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('image')}</span><div><b>صورة حالة الدوام</b><small>${esc(dLong.format(noon(ds)))}${D.synced ? '' : ' · غير مزامَن'}</small></div></div>
-      <div class="hr-dnav"><button class="icon-btn flip" data-d="-1" aria-label="اليوم السابق">${icon('chev')}</button><label><b>${ds === today() ? 'اليوم' : fd(ds)}</b><small>${D.c.unreg} بلا تسجيل · ${D.c.late} متأخر</small></label><button class="icon-btn" data-d="1" aria-label="اليوم التالي" ${ds >= today() ? 'disabled' : ''}>${icon('chev')}</button></div>
-      ${D.synced ? '' : `<div class="hr-warnbox">${icon('alert')}<span>حضور هذا اليوم غير محفوظ على الجهاز، فالأرقام ناقصة. اضغط المزامنة ثم أعد الفتح.</span></div>`}
-      <img class="hr-wimg" alt="حالة الدوام" src="${url}">
-      <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} مشاركة الصورة</button><button type="button" class="btn-outline" id="dyText">مشاركة كنص</button></div>`);
-    $('hrSheetBody').querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => openDaily(addDays(ds, +b.dataset.d)); });
-    $('dyShare').onclick = () => {
-      const name = 'hr-daily-' + ds + '.png', B = window.AndroidBridge;
-      if (B && B.shareImage) { B.shareImage(url.split(',')[1], name, ''); return; }
-      cv.toBlob((bl) => { const file = new File([bl], name, { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file] }).catch(() => {}); else { const a = document.createElement('a'); a.href = url; a.download = name; a.click(); } });
+  // أسماء مستثناة من كل التقارير المصوّرة (يومي/تفصيلي/أسبوعي)
+  const repExcl = () => new Set((HR.db.get('repExcl', []) || []).map(String));
+  const repOk = (e) => !repExcl().has(String(e.id));
+  function openRepExcl(back) {
+    const ex = repExcl(), emps = HR.employees().filter((e) => e.active || ex.has(String(e.id))).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    let q = '', only = false;
+    sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('x')}</span><div><b>استثناء أسماء من التقارير</b><small id="exCnt"></small></div></div>
+      <p class="hr-omn">الأسماء المؤشَّر عليها لا تظهر في صور التقارير (اليومي والتفصيلي والأسبوعي) ولا تُحسب في أرقامها.</p>
+      <input id="exQ" class="hr-in" type="search" placeholder="ابحث باسم الموظف">
+      <div class="chips hr-fc"><button type="button" class="chip sm on" data-o="0">الكل</button><button type="button" class="chip sm" data-o="1">المستثنون فقط</button></div>
+      <div id="exList" class="hr-glist" style="max-height:44vh"></div>
+      <div class="hr-gact"><button type="button" class="btn-primary" id="exDone">تم</button></div>`);
+    const draw = () => {
+      $('exCnt').textContent = `${ex.size} مستثنى`;
+      const rows = emps.filter((e) => (!only || ex.has(String(e.id))) && match(q, e.name, e.empId, e.dept)).slice(0, 150);
+      $('exList').innerHTML = rows.map((e) => `<button type="button" class="hr-grow${ex.has(String(e.id)) ? ' on' : ''}" data-id="${esc(e.id)}"><span class="hr-chk${ex.has(String(e.id)) ? ' on' : ''}">${icon('check')}</span><b>${esc(e.name)}</b><small>${esc([e.org, e.dept].filter(Boolean).join(' · '))}</small></button>`).join('') || '<small>لا نتائج</small>';
+      $('exList').querySelectorAll('.hr-grow').forEach((b) => { b.onclick = () => { const k = b.dataset.id; if (ex.has(k)) ex.delete(k); else ex.add(k); HR.db.put('repExcl', [...ex]); draw(); }; });
     };
-    $('dyText').onclick = () => { const t = HRReport.dailyText(D), B = window.AndroidBridge; if (B && B.share) B.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
+    $('exQ').oninput = (ev) => { q = ev.target.value; draw(); };
+    document.querySelectorAll('#hrSheetBody [data-o]').forEach((b) => { b.onclick = () => { only = b.dataset.o === '1'; document.querySelectorAll('#hrSheetBody [data-o]').forEach((x) => x.classList.toggle('on', x === b)); draw(); }; });
+    $('exDone').onclick = () => { if (back) back(); else closeSheet(); };
+    draw();
+  }
+  let dyView = 'sum';
+  function openDaily(ds, view) {
+    ds = ds || today(); if (view) dyView = view;
+    const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null, ex = repExcl();
+    const stamp = HR.meta().lastSync;
+    const mk = (v) => {
+      if (v === 'sum') { const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, group: g ? g.name : '', syncedAt: stamp }); return { D, cv: HRReport.dailyCanvas(D) }; }
+      const D = HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }); return { D, cv: HRReport.detailCanvas(D) };
+    };
+    const cur = mk(dyView), sum = dyView === 'sum' ? cur.D : HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, syncedAt: stamp });
+    const url = cur.cv.toDataURL('image/png'), synced = HR.dayReport(ds).synced;
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('image')}</span><div><b>صور حالة الدوام</b><small>${esc(dLong.format(noon(ds)))}${synced ? '' : ' · غير مزامَن'}</small></div></div>
+      <div class="hr-dnav"><button class="icon-btn flip" data-d="-1" aria-label="اليوم السابق">${icon('chev')}</button><label><b>${ds === today() ? 'اليوم' : fd(ds)}</b><small>${sum.c.unreg} بلا تسجيل · ${sum.c.late} متأخر</small></label><button class="icon-btn" data-d="1" aria-label="اليوم التالي" ${ds >= today() ? 'disabled' : ''}>${icon('chev')}</button></div>
+      <div class="chips hr-fc" id="dyTabs">${[['sum', 'ملخص'], ['PEF', 'كشف PEF'], ['HHO', 'كشف HHO']].map(([k, n]) => `<button type="button" class="chip sm${dyView === k ? ' on' : ''}" data-v="${k}">${n}</button>`).join('')}</div>
+      ${synced ? '' : `<div class="hr-warnbox">${icon('alert')}<span>حضور هذا اليوم غير محفوظ على الجهاز، فالأرقام ناقصة. اضغط المزامنة ثم أعد الفتح.</span></div>`}
+      <img class="hr-wimg" alt="حالة الدوام" src="${url}">
+      <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} مشاركة هذه الصورة</button>${dyView !== 'sum' ? '' : `<button type="button" class="btn-outline" id="dyText">مشاركة كنص</button>`}</div>
+      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة صورتي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} استثناء أسماء (${ex.size})</button></div>`);
+    const body = $('hrSheetBody');
+    body.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => openDaily(addDays(ds, +b.dataset.d)); });
+    body.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => openDaily(ds, b.dataset.v); });
+    const B = window.AndroidBridge, nameOf = (v) => `hr-${v === 'sum' ? 'daily' : v.toLowerCase()}-${ds}.png`;
+    const shareFiles = (items) => {
+      if (B && B.shareImages) { B.shareImages(JSON.stringify(items.map((x) => ({ b64: x.url.split(',')[1], name: x.name })))); return; }
+      Promise.all(items.map((x) => new Promise((res) => x.cv.toBlob((bl) => res(new File([bl], x.name, { type: 'image/png' })))))).then((files) => {
+        if (navigator.canShare && navigator.canShare({ files })) navigator.share({ files }).catch(() => {});
+        else files.forEach((fl) => { const a = document.createElement('a'); a.href = URL.createObjectURL(fl); a.download = fl.name; a.click(); });
+      });
+    };
+    $('dyShare').onclick = () => { if (B && B.shareImage && !B.shareImages) B.shareImage(url.split(',')[1], nameOf(dyView), ''); else shareFiles([{ cv: cur.cv, url, name: nameOf(dyView) }]); };
+    $('dyBoth').onclick = () => { const a = mk('PEF'), b = mk('HHO'); shareFiles([{ cv: a.cv, url: a.cv.toDataURL('image/png'), name: nameOf('PEF') }, { cv: b.cv, url: b.cv.toDataURL('image/png'), name: nameOf('HHO') }]); };
+    $('dyEx').onclick = () => openRepExcl(() => openDaily(ds));
+    const tx = $('dyText'); if (tx) tx.onclick = () => { const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
 
   /* ---------- التقرير الأسبوعي للمدير (صورة للمشاركة) ---------- */
   function openWeekly(kind) {
     kind = kind || 'prev';
     const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null;
-    const D = HRReport.build(HRReport.range(kind), { filter: orgOk, group: g ? g.name : '' });
+    const D = HRReport.build(HRReport.range(kind), { filter: (e) => orgOk(e) && repOk(e), group: g ? g.name : '' });
     const cv = HRReport.toCanvas(D), url = cv.toDataURL('image/png');
     sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('note')}</span><div><b>التقرير الأسبوعي</b><small>${esc(D.group || 'كل الموظفين')}${D.unsynced ? ' · ' + D.unsynced + ' يوم غير مزامن' : ''}</small></div></div>
       <div class="chips hr-fc"><button class="chip sm${kind === 'prev' ? ' on' : ''}" data-k="prev">الأسبوع الماضي</button><button class="chip sm${kind === 'incl' ? ' on' : ''}" data-k="incl">آخر ٧ أيام</button></div>
@@ -1578,6 +1617,7 @@
       <p class="hr-omn" style="margin:0 0 8px">إشعار واحد كل يوم عمل يلخّص: المتأخرين، وغير المسجلين، والطلبات المعلّقة، والعقود والتكليفات التي تنتهي هذا الأسبوع. يصل حتى والتطبيق مغلق (مع تفعيل المتابعة الخلفية).</p>
       <button type="button" class="btn-outline wide" id="rvOpen">${icon('alert')}<span>المراجعة الشهرية السرية</span></button>
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
+      <button type="button" class="btn-outline wide" id="rxOpen">${icon('x')}<span>استثناء أسماء من التقارير (${repExcl().size})</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
       <label class="hr-srow"><span>إشعار لكل طلب جديد (إجازة، مغادرة، مهمة، عمل إضافي، عمل بعطلة)</span><input type="checkbox" id="rqOn" class="hr-tog" ${s.reqNotify === false ? '' : 'checked'}></label>
       <label class="hr-srow"><span>الوضع المباشر (تحديث الحضور كل ~20 ثانية وقت الدوام والشاشة مفتوحة)</span><input type="checkbox" id="lvOn" class="hr-tog" ${s.live === false ? '' : 'checked'}></label>
@@ -1588,6 +1628,7 @@
       <button class="btn-outline wide" id="dgNow" type="button">${icon('bell')}<span>عرض ملخص اليوم الآن</span></button>`);
     body.appendChild(dg);
     $('wkRep').onclick = () => openWeekly('prev');
+    $('rxOpen').onclick = () => openRepExcl(null);
     $('wnLog').onclick = openWarnLog;
     $('rvOpen').onclick = () => { tab = 'rev'; store.set('hrTab', 'set'); revFlt = 'need'; render(); };
     $('rqOn').onchange = (e) => { put({ reqNotify: e.target.checked }); toast(e.target.checked ? 'فُعّلت إشعارات الطلبات' : 'أُوقفت إشعارات الطلبات'); };
