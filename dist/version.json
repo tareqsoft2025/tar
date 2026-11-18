@@ -1,6 +1,6 @@
 {
-  "versionCode": 84,
-  "versionName": "8.38",
-  "notes": "حفظ قائمة المستثنين والمجموعات والإعدادات بعد تسجيل الخروج وانتهاء الجلسة",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-84.apk"
+  "versionCode": 85,
+  "versionName": "8.39",
+  "notes": "فرز PEF/HHO في قائمة المستثنين مع تأشير كل الظاهرين وأسماء كاملة",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-85.apk"
 }
