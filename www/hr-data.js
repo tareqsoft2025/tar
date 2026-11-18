@@ -175,6 +175,24 @@
       })), upd: pick(x, 'updatedAt'), raw: x
     };
   }
+  // تفاصيل راتب العقد: /api/hr/contracts/{id}/salary-history (سجلات الراتب: الأساسي، السلم، التغييرات)
+  const salRec = (h) => ({
+    id: idOf(h), type: pick(h, 'changeType', 'type', 'kind'), from: d10(pick(h, 'effectiveFrom', 'effectiveDate', 'startDate', 'date', 'createdAt')), to: d10(pick(h, 'effectiveTo', 'endDate')),
+    salary: pick(h, 'basicSalary', 'salary'), cur: pick(h, 'currency', 'salaryCurrency'), grade: pick(h, 'grade'), level: pick(h, 'level'), step: pick(h, 'step'),
+    status: pick(h, 'status'), no: pick(h, 'amendmentNo', 'salaryRecordNo'), reason: pick(h, 'reason', 'reasonAr'), pct: pick(h, 'employmentPercentage', 'percent'), raw: h
+  });
+  async function salaryHistory(contractId) {
+    const all = db.get('salhist', {}), key = String(contractId);
+    const r = await get('/api/hr/contracts/' + encodeURIComponent(contractId) + '/salary-history');
+    if (r.ok) {
+      const items = listOf(r.data).map(salRec);
+      all[key] = { at: Date.now(), items }; db.put('salhist', all);
+      return { ok: true, items, at: all[key].at };
+    }
+    const c = all[key];
+    return c ? { ok: false, cached: true, items: c.items, at: c.at, status: r.status } : { ok: false, items: [], status: r.status, error: errText(r) };
+  }
+  const salaryCached = (contractId) => (db.get('salhist', {})[String(contractId)] || null);
   // المشاريع (من /api/projects/lookup) لربط التكليف برقم المشروع ورمزه واسمه وعملته
   let projIdx = null;
   function projOf(id) {
@@ -686,7 +704,7 @@
   }
   const linkEmp = (sysId, pefId) => { const l = db.get('empLinks', {}); if (pefId == null) delete l[sysId]; else l[sysId] = String(pefId); db.put('empLinks', l); };
 
-  window.HR = { attAdd, attFix, attAudit, localTs, matchEmp, linkEmp, pollHint, notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
+  window.HR = { salaryHistory, salaryCached, attAdd, attFix, attAudit, localTs, matchEmp, linkEmp, pollHint, notices, addNotice, patchNotice, markAllRead, clearDone, unreadCount, digest, maybeDigest, pendingReqs, reqActions, decide, netInfo, isSlow, alertFilter, requests, reqsOn, REQ_LABEL, balanceOf, syncBalance, syncBalances, place, sites, get, login, errText, db, sync, isSyncing: () => syncing, employees, contracts, assignments, events, leaveOf, dayReport, settings, emp, con, asg, listOf,
     setWatch: (min) => { if (B && B.hrWatch) B.hrWatch(min | 0); },
     watchState: () => { try { return B && B.hrWatchState ? JSON.parse(B.hrWatchState()) : { min: 0, last: 0, ok: true }; } catch (e) { return { min: 0, last: 0, ok: true }; } },
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),

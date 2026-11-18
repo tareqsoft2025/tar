@@ -818,15 +818,54 @@
       ${hist.length ? `<div class="hr-hist"><small class="hr-histt">سجل التغييرات (${hist.length})</small>${hist.map((h) => `<div class="hr-hi"><i></i><div><b>${esc(chg(h.type) || 'تغيير')}</b><small>${[h.from ? fd(h.from) : '', gls(h), money(h.salary, c.cur), h.end ? 'حتى ' + fd(h.end) : '', h.reason].filter(Boolean).map(esc).join(' · ')}</small></div></div>`).join('')}</div>` : ''}
     </div>`;
   }
+  /* ---------- تفاصيل راتب العقد (سجل الراتب من النظام) ---------- */
+  const SAL_ST = { approved: ['معتمد', 'ok'], active: ['فعّال', 'ok'], cancelled: ['ملغى', 'bad'], canceled: ['ملغى', 'bad'], draft: ['مسودة', 'mute'], pending: ['بانتظار الاعتماد', 'warn'], superseded: ['مستبدل', 'mute'] };
+  const salState = (st) => SAL_ST[String(st || '').toLowerCase()] || (st ? [st, 'mute'] : null);
+  function drawSalary(box, items, fallback, note) {
+    const t = today(), cur = (x) => x.cur || fallback.cur;
+    const live = items.filter((x) => !['cancelled', 'canceled', 'draft'].includes(String(x.status || '').toLowerCase()) && x.salary != null);
+    const sorted = live.slice().sort((a, b) => String(a.from || '').localeCompare(String(b.from || '')));
+    const nowRec = sorted.filter((x) => (!x.from || x.from <= t) && (!x.to || x.to >= t)).pop() || sorted[sorted.length - 1] || null;
+    const prevOf = (x) => { const i = sorted.indexOf(x); return i > 0 ? sorted[i - 1] : null; };
+    const delta = (x) => { const pv = prevOf(x); if (!pv || pv.salary == null || x.salary == null || !+pv.salary) return ''; const d = +x.salary - +pv.salary; if (!d) return ''; const pc = Math.round(d / +pv.salary * 1000) / 10; return `<em dir="ltr" class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '▲' : '▼'} ${money(Math.abs(d), cur(x))} (${pc > 0 ? '+' : ''}${pc}%)</em>`; };
+    const head = nowRec || (fallback.salary != null ? { salary: fallback.salary, cur: fallback.cur, grade: fallback.grade, level: fallback.level, step: fallback.step, from: fallback.start } : null);
+    let h = '';
+    if (head) h += `<div class="hr-salnow"><small>${nowRec ? 'الراتب الأساسي الحالي' : 'الراتب في العقد'}</small><b>${esc(money(head.salary, cur(head)) || '—')}</b><span>${esc(gls(head) || '')}${head.from ? ' · منذ ' + fd(head.from) : ''}</span>${nowRec && delta(nowRec) ? delta(nowRec) : ''}</div>`;
+    if (items.length) {
+      h += `<div class="hr-saltl">${items.slice().sort((a, b) => String(b.from || '').localeCompare(String(a.from || ''))).map((x) => {
+        const st = salState(x.status), isNow = x === nowRec;
+        return `<div class="hr-salr${isNow ? ' now' : ''}${/cancel/i.test(x.status || '') ? ' x' : ''}"><i></i><div>
+          <div class="hr-salh"><b>${esc(chg(x.type) || 'سجل راتب')}</b>${st ? badge(st[0], st[1]) : ''}${isNow ? badge('الحالي', 'ok') : ''}</div>
+          <div class="hr-salv">${x.salary != null ? esc(money(x.salary, cur(x))) : '—'}${delta(x)}</div>
+          <small>${[gls(x), x.from ? fd(x.from) + (x.to ? ' ← ' + fd(x.to) : ' ← مستمر') : '', x.pct != null && x.pct !== '' ? 'نسبة التوظيف ' + x.pct + '%' : '', x.no ? '#' + x.no : ''].filter(Boolean).map(esc).join(' · ')}</small>
+          ${x.reason ? `<small>${esc(x.reason)}</small>` : ''}
+          ${rawTable(x.raw)}</div></div>`;
+      }).join('')}</div>`;
+    } else if (!head) h += '<div class="hr-none">لا توجد سجلات راتب لهذا العقد</div>';
+    if (note) h += `<small class="hr-salnote">${esc(note)}</small>`;
+    box.innerHTML = h;
+  }
+  async function loadSalary(c) {
+    const box = $('hrSal'); if (!box) return;
+    const cached = HR.salaryCached(c.id);
+    if (cached) drawSalary(box, cached.items, c, 'من نسخة محفوظة، يجري التحديث…');
+    const r = await HR.salaryHistory(c.id);
+    if (!$('hrSal')) return;
+    if (r.ok) drawSalary($('hrSal'), r.items, c, '');
+    else if (r.cached) drawSalary($('hrSal'), r.items, c, 'تعذّر التحديث الآن، المعروض نسخة محفوظة ' + ago(r.at));
+    else drawSalary($('hrSal'), [], c, r.status === 403 ? 'ليست لديك صلاحية عرض سجل الراتب في النظام.' : (r.status === 0 ? 'لا يوجد اتصال، يظهر الراتب المسجَّل في العقد فقط.' : 'تعذّر تحميل سجل الراتب.'));
+  }
   function openCon(c) {
     const sm = conSummary(c.empId);
     const others = sm.list.filter((x) => x.id !== c.id).sort((a, b) => String(b.start).localeCompare(String(a.start)));
     sheet(`<div class="hr-ph"><span class="hr-ava big k-${c.kind}">${esc(initials(c.name))}</span><div><b>${esc(c.name)}</b><small>${sm.records} سجل عقد</small><div class="hr-tags">${flags(sm) || badge('عقد واحد بلا تغييرات', 'mute')}</div></div></div>
       ${conCard(c, true)}
+      <div class="hr-sec"><span>تفاصيل الراتب</span></div><div id="hrSal" class="hr-sal"><div class="hr-none">جارٍ تحميل تفاصيل الراتب…</div></div>
       ${others.length ? `<div class="hr-sec"><span>عقود وسجلات أخرى لنفس الموظف (${others.length})</span></div>${others.map((x) => conCard(x)).join('')}` : ''}
       ${c.empId && HR.db.get('employees', {})[c.empId] ? `<button class="btn-outline wide" id="hrToEmp">${icon('users')}<span>ملف الموظف</span></button>` : ''}
       ${c.empId ? `<button class="btn-outline wide" id="hrMsgCon">${icon('note')}<span>إرسال إشعار انتهاء العقد</span></button>` : ''}
       ${rawTable(c.raw)}`);
+    loadSalary(c);
     const b = $('hrToEmp'); if (b) b.onclick = () => openEmp(c.empId, c.id);
     const mc = $('hrMsgCon'); if (mc) mc.onclick = () => openCompose([{ empId: c.empId, con: c }], 'contract');
   }
