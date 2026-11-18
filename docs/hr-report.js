@@ -265,10 +265,14 @@
     };
   }
   // يقسّم الكشف إلى صفحات (صور) بحجم ثابت 1080×1620 وتُرسم بدقة 4/3 لتبقى القراءة واضحة عند المشاركة
-  function detailPages(D) {
-    const PW = 1080, PH = 1620, SC = 4 / 3, pad = 44, FOOT = 78, FIRST = 330, NEXT = 142;
+  function detailPages(D, opt) {
+    const light = !!(opt && opt.light);
+    const PW = 1080, PH = 1527, SC = 4 / 3, pad = 44, FOOT = 78, FIRST = 330, NEXT = 142;
     const FF = (getComputedStyle(document.body).fontFamily || 'sans-serif');
-    const BG = '#0e1c20', CARD = '#162a2f', LINE = '#22393f', GOLD = '#d9b56b', TXT = '#eef3f2', MUT = '#9bb2b3', OK = '#4fbf8a', WARN = '#e0a03c', BAD = '#e0645a', INFO = '#6aa7e0', PUR = '#b388e0';
+    const P_ = light
+      ? { BG: '#ffffff', CARD: '#f5f8f8', LINE: '#d3dddd', GOLD: '#8f6b1c', TXT: '#12262a', MUT: '#56696c', OK: '#17835a', WARN: '#b4690e', BAD: '#c0392b', INFO: '#2a68ad', PUR: '#7446a8', H1: '#e4efed', H2: '#dcebe3', HT: '#12262a', ST: 'rgba(0,0,0,.04)', FT: '#56696c' }
+      : { BG: '#0e1c20', CARD: '#162a2f', LINE: '#22393f', GOLD: '#d9b56b', TXT: '#eef3f2', MUT: '#9bb2b3', OK: '#4fbf8a', WARN: '#e0a03c', BAD: '#e0645a', INFO: '#6aa7e0', PUR: '#b388e0', H1: '#1d3a3f', H2: '#2b4a3c', HT: '#eef3f2', ST: 'rgba(255,255,255,.035)', FT: '#9bb2b3' };
+    const BG = P_.BG, CARD = P_.CARD, LINE = P_.LINE, GOLD = P_.GOLD, TXT = P_.TXT, MUT = P_.MUT, OK = P_.OK, WARN = P_.WARN, BAD = P_.BAD, INFO = P_.INFO, PUR = P_.PUR;
     const mc = document.createElement('canvas').getContext('2d');
     const fnt = (w, sz) => `${w} ${sz}px ${FF}`;
     const fit = (str, maxW, w, sz) => { mc.font = fnt(w, sz); str = String(str); if (mc.measureText(str).width <= maxW) return str; while (str.length > 1 && mc.measureText(str + '…').width > maxW) str = str.slice(0, -1); return str + '…'; };
@@ -314,18 +318,18 @@
       const rr = (x, yy, w, h, r, fill, stroke) => { g.beginPath(); g.roundRect ? g.roundRect(x, yy, w, h, r) : g.rect(x, yy, w, h); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } };
       g.fillStyle = BG; g.fillRect(0, 0, PW, PH);
       // الرأس
-      const gr = g.createLinearGradient(0, 0, PW, 0); gr.addColorStop(0, '#1d3a3f'); gr.addColorStop(1, '#2b4a3c'); g.fillStyle = gr; g.fillRect(0, 0, PW, pi === 0 ? 170 : 112);
+      const gr = g.createLinearGradient(0, 0, PW, 0); gr.addColorStop(0, P_.H1); gr.addColorStop(1, P_.H2); g.fillStyle = gr; g.fillRect(0, 0, PW, pi === 0 ? 170 : 112);
       g.fillStyle = GOLD; g.fillRect(0, pi === 0 ? 166 : 108, PW, 4);
       if (pi === 0) {
-        g.T(`كشف الدوام — ${D.org}`, PW - pad, 74, TXT, 800, 48); g.T(dfull.format(noon(D.ds)), PW - pad, 126, GOLD, 700, 30);
-        const stamp = D.synced ? dataStamp(D) : 'حضور هذا اليوم غير مزامَن'; if (stamp) g.T(stamp, pad, 126, '#c4d6d5', 600, 24, 'left');
+        g.T(`كشف الدوام — ${D.org}`, PW - pad, 74, P_.HT, 800, 48); g.T(dfull.format(noon(D.ds)), PW - pad, 126, GOLD, 700, 30);
+        const stamp = D.synced ? dataStamp(D) : 'حضور هذا اليوم غير مزامَن'; if (stamp) g.T(stamp, pad, 126, light ? '#3e5558' : '#c4d6d5', 600, 24, 'left');
         const sm = [['الموظفون', D.total, TXT], ['حضور', D.att.length, OK], ['متأخرون', D.late.length, WARN], ['إجازة', D.leave.length, INFO], ['مهام/مغادرات', D.mis.length, PUR], ['بلا تسجيل', D.unreg.length, BAD]];
         const cw = (PW - pad * 2 - 5 * 10) / 6;
         sm.forEach(([n, v, col], i) => { const x = PW - pad - (i + 1) * cw - i * 10; rr(x, 194, cw, 112, 18, CARD, LINE); g.T(v, x + cw / 2, 252, col, 800, 44, 'center'); g.T(n, x + cw / 2, 290, MUT, 600, 21, 'center'); });
       } else {
-        g.T(`كشف الدوام — ${D.org}`, PW - pad, 56, TXT, 800, 38); g.T(`${dfull.format(noon(D.ds))}  ·  تابع`, PW - pad, 94, GOLD, 600, 23);
+        g.T(`كشف الدوام — ${D.org}`, PW - pad, 56, P_.HT, 800, 38); g.T(`${dfull.format(noon(D.ds))}  ·  تابع`, PW - pad, 94, GOLD, 600, 23);
       }
-      g.T(`صفحة ${pi + 1} من ${N}`, pad, pi === 0 ? 74 : 62, '#c4d6d5', 800, 26, 'left');
+      g.T(`صفحة ${pi + 1} من ${N}`, pad, pi === 0 ? 74 : 62, light ? '#3e5558' : '#c4d6d5', 800, 26, 'left');
       // البطاقات
       P.cards.forEach((cd) => { rr(pad, cd.y1, PW - pad * 2, cd.y2 - cd.y1, 22, CARD, LINE); g.fillStyle = cd.col; g.fillRect(PW - pad - 7, cd.y1 + 20, 7, 40); });
       P.ops.forEach((op) => {
@@ -334,7 +338,7 @@
         else if (op.k === 'empty') g.T(b.empty, PW - pad - 26, op.y + 36, MUT, 600, 26);
         else {
           const base = op.y + b.rh * 0.64;
-          if (op.gi % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.035)'; g.fillRect(pad + 12, op.y, PW - pad * 2 - 24, b.rh); }
+          if (op.gi % 2 === 0) { g.fillStyle = P_.ST; g.fillRect(pad + 12, op.y, PW - pad * 2 - 24, b.rh); }
           for (let sl = 0; sl < b.cols; sl++) { const idx = op.gi * b.cols + sl; if (idx < b.items.length) b.row(g, b.items[idx], base, idx, sl); }
         }
       });
@@ -346,5 +350,36 @@
     return out;
   }
 
-  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages };
+
+  /* ---------- PDF: كل صفحة صورة JPEG بحجم A4 (يحفظ تنسيق العربية كما هو، ولا يحتاج خطوطاً) ---------- */
+  function pdfOf(canvases) {
+    const enc = new TextEncoder(), chunks = [], offs = [];
+    let len = 0;
+    const put = (u8) => { chunks.push(u8); len += u8.length; };
+    const txt = (t) => put(enc.encode(t));
+    const N = canvases.length, W = 595.28, H = 841.89;
+    put(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10, 37, 226, 227, 207, 211, 10]));   // %PDF-1.4 + تعليق ثنائي
+    const obj = (id, body) => { offs[id] = len; txt(`${id} 0 obj\n${body}\nendobj\n`); };
+    obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    obj(2, `<< /Type /Pages /Count ${N} /Kids [${canvases.map((_, i) => `${3 + i * 3} 0 R`).join(' ')}] >>`);
+    canvases.forEach((cv, i) => {
+      const pid = 3 + i * 3, cid = pid + 1, iid = pid + 2;
+      const bin = atob(cv.toDataURL('image/jpeg', 0.92).split(',')[1]), jpg = new Uint8Array(bin.length);
+      for (let k = 0; k < bin.length; k++) jpg[k] = bin.charCodeAt(k);
+      obj(pid, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 ${iid} 0 R >> >> /Contents ${cid} 0 R >>`);
+      const content = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+      obj(cid, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+      offs[iid] = len;
+      txt(`${iid} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${cv.width} /Height ${cv.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`);
+      put(jpg); txt('\nendstream\nendobj\n');
+    });
+    const total = 3 + N * 3, xr = len;
+    txt(`xref\n0 ${total}\n0000000000 65535 f \n` + offs.slice(1, total).map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join(''));
+    txt(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`);
+    const out = new Uint8Array(len); let p = 0; chunks.forEach((c) => { out.set(c, p); p += c.length; });
+    return out;
+  }
+  const toB64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64 };
 })();

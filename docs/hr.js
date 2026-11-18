@@ -329,7 +329,9 @@
       ${nP > 1 ? `<small class="hr-pgn">${nP} صفحات — تُرسل كلها معاً</small>` : ''}
       ${urls.map((u, k) => `<img class="hr-wimg" alt="صفحة ${k + 1}" src="${u}">`).join('')}
       <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} ${nP > 1 ? `مشاركة الصفحات (${nP})` : 'مشاركة هذه الصورة'}</button>${dyView !== 'sum' ? '' : `<button type="button" class="btn-outline" id="dyText">مشاركة كنص</button>`}</div>
-      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} استثناء أسماء (${ex.size})</button></div>`);
+      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} استثناء أسماء (${ex.size})</button></div>
+      <div class="hr-gact"><button type="button" class="btn-outline" id="dyPdf">${icon('note')} ملف PDF لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyPdf2">${icon('note')} PDF واحد لـ PEF و HHO</button>`}</div>
+      <small class="hr-pgn">ملف PDF بصفحات A4 مهيأة للطباعة (خلفية بيضاء)</small>`);
     const body = $('hrSheetBody');
     body.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => openDaily(addDays(ds, +b.dataset.d)); });
     body.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => openDaily(ds, b.dataset.v); });
@@ -345,6 +347,16 @@
     $('dyShare').onclick = () => shareFiles(itemsOf(dyView, cur.pages));
     $('dyBoth').onclick = () => { const a = mk('PEF'), b = mk('HHO'); shareFiles(itemsOf('PEF', a.pages).concat(itemsOf('HHO', b.pages))); };
     $('dyEx').onclick = () => openRepExcl(() => openDaily(ds));
+    // PDF: صفحات A4 (كشوف الجهات بخلفية بيضاء للطباعة)
+    const sharePdf = (u8, name) => {
+      if (B && B.shareFile) { B.shareFile(HRReport.toB64(u8), name, 'application/pdf'); return; }
+      const file = new File([u8], name, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file] }).catch(() => {});
+      else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click(); }
+    };
+    const pagesOf = (v) => v === 'sum' ? cur.pages : HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true });
+    $('dyPdf').onclick = () => { toast('جارٍ إنشاء ملف PDF…'); setTimeout(() => sharePdf(HRReport.pdfOf(pagesOf(dyView)), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.pdf`), 60); };
+    const p2 = $('dyPdf2'); if (p2) p2.onclick = () => { toast('جارٍ إنشاء ملف PDF…'); setTimeout(() => sharePdf(HRReport.pdfOf(pagesOf('PEF').concat(pagesOf('HHO'))), `hr-pef-hho-${ds}.pdf`), 60); };
     const tx = $('dyText'); if (tx) tx.onclick = () => { const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
 
