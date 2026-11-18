@@ -1708,3 +1708,19 @@ html:has(#tab-times.active){overflow:hidden}
 .mg-bkseg{margin:6px 0 8px}
 .mg-sentbar{display:flex;align-items:center;justify-content:space-between;margin:4px 0 8px}
 .mg-bknote.danger{color:#e0645a;border-color:rgba(224,100,90,.5)}
+
+/* تفاصيل راتب العقد */
+.hr-sal{display:grid;gap:8px;margin-bottom:8px}
+.hr-salnow{padding:14px;border-radius:18px;text-align:center;background:linear-gradient(150deg,color-mix(in srgb,var(--gold,#d9b56b) 22%,transparent),transparent);border:1px solid color-mix(in srgb,var(--gold,#d9b56b) 45%,transparent);display:grid;gap:4px}
+.hr-salnow small{opacity:.75}.hr-salnow b{font-size:1.7rem;letter-spacing:.01em}.hr-salnow span{font-size:.85rem;opacity:.85}
+.hr-salnow em,.hr-salv em{font-style:normal;font-size:.8rem;font-weight:700}
+.hr-salnow em.up,.hr-salv em.up{color:#4fbf8a}.hr-salnow em.dn,.hr-salv em.dn{color:#e0645a}
+.hr-saltl{display:grid;gap:0;position:relative}
+.hr-salr{display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line,#2a3b3d)}
+.hr-salr>i{flex:none;width:10px;height:10px;border-radius:50%;background:#5B9DF0;margin-top:8px}
+.hr-salr.now>i{background:#4fbf8a;box-shadow:0 0 10px #4fbf8a}.hr-salr.x{opacity:.55}.hr-salr.x .hr-salv{text-decoration:line-through}
+.hr-salr>div{flex:1;min-width:0;display:grid;gap:3px}
+.hr-salh{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.hr-salv{font-size:1.15rem;font-weight:800;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.hr-salr small{opacity:.75;line-height:1.5}
+.hr-salnote{opacity:.7;text-align:center}
