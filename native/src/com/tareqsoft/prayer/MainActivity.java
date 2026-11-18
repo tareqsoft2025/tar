@@ -363,6 +363,29 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void shareImages(final String json) {
+            try {
+                org.json.JSONArray arr = new org.json.JSONArray(json);
+                java.io.File dir = new java.io.File(getCacheDir(), "share"); dir.mkdirs();
+                final java.util.ArrayList<android.net.Uri> uris = new java.util.ArrayList<android.net.Uri>();
+                for (int k = 0; k < arr.length(); k++) {
+                    JSONObject o = arr.getJSONObject(k);
+                    byte[] data = android.util.Base64.decode(o.getString("b64"), android.util.Base64.DEFAULT);
+                    String fn = o.getString("name").replaceAll("[^A-Za-z0-9._-]", "_");
+                    java.io.FileOutputStream os = new java.io.FileOutputStream(new java.io.File(dir, fn)); os.write(data); os.close();
+                    uris.add(android.net.Uri.parse("content://com.tareqsoft.prayer.share/" + fn));
+                }
+                runOnUiThread(new Runnable() { public void run() {
+                    Intent i = new Intent(Intent.ACTION_SEND_MULTIPLE);
+                    i.setType("image/png");
+                    i.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(i, "مشاركة"));
+                } });
+            } catch (Exception e) { js("window.toast && window.toast('تعذّرت المشاركة')"); }
+        }
+
+        @JavascriptInterface
         public void shareImage(final String b64, final String name, final String caption) {
             try {
                 byte[] data = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
