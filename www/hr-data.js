@@ -137,6 +137,25 @@
   const txt = (v) => v == null ? null : typeof v === 'object' ? (v.titleAr || v.nameAr || v.name || v.titleEn || v.code || null) : v;
 
   /* ---------- النماذج ---------- */
+  // الجهة (PEF/HHO) بحسب «سلم» العقد الحالي للموظف: نص السلم يحوي HHO ← HHO، ويحوي PEF ← PEF، وإلا تُستنتج من بيانات الموظف
+  let orgSrc = null, orgMap = {};
+  function orgFromContract(empId) {
+    const cobj = db.get('contracts', {});
+    if (orgSrc !== cobj) {
+      orgSrc = cobj; orgMap = {};
+      const t = dayStr(), best = {};
+      Object.values(cobj).forEach((x) => {
+        const id = String(pick(x, 'employeeId', 'employee.id') || ''); if (!id) return;
+        const sc = String(txt(pick(x, 'salaryScaleBand.nameAr', 'salaryScaleBand.name', 'salaryScaleBand.code', 'salaryScaleBand', 'scale')) || '') + ' ' + String(pick(x, 'salaryScaleBand.code') || '');
+        const o = /hho/i.test(sc) ? 'HHO' : /pef/i.test(sc) ? 'PEF' : null; if (!o) return;
+        const st = d10(pick(x, 'startDate', 'effectiveFrom')) || '', en = d10(pick(x, 'endDate', 'newEndDate', 'effectiveTo')) || '9999';
+        const live = en >= t && (!st || st <= t) ? 1 : 0, key = live + '|' + st;
+        if (!best[id] || key > best[id].key) best[id] = { key, o };
+      });
+      Object.keys(best).forEach((id) => { orgMap[id] = best[id].o; });
+    }
+    return orgMap[String(empId)] || null;
+  }
   function emp(x) {
     const mode = String(pick(x, 'workScheduleMode', 'scheduleMode') || '').toLowerCase();
     const scale = String(pick(x, 'salaryScaleBand', 'scale', 'contract.salaryScaleBand') || '');
@@ -149,7 +168,7 @@
       phone: pick(x, 'mobileNumber', 'mobile', 'phone', 'phoneNumber', 'mobilePhone'), email: pick(x, 'email'),
       join: d10(pick(x, 'joinDate', 'hireDate', 'startDate')), term: d10(pick(x, 'terminationDate', 'endDate')),
       active: x.activeOnJob != null ? !!x.activeOnJob : !(pick(x, 'terminationDate') && d10(x.terminationDate) < dayStr()) && String(x.status || 'active').toLowerCase() !== 'inactive',
-      validContract: x.hasValidContract, org: hho ? 'HHO' : 'PEF', type: mode.includes('field') ? 'field' : 'office', mode, raw: x
+      validContract: x.hasValidContract, org: orgFromContract(idOf(x)) || (hho ? 'HHO' : 'PEF'), type: mode.includes('field') ? 'field' : 'office', mode, raw: x
     };
   }
   function contractKind(x) {
@@ -574,6 +593,7 @@
     const byEmp = {};
     (evs || []).filter((e) => !e.hiddenAt).forEach((e) => { (byEmp[e.employeeId] = byEmp[e.employeeId] || []).push(e); });
     const weekend = cfg.weekend.includes(Tracker.dowOf(ds));
+    const exSet = new Set((db.get('repExcl', []) || []).map(String));
     return {
       synced: !!evs, weekend,
       rows: employees().filter((e) => activeOn(e, ds)).map((e) => {
@@ -591,6 +611,7 @@
         else if (lateMin > 0) status = 'late';
         if (list.length && !ins.length) status = 'noin';
         if (list.length && weekend && !leave) status = 'hwork';   // دوام في يوم عطلة: لا يُحسب تأخراً
+        if (exSet.has(String(e.id))) { if (status === 'absent') status = 'exempt'; else if (status === 'late') { status = 'present'; lateMin = 0; } }   // مستثنى من تسجيل الحضور
         const w = worked(list, ds);
         const outside = list.some((x) => place(x).st === 'outside');
         return { e, list, firstIn, lastOut, lateMin, leave, hasAsg, status, workMin: w.min, openShift: w.open, live: w.live, outside, reqs };
