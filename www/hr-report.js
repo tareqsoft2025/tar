@@ -267,7 +267,10 @@
   // يقسّم الكشف إلى صفحات (صور) بحجم ثابت 1080×1620 وتُرسم بدقة 4/3 لتبقى القراءة واضحة عند المشاركة
   function detailPages(D, opt) {
     const light = !!(opt && opt.light);
-    const PW = 1080, PH = 1527, SC = 4 / 3, pad = 44, FOOT = 78, FIRST = 330, NEXT = 142;
+    const PW = 1080, PH = 1527, SC = 4 / 3, pad = 44;
+    const LHd = opt && opt.letterhead;   // ترويسة وتذييل المؤسسة (صورتان)
+    const LH = LHd ? Math.round(PW * LHd.head.naturalHeight / LHd.head.naturalWidth) : 0, FH = LHd ? Math.round(PW * LHd.foot.naturalHeight / LHd.foot.naturalWidth) : 0;
+    const FOOT = LHd ? FH + 50 : 78, FIRST = LHd ? LH + 262 : 330, NEXT = LHd ? LH + 84 : 142;
     const FF = (getComputedStyle(document.body).fontFamily || 'sans-serif');
     const P_ = light
       ? { BG: '#ffffff', CARD: '#f5f8f8', LINE: '#d3dddd', GOLD: '#8f6b1c', TXT: '#12262a', MUT: '#56696c', OK: '#17835a', WARN: '#b4690e', BAD: '#c0392b', INFO: '#2a68ad', PUR: '#7446a8', H1: '#e4efed', H2: '#dcebe3', HT: '#12262a', ST: 'rgba(0,0,0,.04)', FT: '#56696c' }
@@ -318,6 +321,20 @@
       const rr = (x, yy, w, h, r, fill, stroke) => { g.beginPath(); g.roundRect ? g.roundRect(x, yy, w, h, r) : g.rect(x, yy, w, h); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } };
       g.fillStyle = BG; g.fillRect(0, 0, PW, PH);
       // الرأس
+      if (LHd) {
+        g.drawImage(LHd.head, 0, 0, PW, LH); g.drawImage(LHd.foot, 0, PH - FH, PW, FH);
+        if (pi === 0) {
+          g.T(`كشف الدوام — ${D.org}`, PW - pad, LH + 62, P_.HT, 800, 44); g.T(dfull.format(noon(D.ds)), PW - pad, LH + 106, GOLD, 700, 28);
+          const st0 = D.synced ? dataStamp(D) : 'حضور هذا اليوم غير مزامَن'; if (st0) g.T(st0, pad, LH + 106, '#3e5558', 600, 23, 'left');
+          const sm0 = [['الموظفون', D.total, TXT], ['حضور', D.att.length, OK], ['متأخرون', D.late.length, WARN], ['إجازة', D.leave.length, INFO], ['مهام/مغادرات', D.mis.length, PUR], ['بلا تسجيل', D.unreg.length, BAD]];
+          const cw0 = (PW - pad * 2 - 5 * 10) / 6;
+          sm0.forEach(([n, v, col], i) => { const x = PW - pad - (i + 1) * cw0 - i * 10; rr(x, LH + 128, cw0, 108, 18, CARD, LINE); g.T(v, x + cw0 / 2, LH + 184, col, 800, 42, 'center'); g.T(n, x + cw0 / 2, LH + 220, MUT, 600, 20, 'center'); });
+        } else {
+          g.T(`كشف الدوام — ${D.org}  ·  تابع`, PW - pad, LH + 50, P_.HT, 800, 30); g.T(dfull.format(noon(D.ds)), pad, LH + 50, GOLD, 700, 22, 'left');
+        }
+        g.fillStyle = LINE; g.fillRect(pad, PH - FH - 34, PW - pad * 2, 2);
+        g.T(`صفحة ${pi + 1} من ${N}${dataStamp(D) ? '  ·  ' + dataStamp(D) : ''}${D.excluded ? '  ·  استُثني ' + D.excluded + ' من التقرير' : ''}`, PW / 2, PH - FH - 10, MUT, 600, 21, 'center');
+      } else {
       const gr = g.createLinearGradient(0, 0, PW, 0); gr.addColorStop(0, P_.H1); gr.addColorStop(1, P_.H2); g.fillStyle = gr; g.fillRect(0, 0, PW, pi === 0 ? 170 : 112);
       g.fillStyle = GOLD; g.fillRect(0, pi === 0 ? 166 : 108, PW, 4);
       if (pi === 0) {
@@ -330,6 +347,7 @@
         g.T(`كشف الدوام — ${D.org}`, PW - pad, 56, P_.HT, 800, 38); g.T(`${dfull.format(noon(D.ds))}  ·  تابع`, PW - pad, 94, GOLD, 600, 23);
       }
       g.T(`صفحة ${pi + 1} من ${N}`, pad, pi === 0 ? 74 : 62, light ? '#3e5558' : '#c4d6d5', 800, 26, 'left');
+      }
       // البطاقات
       P.cards.forEach((cd) => { rr(pad, cd.y1, PW - pad * 2, cd.y2 - cd.y1, 22, CARD, LINE); g.fillStyle = cd.col; g.fillRect(PW - pad - 7, cd.y1 + 20, 7, 40); });
       P.ops.forEach((op) => {
@@ -343,14 +361,23 @@
         }
       });
       // التذييل
-      g.fillStyle = LINE; g.fillRect(pad, PH - FOOT + 12, PW - pad * 2, 2);
-      g.T(`أُعدّ بتطبيق الموارد البشرية${dataStamp(D) ? ' · ' + dataStamp(D) : ''}${D.excluded ? ' · استُثني ' + D.excluded + ' من التقرير' : ''}`, PW / 2, PH - 30, MUT, 600, 22, 'center');
+      if (!LHd) { g.fillStyle = LINE; g.fillRect(pad, PH - FOOT + 12, PW - pad * 2, 2); }
+      if (!LHd) g.T(`أُعدّ بتطبيق الموارد البشرية${dataStamp(D) ? ' · ' + dataStamp(D) : ''}${D.excluded ? ' · استُثني ' + D.excluded + ' من التقرير' : ''}`, PW / 2, PH - 30, MUT, 600, 22, 'center');
       out.push(cv);
     });
     return out;
   }
 
 
+  // يحمّل صورتي ترويسة وتذييل المؤسسة من ملفات التطبيق (مرة واحدة)
+  let LHp = null;
+  function loadLetterhead() {
+    if (!LHp) {
+      const ld = (src) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('img ' + src)); im.src = src; });
+      LHp = Promise.all([ld('img/pdf-head.jpg'), ld('img/pdf-foot.jpg')]).then(([head, foot]) => ({ head, foot })).catch(() => null);
+    }
+    return LHp;
+  }
   /* ---------- PDF: كل صفحة صورة JPEG بحجم A4 (يحفظ تنسيق العربية كما هو، ولا يحتاج خطوطاً) ---------- */
   function pdfOf(canvases) {
     const enc = new TextEncoder(), chunks = [], offs = [];
@@ -381,5 +408,38 @@
   }
   const toB64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 
-  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64 };
+
+  /* ---------- تصدير Excel: أوراق جاهزة لكل تقرير ---------- */
+  function sheetsDetail(D, pre) {
+    const P = pre ? pre + ' - ' : '', n = (i) => i + 1;
+    return [
+      { name: P + 'ملخص', widths: [26, 30], rows: [['البند', 'القيمة'], ['الجهة', D.org], ['التاريخ', dfull.format(noon(D.ds))], ['بيانات حتى', D.syncedAt ? tmf.format(new Date(D.syncedAt)) : ''], ['عدد الموظفين', D.total], ['حضور', D.att.length], ['متأخرون', D.late.length], ['إجازة', D.leave.length], ['مهام/مغادرات', D.mis.length], ['بلا تسجيل', D.unreg.length], ['المستثنون من التقرير', D.excluded || 0]] },
+      { name: P + 'الحضور', widths: [6, 36, 14, 14, 34, 34, 12], rows: [['#', 'الاسم', 'الدخول', 'الخروج', 'موقع الدخول', 'موقع الخروج', 'تأخر (د)']].concat(D.att.map((x, i) => [n(i), x.name, x.in, x.out, x.place, x.outPlace, x.late || ''])) },
+      { name: P + 'الإجازات', widths: [6, 36, 24], rows: [['#', 'الاسم', 'نوع الإجازة']].concat(D.leave.map((x, i) => [n(i), x.name, x.label])) },
+      { name: P + 'المهام والمغادرات', widths: [6, 36, 14, 22, 36], rows: [['#', 'الاسم', 'النوع', 'الوقت', 'المشروع / السبب']].concat(D.mis.map((x, i) => [n(i), x.name, x.kind, x.time, x.what])) },
+      { name: P + 'بلا تسجيل', widths: [6, 36, 28], rows: [['#', 'الاسم', 'القسم']].concat(D.unreg.map((x, i) => [n(i), x.name, x.dept])) },
+      { name: P + 'المتأخرون', widths: [6, 36, 14, 14], rows: [['#', 'الاسم', 'وقت الدخول', 'دقائق التأخر']].concat(D.late.map((x, i) => [n(i), x.name, x.in, x.min])) }
+    ];
+  }
+  function sheetsSummary(D) {
+    const c = D.c;
+    return [
+      { name: 'ملخص اليوم', widths: [26, 30], rows: [['البند', 'القيمة'], ['التاريخ', dfull.format(noon(D.ds))], ['بيانات حتى', D.syncedAt ? tmf.format(new Date(D.syncedAt)) : ''], ['نسبة الحضور %', D.rate == null ? '' : D.rate], ['الموظفون', c.total], ['حاضر', c.present], ['متأخر', c.late], ['إجازة', c.leave], ['مهام/طلبات', c.mission], ['بلا تسجيل', c.unreg], ['دوام في عطلة', c.hwork]] },
+      { name: 'حسب السلم', widths: [34, 12, 12, 12, 12, 14], rows: [['السلم', 'الإجمالي', 'حضور', 'متأخر', 'إجازة/مهام', 'بلا تسجيل']].concat(D.bands.map((b) => [b.name, b.total, b.present + b.late, b.late, b.leave, b.unreg])) },
+      { name: 'المتأخرون', widths: [6, 36, 14, 14], rows: [['#', 'الاسم', 'وقت الدخول', 'دقائق التأخر']].concat(D.late.map((x, i) => [i + 1, x.name, x.at ? tmf.format(new Date(x.at)) : '', x.min])) },
+      { name: 'بلا تسجيل', widths: [6, 36, 28, 24], rows: [['#', 'الاسم', 'القسم', 'السلم']].concat(D.unreg.map((x, i) => [i + 1, x.name, x.dept, x.band])) }
+    ];
+  }
+  function sheetsWeekly(D) {
+    return [
+      { name: 'الأسبوعي', widths: [28, 24], rows: [['البند', 'القيمة'], ['الفترة', fmtD(D.range.from) + ' ← ' + fmtD(D.range.to)], ['المجموعة', D.group || 'كل الموظفين'], ['نسبة الحضور %', D.rate == null ? '' : D.rate], ['حضور (موظف-يوم)', D.presentN], ['تأخر', D.lateN], ['دقائق التأخر', D.lateMin], ['بلا تسجيل', D.absentN], ['أيام إجازة', D.leaveDays], ['طلبات معلّقة', D.pending], ['أيام غير مزامنة', D.unsynced]] },
+      { name: 'يومياً', widths: [20, 12, 12, 14, 12], rows: [['اليوم', 'حاضر', 'متأخر', 'بلا تسجيل', 'إجازة']].concat(D.days.map((d) => [d.ds, d.synced ? d.present : '', d.synced ? d.late : '', d.synced ? d.absent : '', d.synced ? d.leave : ''])) },
+      { name: 'الأكثر تأخراً', widths: [6, 36, 12, 14], rows: [['#', 'الاسم', 'المرات', 'الدقائق']].concat(D.topLate.map((x, i) => [i + 1, x.name, x.n, x.min])) },
+      { name: 'الأكثر غياباً', widths: [6, 36, 12], rows: [['#', 'الاسم', 'الأيام']].concat(D.topAbsent.map((x, i) => [i + 1, x.name, x.n])) },
+      { name: 'المواقع', widths: [6, 36, 14], rows: [['#', 'الموقع', 'التسجيلات']].concat(D.topSites.map((x, i) => [i + 1, x.name, x.n])) }
+    ];
+  }
+  const xlsxOf = (sheets) => window.HRXlsx.build(sheets);
+
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64, loadLetterhead, sheetsDetail, sheetsSummary, sheetsWeekly, xlsxOf };
 })();

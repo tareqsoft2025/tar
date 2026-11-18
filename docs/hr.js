@@ -288,6 +288,64 @@
 
   /* ---------- صورة حالة الدوام اليومية (للمشاركة) ---------- */
   const bandOf = (e) => { const c = bestContract(e.id); return (c && (c.scale || (c.grade ? 'درجة ' + c.grade : ''))) || e.org || '—'; };
+  // مشاركة ملف (PDF/Excel) عبر الجسر الأصلي أو متصفح الاختبار
+  function shareBytes(u8, name, mime) {
+    const B = window.AndroidBridge;
+    if (B && B.shareFile) { B.shareFile(HRReport.toB64(u8), name, mime); return; }
+    const file = new File([u8], name, { type: mime });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file] }).catch(() => {});
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click(); }
+  }
+  const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+  /* ---------- إرسال PDF تلقائياً إلى واتساب (خدمة إمكانية الوصول تضغط «إرسال») ---------- */
+  const waNums = () => HR.db.get('waAutoNums', []);
+  const waNorm = (v) => { let d = String(v || '').replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); if (/^05\d{8}$/.test(d)) return '970' + d.slice(1); if (/^5\d{8}$/.test(d)) return '970' + d; return d; };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // getFile: async () => ({ u8, name, caption, mime }) أو null لإدارة الأرقام فقط
+  function openWaAuto(getFile, back) {
+    const B = window.AndroidBridge, has = !!(B && B.waAutoSend);
+    const en = has && B.waAutoEnabled && B.waAutoEnabled(), inst = has && B.waInstalled ? B.waInstalled() : '';
+    sheet(`<div class="hr-ph"><span class="hr-ava big ok">${icon('share')}</span><div><b>إرسال تلقائي إلى واتساب</b><small>التقرير بصيغة PDF إلى الأرقام التي تحدّدها</small></div></div>
+      <div class="hr-wa-st"><div class="${inst ? 'ok' : 'bad'}">${inst ? '✔' : '✘'} واتساب${inst === 'w4b' ? ' للأعمال' : ''} ${inst ? 'مثبّت' : 'غير مثبّت على هذا الجوال'}</div>
+        <div class="${en ? 'ok' : 'bad'}">${en ? '✔' : '✘'} خدمة الإرسال التلقائي ${en ? 'مفعّلة' : 'غير مفعّلة'}</div></div>
+      ${en || !has ? '' : `<div class="hr-warnbox">${icon('alert')}<span>لإرسال بلا ضغط يدوي فعّل الخدمة مرة واحدة: إمكانية الوصول ← التطبيقات المثبّتة ← «مواقيت الصلاة» ← تشغيل. إن ظهرت رسالة «إعداد مقيَّد»: معلومات التطبيق ← ⋮ ← السماح بالإعدادات المقيَّدة، ثم أعد التفعيل.</span></div><button type="button" class="btn-outline wide" id="waSet">فتح إعدادات إمكانية الوصول</button>`}
+      <div class="hr-sl2" style="margin-top:8px">الأرقام (مع رمز الدولة، مثل 970599123456)</div>
+      <div id="waList" class="hr-glist"></div>
+      <div class="hr-sgrow" style="grid-template-columns:1fr 1fr auto"><input id="waN" class="hr-in" type="tel" inputmode="tel" placeholder="رقم واتساب" dir="ltr"><input id="waL" class="hr-in" placeholder="الاسم (اختياري)"><button type="button" class="hr-sgx" id="waAdd" aria-label="إضافة">${icon('plus')}</button></div>
+      <div id="waProg" class="hr-confirm" hidden></div>
+      <div class="hr-gact">${getFile ? `<button type="button" class="btn-primary" id="waGo">إرسال الآن</button>` : ''}<button type="button" class="btn-outline" id="waBack">${back ? 'رجوع' : 'إغلاق'}</button></div>
+      <p class="hr-omn">يجب أن يكون الجوال مفتوح القفل والشاشة تعمل أثناء الإرسال. يفتح التطبيق محادثة كل رقم ويضغط «إرسال» ثم يعود إليك. إن لم يتأكد الإرسال يبقى الملف جاهزاً في واتساب لتضغط «إرسال» يدوياً.</p>`);
+    const draw = () => {
+      const l = waNums();
+      $('waList').innerHTML = l.map((x, i) => `<div class="hr-grow${x.on !== false ? ' on' : ''}" data-i="${i}"><span class="hr-chk${x.on !== false ? ' on' : ''}" data-t="${i}">${icon('check')}</span><b dir="ltr" style="text-align:start">+${esc(x.n)}</b><small>${esc(x.l || '')}</small><button type="button" class="hr-sgx" data-x="${i}" aria-label="حذف" style="min-height:32px;width:32px">${icon('x')}</button></div>`).join('') || '<small>لا أرقام بعد — أضف رقماً</small>';
+      $('waList').querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => { const a = waNums(); a[+b.dataset.t].on = a[+b.dataset.t].on === false; HR.db.put('waAutoNums', a); draw(); }; });
+      $('waList').querySelectorAll('[data-x]').forEach((b) => { b.onclick = () => { const a = waNums(); a.splice(+b.dataset.x, 1); HR.db.put('waAutoNums', a); draw(); }; });
+    };
+    draw();
+    $('waAdd').onclick = () => { const n = waNorm($('waN').value); if (n.length < 10) { toast('اكتب الرقم كاملاً مع رمز الدولة'); return; } const a = waNums(); if (!a.some((x) => x.n === n)) a.push({ n, l: $('waL').value.trim(), on: true }); HR.db.put('waAutoNums', a); $('waN').value = ''; $('waL').value = ''; draw(); };
+    if ($('waSet')) $('waSet').onclick = () => B.waAutoSettings();
+    $('waBack').onclick = () => { if (back) back(); else closeSheet(); };
+    if ($('waGo')) $('waGo').onclick = async () => {
+      if (!has) { toast('الإرسال التلقائي متاح داخل تطبيق أندرويد فقط'); return; }
+      if (!inst) { toast('واتساب غير مثبّت'); return; }
+      const targets = waNums().filter((x) => x.on !== false); if (!targets.length) { toast('أضف رقماً وأشّر عليه'); return; }
+      const go = $('waGo'), pr = $('waProg'); go.disabled = true; pr.hidden = false; pr.innerHTML = 'جارٍ تجهيز الملف…';
+      const file = await getFile(); if (!file) { pr.innerHTML = 'تعذّر تجهيز الملف'; go.disabled = false; return; }
+      const b64 = HRReport.toB64(file.u8), res = [];
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i], nm = t.l || '+' + t.n;
+        pr.innerHTML = `(${i + 1}/${targets.length}) جارٍ الإرسال إلى <b>${esc(nm)}</b>… لا تغلق الشاشة<br>${res.map((r) => esc(r)).join('<br>')}`;
+        const ok = B.waAutoSend(t.n, b64, file.name, file.mime || 'application/pdf', file.caption || '');
+        if (!ok) { res.push(`✘ ${nm}: تعذّر فتح واتساب`); continue; }
+        let st = 'waiting'; for (let k = 0; k < 85 && st === 'waiting'; k++) { await sleep(700); st = B.waAutoStatus(); }
+        res.push(st === 'sent' ? `✔ ${nm}: أُرسل` : `⚠ ${nm}: لم يتأكد الإرسال — إن كان الملف ظاهراً في واتساب اضغط «إرسال» يدوياً`);
+        await sleep(3200);
+      }
+      pr.innerHTML = res.map((r) => esc(r)).join('<br>'); go.disabled = false; go.textContent = 'إرسال مرة أخرى';
+    };
+  }
+
   // أسماء مستثناة من كل التقارير المصوّرة (يومي/تفصيلي/أسبوعي)
   const repExcl = () => new Set((HR.db.get('repExcl', []) || []).map(String));
   const repOk = (e) => !repExcl().has(String(e.id));
@@ -331,7 +389,9 @@
       <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} ${nP > 1 ? `مشاركة الصفحات (${nP})` : 'مشاركة هذه الصورة'}</button>${dyView !== 'sum' ? '' : `<button type="button" class="btn-outline" id="dyText">مشاركة كنص</button>`}</div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} استثناء أسماء (${ex.size})</button></div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyPdf">${icon('note')} ملف PDF لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyPdf2">${icon('note')} PDF واحد لـ PEF و HHO</button>`}</div>
-      <small class="hr-pgn">ملف PDF بصفحات A4 مهيأة للطباعة (خلفية بيضاء)</small>`);
+      <div class="hr-gact"><button type="button" class="btn-outline" id="dyWa">${icon('share')} إرسال PDF تلقائياً إلى واتساب</button></div>
+      <div class="hr-gact"><button type="button" class="btn-outline" id="dyXl">${icon('chart')} ملف Excel لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyXl2">${icon('chart')} Excel واحد لـ PEF و HHO</button>`}</div>
+      <small class="hr-pgn">PDF بصفحات A4 مهيأة للطباعة بترويسة وتذييل المؤسسة · Excel بأوراق منفصلة لكل قسم</small>`);
     const body = $('hrSheetBody');
     body.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => openDaily(addDays(ds, +b.dataset.d)); });
     body.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => openDaily(ds, b.dataset.v); });
@@ -354,9 +414,17 @@
       if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file] }).catch(() => {});
       else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click(); }
     };
-    const pagesOf = (v) => v === 'sum' ? cur.pages : HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true });
-    $('dyPdf').onclick = () => { toast('جارٍ إنشاء ملف PDF…'); setTimeout(() => sharePdf(HRReport.pdfOf(pagesOf(dyView)), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.pdf`), 60); };
-    const p2 = $('dyPdf2'); if (p2) p2.onclick = () => { toast('جارٍ إنشاء ملف PDF…'); setTimeout(() => sharePdf(HRReport.pdfOf(pagesOf('PEF').concat(pagesOf('HHO'))), `hr-pef-hho-${ds}.pdf`), 60); };
+    $('dyWa').onclick = () => openWaAuto(async () => {
+      const lh = await HRReport.loadLetterhead(), both = true;
+      const pg = (await Promise.all(['PEF', 'HHO'].map(async (v) => HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true, letterhead: lh })))).flat();
+      return { u8: HRReport.pdfOf(pg), name: `hr-pef-hho-${ds}.pdf`, mime: 'application/pdf', caption: `كشف الدوام — ${dLong.format(noon(ds))}` };
+    }, () => openDaily(ds));
+    const dOf = (v) => HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() });
+    $('dyXl').onclick = () => shareBytes(HRReport.xlsxOf(dyView === 'sum' ? HRReport.sheetsSummary(cur.D) : HRReport.sheetsDetail(cur.D)), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.xlsx`, XLSX_MIME);
+    const x2 = $('dyXl2'); if (x2) x2.onclick = () => shareBytes(HRReport.xlsxOf(HRReport.sheetsDetail(dOf('PEF'), 'PEF').concat(HRReport.sheetsDetail(dOf('HHO'), 'HHO'))), `hr-pef-hho-${ds}.xlsx`, XLSX_MIME);
+    const pagesOf = async (v) => { const lh = await HRReport.loadLetterhead(); return v === 'sum' ? cur.pages : HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true, letterhead: lh }); };
+    $('dyPdf').onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = await pagesOf(dyView); sharePdf(HRReport.pdfOf(pg), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.pdf`); };
+    const p2 = $('dyPdf2'); if (p2) p2.onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = (await pagesOf('PEF')).concat(await pagesOf('HHO')); sharePdf(HRReport.pdfOf(pg), `hr-pef-hho-${ds}.pdf`); };
     const tx = $('dyText'); if (tx) tx.onclick = () => { const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
 
@@ -369,7 +437,9 @@
     sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('note')}</span><div><b>التقرير الأسبوعي</b><small>${esc(D.group || 'كل الموظفين')}${D.unsynced ? ' · ' + D.unsynced + ' يوم غير مزامن' : ''}</small></div></div>
       <div class="chips hr-fc"><button class="chip sm${kind === 'prev' ? ' on' : ''}" data-k="prev">الأسبوع الماضي</button><button class="chip sm${kind === 'incl' ? ' on' : ''}" data-k="incl">آخر ٧ أيام</button></div>
       <img class="hr-wimg" alt="التقرير الأسبوعي" src="${url}">
-      <div class="hr-gact"><button type="button" class="btn-primary" id="wkShare">${icon('note')} مشاركة الصورة</button><button type="button" class="btn-outline" id="wkText">مشاركة كنص</button></div>`);
+      <div class="hr-gact"><button type="button" class="btn-primary" id="wkShare">${icon('note')} مشاركة الصورة</button><button type="button" class="btn-outline" id="wkText">مشاركة كنص</button></div>
+      <div class="hr-gact"><button type="button" class="btn-outline" id="wkXl">${icon('chart')} ملف Excel</button></div>`);
+    $('wkXl').onclick = () => shareBytes(HRReport.xlsxOf(HRReport.sheetsWeekly(D)), 'hr-weekly-' + D.range.to + '.xlsx', XLSX_MIME);
     const body = $('hrSheetBody');
     body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openWeekly(b.dataset.k); });
     $('wkShare').onclick = () => {
@@ -1631,6 +1701,7 @@
       <p class="hr-omn" style="margin:0 0 8px">إشعار واحد كل يوم عمل يلخّص: المتأخرين، وغير المسجلين، والطلبات المعلّقة، والعقود والتكليفات التي تنتهي هذا الأسبوع. يصل حتى والتطبيق مغلق (مع تفعيل المتابعة الخلفية).</p>
       <button type="button" class="btn-outline wide" id="rvOpen">${icon('alert')}<span>المراجعة الشهرية السرية</span></button>
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
+      <button type="button" class="btn-outline wide" id="waOpen">${icon('share')}<span>الإرسال التلقائي إلى واتساب (الأرقام والتفعيل)</span></button>
       <button type="button" class="btn-outline wide" id="rxOpen">${icon('x')}<span>استثناء أسماء من التقارير (${repExcl().size})</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
       <label class="hr-srow"><span>إشعار لكل طلب جديد (إجازة، مغادرة، مهمة، عمل إضافي، عمل بعطلة)</span><input type="checkbox" id="rqOn" class="hr-tog" ${s.reqNotify === false ? '' : 'checked'}></label>
@@ -1643,6 +1714,7 @@
     body.appendChild(dg);
     $('wkRep').onclick = () => openWeekly('prev');
     $('rxOpen').onclick = () => openRepExcl(null);
+    $('waOpen').onclick = () => openWaAuto(null, null);
     $('wnLog').onclick = openWarnLog;
     $('rvOpen').onclick = () => { tab = 'rev'; store.set('hrTab', 'set'); revFlt = 'need'; render(); };
     $('rqOn').onchange = (e) => { put({ reqNotify: e.target.checked }); toast(e.target.checked ? 'فُعّلت إشعارات الطلبات' : 'أُوقفت إشعارات الطلبات'); };
@@ -1965,7 +2037,8 @@
     const head = el('div', 'hr-dnav', `<button class="icon-btn flip" data-d="-1" aria-label="الشهر السابق">${icon('chev')}</button><label><b>${mLbl.format(new Date(revYm + '-15T12:00:00Z'))}</b><small>${M.workDays} يوم دوام مزامَن</small></label><button class="icon-btn" data-d="1" aria-label="الشهر التالي" ${revYm >= ym0 ? 'disabled' : ''}>${icon('chev')}</button>`);
     head.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => shift(+b.dataset.d); });
     body.appendChild(head);
-    body.appendChild(el('div', 'hr-rvtop', `<button type="button" id="rvLock">${icon('alert')}قفل الآن</button><button type="button" id="rvPinCh">${hasPin() ? 'تغيير الرمز / إزالته' : 'تعيين رمز'}</button><button type="button" id="rvShare">${icon('note')}مشاركة</button>`));
+    body.appendChild(el('div', 'hr-rvtop', `<button type="button" id="rvLock">${icon('alert')}قفل الآن</button><button type="button" id="rvPinCh">${hasPin() ? 'تغيير الرمز / إزالته' : 'تعيين رمز'}</button><button type="button" id="rvShare">${icon('note')}مشاركة</button><button type="button" id="rvXl">${icon('chart')}Excel</button>`));
+    $('rvXl').onclick = () => shareBytes(HRReport.xlsxOf([{ name: 'المراجعة الشهرية', widths: [6, 36, 22, 10, 10, 10, 12, 12, 14, 10, 12, 12], rows: [['#', 'الاسم', 'القسم', 'حضور', 'غياب', 'تأخر (مرات)', 'تأخر (دقائق)', 'ساعات العمل', 'مغادرات شخصية (د)', 'مهام عمل', 'عمل بعطلة', 'بلا خروج']].concat(M.list.map((E, i) => [i + 1, E.e.name, E.e.dept || '', E.c.present, E.c.absent, E.c.late, E.c.lateMin, Math.round(E.c.workMin / 6) / 10, E.c.personalMin, E.c.missionN, E.c.holidayN, E.c.noOut])) }]), `hr-review-${M.ym}.xlsx`, XLSX_MIME);
     $('rvLock').onclick = () => { revOpen = 0; render(); };
     $('rvPinCh').onclick = () => { store.set('hrRevPin', ''); revOpen = 0; toast(hasPin() ? '' : 'أدخل رمزاً جديداً أو تابع بدونه'); render(); };
     $('rvShare').onclick = () => { const t = revSummaryText(M); const B = window.AndroidBridge; if (B && B.share) B.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
