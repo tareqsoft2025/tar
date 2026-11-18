@@ -264,61 +264,87 @@
       total: rows.length, excluded: all.length - rows.length, att, leave, mis, unreg, late
     };
   }
-  function detailCanvas(D) {
-    const W = 1080, pad = 48, RH = 46;
-    const sec = (n) => 84 + Math.max(n, 1) * RH + 18;
-    const H = 170 + 120 + sec(D.att.length) + sec(D.leave.length) + sec(D.mis.length) + sec(D.unreg.length) + sec(D.late.length) + 90;
-    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-    const g = cv.getContext('2d'); g.direction = 'rtl'; g.textBaseline = 'alphabetic';
+  // يقسّم الكشف إلى صفحات (صور) بحجم ثابت 1080×1620 وتُرسم بدقة 4/3 لتبقى القراءة واضحة عند المشاركة
+  function detailPages(D) {
+    const PW = 1080, PH = 1620, SC = 4 / 3, pad = 44, FOOT = 78, FIRST = 330, NEXT = 142;
     const FF = (getComputedStyle(document.body).fontFamily || 'sans-serif');
-    const BG = '#0e1c20', CARD = '#162a2f', LINE = '#22393f', GOLD = '#d9b56b', TXT = '#eef3f2', MUT = '#8fa7a8', OK = '#4fbf8a', WARN = '#e0a03c', BAD = '#e0645a', INFO = '#6aa7e0', PUR = '#b388e0';
-    const font = (w, sz) => { g.font = `${w} ${sz}px ${FF}`; };
-    const fit = (s, maxW, w, sz) => { font(w, sz); s = String(s); if (g.measureText(s).width <= maxW) return s; while (s.length > 1 && g.measureText(s + '…').width > maxW) s = s.slice(0, -1); return s + '…'; };
-    const T = (s, x, y, col, w, sz, al, maxW) => { const t = maxW ? fit(s, maxW, w || 500, sz || 24) : String(s); font(w || 500, sz || 24); g.fillStyle = col || TXT; g.textAlign = al || 'right'; g.fillText(t, x, y); };
-    const rr = (x, y, w, h, r, fill, stroke) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } };
-    g.fillStyle = BG; g.fillRect(0, 0, W, H);
-    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#1d3a3f'); gr.addColorStop(1, '#2b4a3c'); g.fillStyle = gr; g.fillRect(0, 0, W, 170);
-    g.fillStyle = GOLD; g.fillRect(0, 166, W, 4);
-    T(`كشف الدوام — ${D.org}`, W - pad, 72, TXT, 800, 46);
-    T(dfull.format(noon(D.ds)), W - pad, 122, GOLD, 600, 28);
-    const stamp = D.synced ? dataStamp(D) : 'حضور هذا اليوم غير مزامَن';
-    if (stamp) T(stamp, pad, 122, '#bcd0cf', 500, 23, 'left');
-    // ملخص
-    let y = 196;
-    const sm = [['الموظفون', D.total, TXT], ['حضور', D.att.length, OK], ['متأخرون', D.late.length, WARN], ['إجازة', D.leave.length, INFO], ['مهام/مغادرات', D.mis.length, PUR], ['بلا تسجيل', D.unreg.length, BAD]];
-    const cw = (W - pad * 2 - 5 * 10) / 6;
-    sm.forEach(([n, v, col], i) => { const x = W - pad - (i + 1) * cw - i * 10; rr(x, y, cw, 96, 16, CARD, LINE); T(v, x + cw / 2, y + 52, col, 800, 38, 'center'); T(n, x + cw / 2, y + 82, MUT, 500, 19, 'center'); });
-    y += 120;
-    const section = (title, col, items, draw, emptyMsg) => {
-      rr(pad, y, W - pad * 2, sec(items.length) - 18, 20, CARD, LINE);
-      g.fillStyle = col; g.fillRect(W - pad - 6, y + 22, 6, 36);
-      T(`${title} (${items.length})`, W - pad - 24, y + 52, col, 800, 30);
-      if (!items.length) T(emptyMsg || '—', W - pad - 24, y + 84 + 30, MUT, 500, 24);
-      items.forEach((it, i) => { const yy = y + 78 + i * RH; if (i % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.035)'; g.fillRect(pad + 12, yy, W - pad * 2 - 24, RH); } draw(it, yy + 31, i); });
-      y += sec(items.length);
-    };
-    const R = W - pad - 24;   // الحافة اليمنى للنص
-    section('الحضور — الوقت والموقع', OK, D.att, (x, yy, i) => {
-      T(`${i + 1}. ${x.name}`, R, yy, x.late ? WARN : TXT, 600, 24, 'right', 330);
-      T(`${x.in}${x.out ? ' ← ' + x.out : ''}`, R - 360, yy, x.late ? WARN : OK, 700, 23, 'right', 230);
-      T(`${x.place || '—'}${x.outPlace ? ' · خروج: ' + x.outPlace : ''}`, pad + 24, yy, x.st === 'outside' ? BAD : MUT, 500, 22, 'left', 380);
-    }, 'لا تسجيلات حضور');
-    section('الإجازات', INFO, D.leave, (x, yy, i) => { T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 520); T(x.label, pad + 24, yy, INFO, 600, 23, 'left'); }, 'لا إجازات');
-    section('مهام العمل والمغادرات', PUR, D.mis, (x, yy, i) => {
-      T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 330);
-      T(x.kind, R - 360, yy, PUR, 700, 22, 'right');
-      T(`${x.time}${x.what ? ' · ' + x.what : ''}`, pad + 24, yy, MUT, 500, 21, 'left', 400);
-    }, 'لا مهام ولا مغادرات');
-    section('بلا تسجيل — لا إجازة ولا مهمة ولا حضور', BAD, D.unreg, (x, yy, i) => { T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 560); T(x.dept, pad + 24, yy, MUT, 500, 21, 'left', 300); }, 'الجميع مسجَّل أو لديه إجازة/مهمة ✔');
+    const BG = '#0e1c20', CARD = '#162a2f', LINE = '#22393f', GOLD = '#d9b56b', TXT = '#eef3f2', MUT = '#9bb2b3', OK = '#4fbf8a', WARN = '#e0a03c', BAD = '#e0645a', INFO = '#6aa7e0', PUR = '#b388e0';
+    const mc = document.createElement('canvas').getContext('2d');
+    const fnt = (w, sz) => `${w} ${sz}px ${FF}`;
+    const fit = (str, maxW, w, sz) => { mc.font = fnt(w, sz); str = String(str); if (mc.measureText(str).width <= maxW) return str; while (str.length > 1 && mc.measureText(str + '…').width > maxW) str = str.slice(0, -1); return str + '…'; };
+    const R = PW - pad - 26, Lx = pad + 26;
     const c = D.cfg || {};
-    section(`كشف المتأخرين${c.office ? ` — الدوام ${c.office} + سماح ${c.grace || 0} د` : ''}`, WARN, D.late, (x, yy, i) => {
-      T(`${i + 1}. ${x.name}`, R, yy, TXT, 600, 24, 'right', 440);
-      T(`دخل ${x.in}`, R - 480, yy, MUT, 500, 22, 'right');
-      T(`${x.min} دقيقة`, pad + 24, yy, WARN, 800, 24, 'left');
-    }, 'لا متأخرين ✔');
-    T(`أُعدّ بتطبيق الموارد البشرية${dataStamp(D) ? ' · ' + dataStamp(D) : ''}${D.excluded ? ' · استُثني ' + D.excluded + ' من التقرير' : ''}`, W / 2, H - 34, MUT, 500, 21, 'center');
-    return cv;
+    const blocks = [
+      { id: 'att', title: 'الحضور — الوقت والموقع', col: OK, items: D.att, rh: 76, cols: 1, two: true, empty: 'لا تسجيلات حضور',
+        row: (g, x, y, i) => { g.T(`${i + 1}. ${x.name}`, R, y - 14, x.late ? WARN : TXT, 700, 28, 'right', 640); g.T(`${x.in}${x.out ? ' ← ' + x.out : ''}`, Lx, y - 14, x.late ? WARN : OK, 800, 27, 'left', 300); g.T(`${x.place || '—'}${x.outPlace ? ' · خروج: ' + x.outPlace : ''}${x.late ? ' · متأخر ' + x.late + ' د' : ''}`, R, y + 20, x.st === 'outside' ? BAD : MUT, 600, 22, 'right', PW - pad * 2 - 60); } },
+      { id: 'leave', title: 'الإجازات', col: INFO, items: D.leave, rh: 56, cols: 1, empty: 'لا إجازات',
+        row: (g, x, y, i) => { g.T(`${i + 1}. ${x.name}`, R, y, TXT, 700, 28, 'right', 600); g.T(x.label, Lx, y, INFO, 700, 26, 'left', 300); } },
+      { id: 'mis', title: 'مهام العمل والمغادرات', col: PUR, items: D.mis, rh: 76, cols: 1, two: true, empty: 'لا مهام ولا مغادرات',
+        row: (g, x, y, i) => { g.T(`${i + 1}. ${x.name}`, R, y - 14, TXT, 700, 28, 'right', 640); g.T(x.kind, Lx, y - 14, PUR, 800, 26, 'left'); g.T(`${x.time}${x.what ? ' · ' + x.what : ''}`, R, y + 20, MUT, 600, 22, 'right', PW - pad * 2 - 60); } },
+      { id: 'unreg', title: 'بلا تسجيل — لا إجازة ولا مهمة ولا حضور', col: BAD, items: D.unreg, rh: 52, cols: 2, empty: 'الجميع مسجَّل أو لديه إجازة/مهمة ✔',
+        row: (g, x, y, i, slot) => { const colW = (PW - pad * 2 - 52) / 2, xr = R - slot * colW; g.T(`${i + 1}. ${x.name}`, xr, y, TXT, 600, 25, 'right', colW - 18); } },
+      { id: 'late', title: `كشف المتأخرين${c.office ? ` — الدوام ${c.office} + سماح ${c.grace || 0} د` : ''}`, col: WARN, items: D.late, rh: 56, cols: 1, empty: 'لا متأخرين ✔',
+        row: (g, x, y, i) => { g.T(`${i + 1}. ${x.name}`, R, y, TXT, 700, 28, 'right', 470); g.T(`دخل ${x.in}`, R - 510, y, MUT, 600, 25, 'right'); g.T(`${x.min} دقيقة`, Lx, y, WARN, 800, 27, 'left'); } }
+    ];
+    // ---- التخطيط: لكل صفحة مصفوفة عمليات ----
+    const pages = [{ ops: [], cards: [] }];
+    let pg = pages[0], y = FIRST; const bottom = PH - FOOT;
+    const newPage = () => { pg = { ops: [], cards: [] }; pages.push(pg); y = NEXT; };
+    const SEC = 84, SECC = 70;
+    blocks.forEach((b) => {
+      const groups = Math.ceil(b.items.length / b.cols), first = b.items.length ? b.rh : 62;
+      const full = SEC + (groups ? groups * b.rh : 62);
+      if (y + SEC + first > bottom || (y + full > bottom && full <= bottom - NEXT && groups <= 8)) newPage();
+      let cardTop = y, cont = false;
+      const head = () => { pg.ops.push({ k: 'sec', y, b, cont }); y += cont ? SECC : SEC; };
+      head();
+      if (!b.items.length) { pg.ops.push({ k: 'empty', y: y + 4, b }); y += 62; }
+      for (let gi = 0; gi < groups; gi++) {
+        if (y + b.rh > bottom) { pg.cards.push({ y1: cardTop, y2: y + 6, col: b.col }); newPage(); cardTop = y; cont = true; head(); }
+        pg.ops.push({ k: 'row', y, b, gi });
+        y += b.rh;
+      }
+      pg.cards.push({ y1: cardTop, y2: y + 10, col: b.col }); y += 26;
+    });
+    const N = pages.length, out = [];
+    pages.forEach((P, pi) => {
+      const cv = document.createElement('canvas'); cv.width = Math.round(PW * SC); cv.height = Math.round(PH * SC);
+      const g = cv.getContext('2d'); g.scale(SC, SC); g.direction = 'rtl'; g.textBaseline = 'alphabetic';
+      g.T = (str, x, yy, col, w, sz, al, maxW) => { const t = maxW ? fit(str, maxW, w || 500, sz || 24) : String(str); g.font = fnt(w || 500, sz || 24); g.fillStyle = col || TXT; g.textAlign = al || 'right'; g.fillText(t, x, yy); };
+      const rr = (x, yy, w, h, r, fill, stroke) => { g.beginPath(); g.roundRect ? g.roundRect(x, yy, w, h, r) : g.rect(x, yy, w, h); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } };
+      g.fillStyle = BG; g.fillRect(0, 0, PW, PH);
+      // الرأس
+      const gr = g.createLinearGradient(0, 0, PW, 0); gr.addColorStop(0, '#1d3a3f'); gr.addColorStop(1, '#2b4a3c'); g.fillStyle = gr; g.fillRect(0, 0, PW, pi === 0 ? 170 : 112);
+      g.fillStyle = GOLD; g.fillRect(0, pi === 0 ? 166 : 108, PW, 4);
+      if (pi === 0) {
+        g.T(`كشف الدوام — ${D.org}`, PW - pad, 74, TXT, 800, 48); g.T(dfull.format(noon(D.ds)), PW - pad, 126, GOLD, 700, 30);
+        const stamp = D.synced ? dataStamp(D) : 'حضور هذا اليوم غير مزامَن'; if (stamp) g.T(stamp, pad, 126, '#c4d6d5', 600, 24, 'left');
+        const sm = [['الموظفون', D.total, TXT], ['حضور', D.att.length, OK], ['متأخرون', D.late.length, WARN], ['إجازة', D.leave.length, INFO], ['مهام/مغادرات', D.mis.length, PUR], ['بلا تسجيل', D.unreg.length, BAD]];
+        const cw = (PW - pad * 2 - 5 * 10) / 6;
+        sm.forEach(([n, v, col], i) => { const x = PW - pad - (i + 1) * cw - i * 10; rr(x, 194, cw, 112, 18, CARD, LINE); g.T(v, x + cw / 2, 252, col, 800, 44, 'center'); g.T(n, x + cw / 2, 290, MUT, 600, 21, 'center'); });
+      } else {
+        g.T(`كشف الدوام — ${D.org}`, PW - pad, 56, TXT, 800, 38); g.T(`${dfull.format(noon(D.ds))}  ·  تابع`, PW - pad, 94, GOLD, 600, 23);
+      }
+      g.T(`صفحة ${pi + 1} من ${N}`, pad, pi === 0 ? 74 : 62, '#c4d6d5', 800, 26, 'left');
+      // البطاقات
+      P.cards.forEach((cd) => { rr(pad, cd.y1, PW - pad * 2, cd.y2 - cd.y1, 22, CARD, LINE); g.fillStyle = cd.col; g.fillRect(PW - pad - 7, cd.y1 + 20, 7, 40); });
+      P.ops.forEach((op) => {
+        const b = op.b;
+        if (op.k === 'sec') g.T(`${b.title}${op.cont ? ' (تابع)' : ` (${b.items.length})`}`, PW - pad - 26, op.y + (op.cont ? 46 : 56), b.col, 800, op.cont ? 28 : 32, 'right', PW - pad * 2 - 60);
+        else if (op.k === 'empty') g.T(b.empty, PW - pad - 26, op.y + 36, MUT, 600, 26);
+        else {
+          const base = op.y + b.rh * 0.64;
+          if (op.gi % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.035)'; g.fillRect(pad + 12, op.y, PW - pad * 2 - 24, b.rh); }
+          for (let sl = 0; sl < b.cols; sl++) { const idx = op.gi * b.cols + sl; if (idx < b.items.length) b.row(g, b.items[idx], base, idx, sl); }
+        }
+      });
+      // التذييل
+      g.fillStyle = LINE; g.fillRect(pad, PH - FOOT + 12, PW - pad * 2, 2);
+      g.T(`أُعدّ بتطبيق الموارد البشرية${dataStamp(D) ? ' · ' + dataStamp(D) : ''}${D.excluded ? ' · استُثني ' + D.excluded + ' من التقرير' : ''}`, PW / 2, PH - 30, MUT, 600, 22, 'center');
+      out.push(cv);
+    });
+    return out;
   }
 
-  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailCanvas };
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages };
 })();
