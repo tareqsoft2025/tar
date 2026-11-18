@@ -1743,3 +1743,7 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-exn b{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.45}
 .hr-exn small{max-width:none!important;white-space:normal!important}
 #exF .chip em{font-style:normal;opacity:.75;margin-inline-start:6px;font-size:.8em}
+
+.hr-wa-steps{border:1px solid var(--line,#2a3b3d);border-radius:14px;padding:10px 12px;margin:6px 0 10px;display:grid;gap:6px;font-size:.88rem;line-height:1.6}
+.hr-wa-steps p{margin:0;display:block}
+.hr-wa-steps i{width:22px;height:22px;border-radius:50%;background:var(--gold,#d9b56b);color:#1a1405;font-style:normal;font-weight:800;display:inline-grid;place-items:center;font-size:.8rem;vertical-align:middle;margin-inline-end:8px}
