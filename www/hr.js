@@ -317,22 +317,24 @@
     const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null, ex = repExcl();
     const stamp = HR.meta().lastSync;
     const mk = (v) => {
-      if (v === 'sum') { const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, group: g ? g.name : '', syncedAt: stamp }); return { D, cv: HRReport.dailyCanvas(D) }; }
-      const D = HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }); return { D, cv: HRReport.detailCanvas(D) };
+      if (v === 'sum') { const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, group: g ? g.name : '', syncedAt: stamp }); return { D, pages: [HRReport.dailyCanvas(D)] }; }
+      const D = HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }); return { D, pages: HRReport.detailPages(D) };
     };
     const cur = mk(dyView), sum = dyView === 'sum' ? cur.D : HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, syncedAt: stamp });
-    const url = cur.cv.toDataURL('image/png'), synced = HR.dayReport(ds).synced;
+    const urls = cur.pages.map((cv) => cv.toDataURL('image/png')), synced = HR.dayReport(ds).synced, nP = cur.pages.length;
     sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('image')}</span><div><b>صور حالة الدوام</b><small>${esc(dLong.format(noon(ds)))}${synced ? '' : ' · غير مزامَن'}</small></div></div>
       <div class="hr-dnav"><button class="icon-btn flip" data-d="-1" aria-label="اليوم السابق">${icon('chev')}</button><label><b>${ds === today() ? 'اليوم' : fd(ds)}</b><small>${sum.c.unreg} بلا تسجيل · ${sum.c.late} متأخر</small></label><button class="icon-btn" data-d="1" aria-label="اليوم التالي" ${ds >= today() ? 'disabled' : ''}>${icon('chev')}</button></div>
       <div class="chips hr-fc" id="dyTabs">${[['sum', 'ملخص'], ['PEF', 'كشف PEF'], ['HHO', 'كشف HHO']].map(([k, n]) => `<button type="button" class="chip sm${dyView === k ? ' on' : ''}" data-v="${k}">${n}</button>`).join('')}</div>
       ${synced ? '' : `<div class="hr-warnbox">${icon('alert')}<span>حضور هذا اليوم غير محفوظ على الجهاز، فالأرقام ناقصة. اضغط المزامنة ثم أعد الفتح.</span></div>`}
-      <img class="hr-wimg" alt="حالة الدوام" src="${url}">
-      <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} مشاركة هذه الصورة</button>${dyView !== 'sum' ? '' : `<button type="button" class="btn-outline" id="dyText">مشاركة كنص</button>`}</div>
-      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة صورتي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} استثناء أسماء (${ex.size})</button></div>`);
+      ${nP > 1 ? `<small class="hr-pgn">${nP} صفحات — تُرسل كلها معاً</small>` : ''}
+      ${urls.map((u, k) => `<img class="hr-wimg" alt="صفحة ${k + 1}" src="${u}">`).join('')}
+      <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} ${nP > 1 ? `مشاركة الصفحات (${nP})` : 'مشاركة هذه الصورة'}</button>${dyView !== 'sum' ? '' : `<button type="button" class="btn-outline" id="dyText">مشاركة كنص</button>`}</div>
+      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} استثناء أسماء (${ex.size})</button></div>`);
     const body = $('hrSheetBody');
     body.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => openDaily(addDays(ds, +b.dataset.d)); });
     body.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => openDaily(ds, b.dataset.v); });
-    const B = window.AndroidBridge, nameOf = (v) => `hr-${v === 'sum' ? 'daily' : v.toLowerCase()}-${ds}.png`;
+    const B = window.AndroidBridge, nameOf = (v, k, n) => `hr-${v === 'sum' ? 'daily' : v.toLowerCase()}-${ds}${n > 1 ? '-p' + (k + 1) + 'of' + n : ''}.png`;
+    const itemsOf = (v, pages) => pages.map((cv, k) => ({ cv, url: cv.toDataURL('image/png'), name: nameOf(v, k, pages.length) }));
     const shareFiles = (items) => {
       if (B && B.shareImages) { B.shareImages(JSON.stringify(items.map((x) => ({ b64: x.url.split(',')[1], name: x.name })))); return; }
       Promise.all(items.map((x) => new Promise((res) => x.cv.toBlob((bl) => res(new File([bl], x.name, { type: 'image/png' })))))).then((files) => {
@@ -340,8 +342,8 @@
         else files.forEach((fl) => { const a = document.createElement('a'); a.href = URL.createObjectURL(fl); a.download = fl.name; a.click(); });
       });
     };
-    $('dyShare').onclick = () => { if (B && B.shareImage && !B.shareImages) B.shareImage(url.split(',')[1], nameOf(dyView), ''); else shareFiles([{ cv: cur.cv, url, name: nameOf(dyView) }]); };
-    $('dyBoth').onclick = () => { const a = mk('PEF'), b = mk('HHO'); shareFiles([{ cv: a.cv, url: a.cv.toDataURL('image/png'), name: nameOf('PEF') }, { cv: b.cv, url: b.cv.toDataURL('image/png'), name: nameOf('HHO') }]); };
+    $('dyShare').onclick = () => shareFiles(itemsOf(dyView, cur.pages));
+    $('dyBoth').onclick = () => { const a = mk('PEF'), b = mk('HHO'); shareFiles(itemsOf('PEF', a.pages).concat(itemsOf('HHO', b.pages))); };
     $('dyEx').onclick = () => openRepExcl(() => openDaily(ds));
     const tx = $('dyText'); if (tx) tx.onclick = () => { const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
