@@ -121,9 +121,14 @@
       try { if (B && B.hrPut) B.hrPut(name, s); else localStorage.setItem('hr_' + name, s); } catch (e) { /* full */ }
     },
     reload() { Object.keys(mem).forEach((k) => delete mem[k]); },
+    // بيانات يضعها المستخدم بنفسه (استثناءات الحضور، المجموعات، القوالب، أرقام واتساب، الإعدادات…) لا تُمسح بتسجيل الخروج أو انتهاء الجلسة
+    KEEP: ['repExcl', 'groups', 'msgTpl', 'waAutoNums', 'waPref', 'warnLog', 'attAudit', 'smsLog', 'empLinks', 'settings'],
     wipe() {
+      const keep = {};
+      db.KEEP.forEach((k) => { const v = db.get(k, undefined); if (v !== undefined) keep[k] = v; });
       Object.keys(mem).forEach((k) => delete mem[k]);
       try { if (B && B.hrWipe) B.hrWipe(); else Object.keys(localStorage).filter((k) => k.startsWith('hr_')).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
+      Object.keys(keep).forEach((k) => db.put(k, keep[k]));
     }
   };
 
