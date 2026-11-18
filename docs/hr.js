@@ -307,15 +307,32 @@
     const B = window.AndroidBridge, has = !!(B && B.waAutoSend);
     const en = has && B.waAutoEnabled && B.waAutoEnabled(), inst = has && B.waInstalled ? B.waInstalled() : '';
     sheet(`<div class="hr-ph"><span class="hr-ava big ok">${icon('share')}</span><div><b>إرسال تلقائي إلى واتساب</b><small>التقرير بصيغة PDF إلى الأرقام التي تحدّدها</small></div></div>
-      <div class="hr-wa-st"><div class="${inst ? 'ok' : 'bad'}">${inst ? '✔' : '✘'} واتساب${inst === 'w4b' ? ' للأعمال' : ''} ${inst ? 'مثبّت' : 'غير مثبّت على هذا الجوال'}</div>
-        <div class="${en ? 'ok' : 'bad'}">${en ? '✔' : '✘'} خدمة الإرسال التلقائي ${en ? 'مفعّلة' : 'غير مفعّلة'}</div></div>
-      ${en || !has ? '' : `<div class="hr-warnbox">${icon('alert')}<span>لإرسال بلا ضغط يدوي فعّل الخدمة مرة واحدة: إمكانية الوصول ← التطبيقات المثبّتة ← «مواقيت الصلاة» ← تشغيل. إن ظهرت رسالة «إعداد مقيَّد»: معلومات التطبيق ← ⋮ ← السماح بالإعدادات المقيَّدة، ثم أعد التفعيل.</span></div><button type="button" class="btn-outline wide" id="waSet">فتح إعدادات إمكانية الوصول</button>`}
+      <div id="waSt"></div>
       <div class="hr-sl2" style="margin-top:8px">الأرقام (مع رمز الدولة، مثل 970599123456)</div>
       <div id="waList" class="hr-glist"></div>
       <div class="hr-sgrow" style="grid-template-columns:1fr 1fr auto"><input id="waN" class="hr-in" type="tel" inputmode="tel" placeholder="رقم واتساب" dir="ltr"><input id="waL" class="hr-in" placeholder="الاسم (اختياري)"><button type="button" class="hr-sgx" id="waAdd" aria-label="إضافة">${icon('plus')}</button></div>
       <div id="waProg" class="hr-confirm" hidden></div>
       <div class="hr-gact">${getFile ? `<button type="button" class="btn-primary" id="waGo">إرسال الآن</button>` : ''}<button type="button" class="btn-outline" id="waBack">${back ? 'رجوع' : 'إغلاق'}</button></div>
       <p class="hr-omn">يجب أن يكون الجوال مفتوح القفل والشاشة تعمل أثناء الإرسال. يفتح التطبيق محادثة كل رقم ويضغط «إرسال» ثم يعود إليك. إن لم يتأكد الإرسال يبقى الملف جاهزاً في واتساب لتضغط «إرسال» يدوياً.</p>`);
+    const drawSt = () => {
+      const en2 = has && B.waAutoEnabled && B.waAutoEnabled(), inst2 = has && B.waInstalled ? B.waInstalled() : '';
+      const box = $('waSt'); if (!box) return en2;
+      box.innerHTML = `<div class="hr-wa-st"><div class="${inst2 ? 'ok' : 'bad'}">${inst2 ? '✔' : '✘'} واتساب${inst2 === 'w4b' ? ' للأعمال' : ''} ${inst2 ? 'مثبّت' : 'غير مثبّت على هذا الجوال'}</div>
+        <div class="${en2 ? 'ok' : 'bad'}">${en2 ? '✔' : '✘'} خدمة الإرسال التلقائي ${en2 ? 'مفعّلة — جاهز للإرسال' : 'غير مفعّلة'}</div></div>
+        ${en2 || !has ? '' : `<div class="hr-wa-steps"><b>خطوات التفعيل (مرة واحدة)</b>
+          <p><i>١</i>إن ظهر لك «يتحكّم فيه إعداد محظور»: اضغط الزر الأول ← ⋮ (القائمة أعلى الشاشة) ← <b>السماح بالإعدادات المقيَّدة</b> ← أكّد (قد يطلب البصمة أو رمز القفل).</p>
+          <p><i>٢</i>اضغط الزر الثاني ← <b>التطبيقات المثبّتة</b> ← «مواقيت الصلاة» ← شغّله ووافق على التنبيه.</p>
+          <p><i>٣</i>ارجع إلى هنا، وسيتحدّث الوضع تلقائياً.</p>
+          <div class="hr-gact"><button type="button" class="btn-outline" id="waApp">١) معلومات التطبيق</button><button type="button" class="btn-primary" id="waSet">٢) إمكانية الوصول</button></div></div>`}`;
+      if ($('waApp')) $('waApp').onclick = () => { if (B.openAppSettings) B.openAppSettings(); else toast('افتح إعدادات الجوال ← التطبيقات ← مواقيت الصلاة'); };
+      if ($('waSet')) $('waSet').onclick = () => B.waAutoSettings();
+      return en2;
+    };
+    // عند العودة من إعدادات أندرويد يُحدَّث الوضع تلقائياً
+    let wasOn = !!en;
+    const onVis = () => { if (!$('waSt')) { document.removeEventListener('visibilitychange', onVis); return; } if (document.hidden) return; const now = drawSt(); if (now && !wasOn) toast('تم تفعيل الإرسال التلقائي ✔'); wasOn = !!now; };
+    document.addEventListener('visibilitychange', onVis);
+    drawSt();
     const draw = () => {
       const l = waNums();
       $('waList').innerHTML = l.map((x, i) => `<div class="hr-grow${x.on !== false ? ' on' : ''}" data-i="${i}"><span class="hr-chk${x.on !== false ? ' on' : ''}" data-t="${i}">${icon('check')}</span><b dir="ltr" style="text-align:start">+${esc(x.n)}</b><small>${esc(x.l || '')}</small><button type="button" class="hr-sgx" data-x="${i}" aria-label="حذف" style="min-height:32px;width:32px">${icon('x')}</button></div>`).join('') || '<small>لا أرقام بعد — أضف رقماً</small>';
@@ -324,7 +341,6 @@
     };
     draw();
     $('waAdd').onclick = () => { const n = waNorm($('waN').value); if (n.length < 10) { toast('اكتب الرقم كاملاً مع رمز الدولة'); return; } const a = waNums(); if (!a.some((x) => x.n === n)) a.push({ n, l: $('waL').value.trim(), on: true }); HR.db.put('waAutoNums', a); $('waN').value = ''; $('waL').value = ''; draw(); };
-    if ($('waSet')) $('waSet').onclick = () => B.waAutoSettings();
     $('waBack').onclick = () => { if (back) back(); else closeSheet(); };
     if ($('waGo')) $('waGo').onclick = async () => {
       if (!has) { toast('الإرسال التلقائي متاح داخل تطبيق أندرويد فقط'); return; }
