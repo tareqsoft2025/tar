@@ -18,7 +18,7 @@
   const initials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('');
   const TYPE = { office: 'مكتبي', field: 'ميداني' };
   const KIND = { contract: 'عقد', extension: 'تمديد', annex: 'ملحق', placement: 'تسكين', amendment: 'تعديل' };
-  const STATUS = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'], hwork: ['دوام في عطلة', 'ok'] };
+  const STATUS = { present: ['حاضر', 'ok'], late: ['متأخر', 'warn'], absent: ['بلا تسجيل', 'bad'], leave: ['إجازة / مهمة', 'info'], off: ['عطلة', 'mute'], noin: ['بلا دخول', 'warn'], hwork: ['دوام في عطلة', 'ok'], exempt: ['مستثنى من الحضور', 'mute'] };
   const LEAVE = { annual: 'سنوية', sick: 'مرضية', mission: 'مهمة عمل', task: 'مهمة', official: 'رسمية', unpaid: 'بدون راتب', leave: 'إجازة', holiday: 'عطلة', compensatory: 'تعويضية', maternity: 'أمومة' };
   Object.assign(LEAVE, { emergency: 'طارئة', marriage: 'زواج', study_leave: 'دراسية', official_duty: 'مهمة رسمية', work_mission: 'مهمة عمل', personal_hourly: 'مغادرة شخصية', hajj: 'حج', bereavement: 'وفاة', paternity: 'أبوة' });
   const leaveLbl = (n) => LEAVE[String(n || '').toLowerCase()] || n || 'إجازة';
@@ -347,13 +347,14 @@
   }
 
   // أسماء مستثناة من كل التقارير المصوّرة (يومي/تفصيلي/أسبوعي)
+  const exListOf = () => { const ex = repExcl(); return HR.employees().filter((e) => ex.has(String(e.id))).map((e) => ({ name: e.name, dept: e.dept || '', org: e.org })).sort((a, b) => a.name.localeCompare(b.name, 'ar')); };
   const repExcl = () => new Set((HR.db.get('repExcl', []) || []).map(String));
   const repOk = (e) => !repExcl().has(String(e.id));
   function openRepExcl(back) {
     const ex = repExcl(), emps = HR.employees().filter((e) => e.active || ex.has(String(e.id))).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     let q = '', only = false;
-    sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('x')}</span><div><b>استثناء أسماء من التقارير</b><small id="exCnt"></small></div></div>
-      <p class="hr-omn">الأسماء المؤشَّر عليها لا تظهر في صور التقارير (اليومي والتفصيلي والأسبوعي) ولا تُحسب في أرقامها.</p>
+    sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('x')}</span><div><b>أسماء مستثناة من تسجيل الحضور</b><small id="exCnt"></small></div></div>
+      <p class="hr-omn">الأسماء المؤشَّر عليها مستثناة من تسجيل الحضور: لا تُحسب غياباً ولا تأخراً في التطبيق والتنبيهات، ولا تظهر في صور وملفات التقارير ولا تُحسب في أرقامها (وتُسرد أسماؤها في ورقة «المستثنون» بملف Excel).</p>
       <input id="exQ" class="hr-in" type="search" placeholder="ابحث باسم الموظف">
       <div class="chips hr-fc"><button type="button" class="chip sm on" data-o="0">الكل</button><button type="button" class="chip sm" data-o="1">المستثنون فقط</button></div>
       <div id="exList" class="hr-glist" style="max-height:44vh"></div>
@@ -375,7 +376,7 @@
     const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null, ex = repExcl();
     const stamp = HR.meta().lastSync;
     const mk = (v) => {
-      if (v === 'sum') { const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, group: g ? g.name : '', syncedAt: stamp }); return { D, pages: [HRReport.dailyCanvas(D)] }; }
+      if (v === 'sum') { const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, group: g ? g.name : '', syncedAt: stamp, placeName: plName, exList: exListOf() }); return { D, pages: [HRReport.dailyCanvas(D)] }; }
       const D = HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }); return { D, pages: HRReport.detailPages(D) };
     };
     const cur = mk(dyView), sum = dyView === 'sum' ? cur.D : HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, syncedAt: stamp });
@@ -387,7 +388,7 @@
       ${nP > 1 ? `<small class="hr-pgn">${nP} صفحات — تُرسل كلها معاً</small>` : ''}
       ${urls.map((u, k) => `<img class="hr-wimg" alt="صفحة ${k + 1}" src="${u}">`).join('')}
       <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} ${nP > 1 ? `مشاركة الصفحات (${nP})` : 'مشاركة هذه الصورة'}</button>${dyView !== 'sum' ? '' : `<button type="button" class="btn-outline" id="dyText">مشاركة كنص</button>`}</div>
-      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} استثناء أسماء (${ex.size})</button></div>
+      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} المستثنون من الحضور (${ex.size})</button></div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyPdf">${icon('note')} ملف PDF لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyPdf2">${icon('note')} PDF واحد لـ PEF و HHO</button>`}</div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyWa">${icon('share')} إرسال PDF تلقائياً إلى واتساب</button></div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyXl">${icon('chart')} ملف Excel لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyXl2">${icon('chart')} Excel واحد لـ PEF و HHO</button>`}</div>
@@ -432,7 +433,7 @@
   function openWeekly(kind) {
     kind = kind || 'prev';
     const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null;
-    const D = HRReport.build(HRReport.range(kind), { filter: (e) => orgOk(e) && repOk(e), group: g ? g.name : '' });
+    const D = HRReport.build(HRReport.range(kind), { filter: (e) => orgOk(e) && repOk(e), group: g ? g.name : '', placeName: plName, exList: exListOf() });
     const cv = HRReport.toCanvas(D), url = cv.toDataURL('image/png');
     sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('note')}</span><div><b>التقرير الأسبوعي</b><small>${esc(D.group || 'كل الموظفين')}${D.unsynced ? ' · ' + D.unsynced + ' يوم غير مزامن' : ''}</small></div></div>
       <div class="chips hr-fc"><button class="chip sm${kind === 'prev' ? ' on' : ''}" data-k="prev">الأسبوع الماضي</button><button class="chip sm${kind === 'incl' ? ' on' : ''}" data-k="incl">آخر ٧ أيام</button></div>
@@ -1702,7 +1703,7 @@
       <button type="button" class="btn-outline wide" id="rvOpen">${icon('alert')}<span>المراجعة الشهرية السرية</span></button>
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
       <button type="button" class="btn-outline wide" id="waOpen">${icon('share')}<span>الإرسال التلقائي إلى واتساب (الأرقام والتفعيل)</span></button>
-      <button type="button" class="btn-outline wide" id="rxOpen">${icon('x')}<span>استثناء أسماء من التقارير (${repExcl().size})</span></button>
+      <button type="button" class="btn-outline wide" id="rxOpen">${icon('x')}<span>أسماء مستثناة من تسجيل الحضور (${repExcl().size})</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
       <label class="hr-srow"><span>إشعار لكل طلب جديد (إجازة، مغادرة، مهمة، عمل إضافي، عمل بعطلة)</span><input type="checkbox" id="rqOn" class="hr-tog" ${s.reqNotify === false ? '' : 'checked'}></label>
       <label class="hr-srow"><span>الوضع المباشر (تحديث الحضور كل ~20 ثانية وقت الدوام والشاشة مفتوحة)</span><input type="checkbox" id="lvOn" class="hr-tog" ${s.live === false ? '' : 'checked'}></label>
@@ -2038,7 +2039,7 @@
     head.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => shift(+b.dataset.d); });
     body.appendChild(head);
     body.appendChild(el('div', 'hr-rvtop', `<button type="button" id="rvLock">${icon('alert')}قفل الآن</button><button type="button" id="rvPinCh">${hasPin() ? 'تغيير الرمز / إزالته' : 'تعيين رمز'}</button><button type="button" id="rvShare">${icon('note')}مشاركة</button><button type="button" id="rvXl">${icon('chart')}Excel</button>`));
-    $('rvXl').onclick = () => shareBytes(HRReport.xlsxOf([{ name: 'المراجعة الشهرية', widths: [6, 36, 22, 10, 10, 10, 12, 12, 14, 10, 12, 12], rows: [['#', 'الاسم', 'القسم', 'حضور', 'غياب', 'تأخر (مرات)', 'تأخر (دقائق)', 'ساعات العمل', 'مغادرات شخصية (د)', 'مهام عمل', 'عمل بعطلة', 'بلا خروج']].concat(M.list.map((E, i) => [i + 1, E.e.name, E.e.dept || '', E.c.present, E.c.absent, E.c.late, E.c.lateMin, Math.round(E.c.workMin / 6) / 10, E.c.personalMin, E.c.missionN, E.c.holidayN, E.c.noOut])) }]), `hr-review-${M.ym}.xlsx`, XLSX_MIME);
+    $('rvXl').onclick = () => shareBytes(HRReport.xlsxOf([{ name: 'تفاصيل الأيام', widths: [16, 36, 10, 18, 14, 14, 12], rows: [['التاريخ', 'الاسم', 'الجهة', 'الحالة', 'الدخول', 'الخروج', 'تأخر (د)']].concat([].concat(...M.list.map((E) => Object.values(E.d).filter((r) => r.n || r.status !== 'off').map((r) => [r.ds, E.e.name, E.e.org, (STATUS[r.status] || [r.status])[0] + (r.holidayWork ? ' (عمل بعطلة)' : ''), r.firstIn ? tf.format(new Date(r.firstIn)) : '', r.lastOut ? tf.format(new Date(r.lastOut)) : '', r.lateMin || ''])))) }, { name: 'المراجعة الشهرية', widths: [6, 36, 22, 10, 10, 10, 12, 12, 14, 10, 12, 12], rows: [['#', 'الاسم', 'القسم', 'حضور', 'غياب', 'تأخر (مرات)', 'تأخر (دقائق)', 'ساعات العمل', 'مغادرات شخصية (د)', 'مهام عمل', 'عمل بعطلة', 'بلا خروج']].concat(M.list.map((E, i) => [i + 1, E.e.name, E.e.dept || '', E.c.present, E.c.absent, E.c.late, E.c.lateMin, Math.round(E.c.workMin / 6) / 10, E.c.personalMin, E.c.missionN, E.c.holidayN, E.c.noOut])) }]), `hr-review-${M.ym}.xlsx`, XLSX_MIME);
     $('rvLock').onclick = () => { revOpen = 0; render(); };
     $('rvPinCh').onclick = () => { store.set('hrRevPin', ''); revOpen = 0; toast(hasPin() ? '' : 'أدخل رمزاً جديداً أو تابع بدونه'); render(); };
     $('rvShare').onclick = () => { const t = revSummaryText(M); const B = window.AndroidBridge; if (B && B.share) B.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };

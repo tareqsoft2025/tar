@@ -17,7 +17,7 @@
 
   function build(r, opt) {
     const ok = (e) => !opt || !opt.filter || opt.filter(e);
-    const days = [], late = {}, absent = {}, sites = {};
+    const days = [], late = {}, absent = {}, sites = {}, attRows = [], lateRows = [];
     let leaveDays = 0, lateMin = 0, lateN = 0, absentN = 0, presentN = 0, unsynced = 0, workDays = 0;
     for (let ds = r.from; ds <= r.to; ds = addDays(ds, 1)) {
       const rep = HR.dayReport(ds);
@@ -31,6 +31,11 @@
         else if (x.status === 'absent') { d.absent++; absentN++; (absent[x.e.id] = absent[x.e.id] || { name: x.e.name, n: 0 }).n++; }
         else if (x.status === 'leave') { d.leave++; leaveDays++; }
         if (x.list && x.list.length) {
+          const i0 = x.list.filter((y) => y.eventType === 'check_in'), o0 = x.list.filter((y) => y.eventType === 'check_out'), f0 = i0[0] || x.list[0], pl0 = HR.place(f0);
+          attRows.push({ ds, name: x.e.name, org: x.e.org, in: x.firstIn ? tmf.format(new Date(x.firstIn)) : '', out: o0.length ? tmf.format(new Date(x.lastOut)) : '', place: opt && opt.placeName ? opt.placeName(pl0) : (pl0.name || ''), late: x.status === 'late' ? x.lateMin : 0 });
+          if (x.status === 'late') lateRows.push({ ds, name: x.e.name, org: x.e.org, in: x.firstIn ? tmf.format(new Date(x.firstIn)) : '', min: x.lateMin });
+        }
+        if (x.list && x.list.length) {
           const ins = x.list.filter((y) => y.eventType === 'check_in'), ev = ins[ins.length - 1] || x.list[x.list.length - 1];
           const pl = HR.place(ev); const nm = pl.st === 'matched' ? (pl.name || 'موقع') : pl.st === 'outside' ? 'خارج نطاق المواقع' : null;
           if (nm) sites[nm] = (sites[nm] || 0) + 1;
@@ -41,7 +46,7 @@
     const top = (o, k) => Object.values(o).sort((a, b) => b[k] - a[k] || a.name.localeCompare(b.name, 'ar')).slice(0, 5);
     const att = presentN + absentN;
     return {
-      range: r, group: opt && opt.group || '', days, workDays, unsynced,
+      range: r, group: opt && opt.group || '', days, attRows, lateRows, exList: (opt && opt.exList) || [], workDays, unsynced,
       rate: att ? Math.round(presentN * 100 / att) : null,
       presentN, lateN, lateMin, absentN, leaveDays,
       topLate: top(late, 'n'), topAbsent: top(absent, 'n'),
@@ -126,11 +131,16 @@
     const rep = HR.dayReport(ds), ok = (e) => !opt.filter || opt.filter(e);
     const rows = rep.rows.filter((r) => ok(r.e));
     const c = { total: rows.length, present: 0, late: 0, leave: 0, mission: 0, hwork: 0, unreg: 0, off: 0 };
-    const bands = {}, late = [], unreg = [];
+    const bands = {}, late = [], unreg = [], att = [], exList = [];
     rows.forEach((r) => {
       const band = (opt.band && opt.band(r.e)) || r.e.org || '—';
       const B = bands[band] = bands[band] || { name: band, total: 0, present: 0, late: 0, leave: 0, unreg: 0 };
       const other = (r.reqs || []).filter((q) => q.kind !== 'daily');          // مهمة/مغادرة/عمل إضافي…
+      if (r.list && r.list.length) {
+        const ins = r.list.filter((x) => x.eventType === 'check_in'), outs = r.list.filter((x) => x.eventType === 'check_out'), fi = ins[0] || r.list[0], lo = outs[outs.length - 1];
+        const pl = HR.place(fi);
+        att.push({ name: r.e.name, org: r.e.org, band, in: r.firstIn ? tmf.format(new Date(r.firstIn)) : '', out: lo ? tmf.format(new Date(r.lastOut)) : '', place: opt.placeName ? opt.placeName(pl) : (pl.name || ''), late: r.status === 'late' ? r.lateMin : 0 });
+      }
       B.total++;
       if (r.status === 'late') { c.late++; B.late++; late.push({ name: r.e.name, min: r.lateMin || 0, at: r.firstIn }); }
       else if (r.status === 'present' || r.status === 'noin') { c.present++; B.present++; }
@@ -148,7 +158,8 @@
       ds, synced: rep.synced, weekend: !!rep.weekend, group: opt.group || '', syncedAt: opt.syncedAt || null, c,
       rate: expected > 0 ? Math.round(here * 100 / expected) : null,
       bands: Object.values(bands).sort((a, b) => b.total - a.total),
-      late: late.sort((a, b) => b.min - a.min), unreg: unreg.sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+      late: late.sort((a, b) => b.min - a.min), unreg: unreg.sort((a, b) => a.name.localeCompare(b.name, 'ar')),
+      att: att.sort((a, b) => a.name.localeCompare(b.name, 'ar')), exList: (opt.exList || [])
     };
   }
   const dfull = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -258,10 +269,11 @@
       const other = (r.reqs || []).filter((q) => q.kind !== 'daily');
       if (r.status === 'absent' && !other.length) unreg.push({ name: nm, dept: r.e.dept || '' });
     });
+    const exList = all.filter((r) => ex.has(String(r.e.id))).map((r) => ({ name: r.e.name, dept: r.e.dept || '', org: r.e.org })).sort(byName);
     att.sort(byName); leave.sort(byName); mis.sort(byName); unreg.sort(byName); late.sort((a, b) => b.min - a.min);
     return {
       ds, org, synced: rep.synced, weekend: !!rep.weekend, syncedAt: opt.syncedAt || null, cfg: opt.cfg || {},
-      total: rows.length, excluded: all.length - rows.length, att, leave, mis, unreg, late
+      total: rows.length, excluded: all.length - rows.length, exList, att, leave, mis, unreg, late
     };
   }
   // يقسّم الكشف إلى صفحات (صور) بحجم ثابت 1080×1620 وتُرسم بدقة 4/3 لتبقى القراءة واضحة عند المشاركة
@@ -414,11 +426,12 @@
     const P = pre ? pre + ' - ' : '', n = (i) => i + 1;
     return [
       { name: P + 'ملخص', widths: [26, 30], rows: [['البند', 'القيمة'], ['الجهة', D.org], ['التاريخ', dfull.format(noon(D.ds))], ['بيانات حتى', D.syncedAt ? tmf.format(new Date(D.syncedAt)) : ''], ['عدد الموظفين', D.total], ['حضور', D.att.length], ['متأخرون', D.late.length], ['إجازة', D.leave.length], ['مهام/مغادرات', D.mis.length], ['بلا تسجيل', D.unreg.length], ['المستثنون من التقرير', D.excluded || 0]] },
-      { name: P + 'الحضور', widths: [6, 36, 14, 14, 34, 34, 12], rows: [['#', 'الاسم', 'الدخول', 'الخروج', 'موقع الدخول', 'موقع الخروج', 'تأخر (د)']].concat(D.att.map((x, i) => [n(i), x.name, x.in, x.out, x.place, x.outPlace, x.late || ''])) },
+      { name: P + 'الحضور', widths: [6, 36, 16, 14, 14, 34, 34, 12], rows: [['#', 'الاسم', 'تاريخ الحضور', 'الدخول', 'الخروج', 'موقع الدخول', 'موقع الخروج', 'تأخر (د)']].concat(D.att.map((x, i) => [n(i), x.name, D.ds, x.in, x.out, x.place, x.outPlace, x.late || ''])) },
       { name: P + 'الإجازات', widths: [6, 36, 24], rows: [['#', 'الاسم', 'نوع الإجازة']].concat(D.leave.map((x, i) => [n(i), x.name, x.label])) },
       { name: P + 'المهام والمغادرات', widths: [6, 36, 14, 22, 36], rows: [['#', 'الاسم', 'النوع', 'الوقت', 'المشروع / السبب']].concat(D.mis.map((x, i) => [n(i), x.name, x.kind, x.time, x.what])) },
       { name: P + 'بلا تسجيل', widths: [6, 36, 28], rows: [['#', 'الاسم', 'القسم']].concat(D.unreg.map((x, i) => [n(i), x.name, x.dept])) },
-      { name: P + 'المتأخرون', widths: [6, 36, 14, 14], rows: [['#', 'الاسم', 'وقت الدخول', 'دقائق التأخر']].concat(D.late.map((x, i) => [n(i), x.name, x.in, x.min])) }
+      { name: P + 'المتأخرون', widths: [6, 36, 16, 14, 14], rows: [['#', 'الاسم', 'التاريخ', 'وقت الدخول', 'دقائق التأخر']].concat(D.late.map((x, i) => [n(i), x.name, D.ds, x.in, x.min])) },
+      { name: P + 'المستثنون', widths: [6, 36, 28], rows: [['#', 'الاسم (مستثنى من تسجيل الحضور)', 'القسم']].concat((D.exList || []).map((x, i) => [n(i), x.name, x.dept])) }
     ];
   }
   function sheetsSummary(D) {
@@ -426,8 +439,10 @@
     return [
       { name: 'ملخص اليوم', widths: [26, 30], rows: [['البند', 'القيمة'], ['التاريخ', dfull.format(noon(D.ds))], ['بيانات حتى', D.syncedAt ? tmf.format(new Date(D.syncedAt)) : ''], ['نسبة الحضور %', D.rate == null ? '' : D.rate], ['الموظفون', c.total], ['حاضر', c.present], ['متأخر', c.late], ['إجازة', c.leave], ['مهام/طلبات', c.mission], ['بلا تسجيل', c.unreg], ['دوام في عطلة', c.hwork]] },
       { name: 'حسب السلم', widths: [34, 12, 12, 12, 12, 14], rows: [['السلم', 'الإجمالي', 'حضور', 'متأخر', 'إجازة/مهام', 'بلا تسجيل']].concat(D.bands.map((b) => [b.name, b.total, b.present + b.late, b.late, b.leave, b.unreg])) },
-      { name: 'المتأخرون', widths: [6, 36, 14, 14], rows: [['#', 'الاسم', 'وقت الدخول', 'دقائق التأخر']].concat(D.late.map((x, i) => [i + 1, x.name, x.at ? tmf.format(new Date(x.at)) : '', x.min])) },
-      { name: 'بلا تسجيل', widths: [6, 36, 28, 24], rows: [['#', 'الاسم', 'القسم', 'السلم']].concat(D.unreg.map((x, i) => [i + 1, x.name, x.dept, x.band])) }
+      { name: 'الحضور', widths: [6, 36, 10, 16, 14, 14, 34, 12], rows: [['#', 'الاسم', 'الجهة', 'تاريخ الحضور', 'الدخول', 'الخروج', 'الموقع', 'تأخر (د)']].concat((D.att || []).map((x, i) => [i + 1, x.name, x.org, D.ds, x.in, x.out, x.place, x.late || ''])) },
+      { name: 'المتأخرون', widths: [6, 36, 16, 14, 14], rows: [['#', 'الاسم', 'التاريخ', 'وقت الدخول', 'دقائق التأخر']].concat(D.late.map((x, i) => [i + 1, x.name, D.ds, x.at ? tmf.format(new Date(x.at)) : '', x.min])) },
+      { name: 'بلا تسجيل', widths: [6, 36, 28, 24], rows: [['#', 'الاسم', 'القسم', 'السلم']].concat(D.unreg.map((x, i) => [i + 1, x.name, x.dept, x.band])) },
+      { name: 'المستثنون', widths: [6, 36, 28, 10], rows: [['#', 'الاسم (مستثنى من تسجيل الحضور)', 'القسم', 'الجهة']].concat((D.exList || []).map((x, i) => [i + 1, x.name, x.dept, x.org])) }
     ];
   }
   function sheetsWeekly(D) {
@@ -436,7 +451,10 @@
       { name: 'يومياً', widths: [20, 12, 12, 14, 12], rows: [['اليوم', 'حاضر', 'متأخر', 'بلا تسجيل', 'إجازة']].concat(D.days.map((d) => [d.ds, d.synced ? d.present : '', d.synced ? d.late : '', d.synced ? d.absent : '', d.synced ? d.leave : ''])) },
       { name: 'الأكثر تأخراً', widths: [6, 36, 12, 14], rows: [['#', 'الاسم', 'المرات', 'الدقائق']].concat(D.topLate.map((x, i) => [i + 1, x.name, x.n, x.min])) },
       { name: 'الأكثر غياباً', widths: [6, 36, 12], rows: [['#', 'الاسم', 'الأيام']].concat(D.topAbsent.map((x, i) => [i + 1, x.name, x.n])) },
-      { name: 'المواقع', widths: [6, 36, 14], rows: [['#', 'الموقع', 'التسجيلات']].concat(D.topSites.map((x, i) => [i + 1, x.name, x.n])) }
+      { name: 'المواقع', widths: [6, 36, 14], rows: [['#', 'الموقع', 'التسجيلات']].concat(D.topSites.map((x, i) => [i + 1, x.name, x.n])) },
+      { name: 'تفاصيل الحضور', widths: [6, 36, 10, 16, 14, 14, 34, 12], rows: [['#', 'الاسم', 'الجهة', 'تاريخ الحضور', 'الدخول', 'الخروج', 'الموقع', 'تأخر (د)']].concat((D.attRows || []).map((x, i) => [i + 1, x.name, x.org, x.ds, x.in, x.out, x.place, x.late || ''])) },
+      { name: 'كل المتأخرين', widths: [6, 36, 10, 16, 14, 14], rows: [['#', 'الاسم', 'الجهة', 'التاريخ', 'وقت الدخول', 'دقائق التأخر']].concat((D.lateRows || []).map((x, i) => [i + 1, x.name, x.org, x.ds, x.in, x.min])) },
+      { name: 'المستثنون', widths: [6, 36, 28, 10], rows: [['#', 'الاسم (مستثنى من تسجيل الحضور)', 'القسم', 'الجهة']].concat((D.exList || []).map((x, i) => [i + 1, x.name, x.dept, x.org])) }
     ];
   }
   const xlsxOf = (sheets) => window.HRXlsx.build(sheets);
