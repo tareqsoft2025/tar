@@ -285,6 +285,28 @@
   }
   const match = (q, ...vals) => !q || vals.some((v) => v != null && String(v).toLowerCase().includes(q.toLowerCase()));
 
+
+  /* ---------- صورة حالة الدوام اليومية (للمشاركة) ---------- */
+  const bandOf = (e) => { const c = bestContract(e.id); return (c && (c.scale || (c.grade ? 'درجة ' + c.grade : ''))) || e.org || '—'; };
+  function openDaily(ds) {
+    ds = ds || today();
+    const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null;
+    const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e), band: bandOf, group: g ? g.name : '', syncedAt: HR.meta().lastSync });
+    const cv = HRReport.dailyCanvas(D), url = cv.toDataURL('image/png');
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('image')}</span><div><b>صورة حالة الدوام</b><small>${esc(dLong.format(noon(ds)))}${D.synced ? '' : ' · غير مزامَن'}</small></div></div>
+      <div class="hr-dnav"><button class="icon-btn flip" data-d="-1" aria-label="اليوم السابق">${icon('chev')}</button><label><b>${ds === today() ? 'اليوم' : fd(ds)}</b><small>${D.c.unreg} بلا تسجيل · ${D.c.late} متأخر</small></label><button class="icon-btn" data-d="1" aria-label="اليوم التالي" ${ds >= today() ? 'disabled' : ''}>${icon('chev')}</button></div>
+      ${D.synced ? '' : `<div class="hr-warnbox">${icon('alert')}<span>حضور هذا اليوم غير محفوظ على الجهاز، فالأرقام ناقصة. اضغط المزامنة ثم أعد الفتح.</span></div>`}
+      <img class="hr-wimg" alt="حالة الدوام" src="${url}">
+      <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} مشاركة الصورة</button><button type="button" class="btn-outline" id="dyText">مشاركة كنص</button></div>`);
+    $('hrSheetBody').querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => openDaily(addDays(ds, +b.dataset.d)); });
+    $('dyShare').onclick = () => {
+      const name = 'hr-daily-' + ds + '.png', B = window.AndroidBridge;
+      if (B && B.shareImage) { B.shareImage(url.split(',')[1], name, ''); return; }
+      cv.toBlob((bl) => { const file = new File([bl], name, { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file] }).catch(() => {}); else { const a = document.createElement('a'); a.href = url; a.download = name; a.click(); } });
+    };
+    $('dyText').onclick = () => { const t = HRReport.dailyText(D), B = window.AndroidBridge; if (B && B.share) B.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
+  }
+
   /* ---------- التقرير الأسبوعي للمدير (صورة للمشاركة) ---------- */
   function openWeekly(kind) {
     kind = kind || 'prev';
@@ -628,7 +650,8 @@
     const cnt = (s) => rows.filter((r) => r.status === s).length;
     const cons = HR.contracts().filter((c) => c.end && daysTo(c.end) >= 0 && daysTo(c.end) <= 30);
     const asgs = HR.assignments().filter((a) => a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
-    body.appendChild(el('div', 'hr-day', `<b>${dLong.format(new Date())}</b><small>${rep.synced ? 'حسب آخر مزامنة' : 'لم يُزامن حضور اليوم بعد'}${rep.weekend ? ' · عطلة' + (rows.some((r) => r.status === 'hwork') ? ` · ${rows.filter((r) => r.status === 'hwork').length} موظف داوموا` : '') : ''}</small>`));
+    body.appendChild(el('div', 'hr-day', `<div class="hr-dayt"><b>${dLong.format(new Date())}</b><small>${rep.synced ? 'حسب آخر مزامنة' : 'لم يُزامن حضور اليوم بعد'}${rep.weekend ? ' · عطلة' + (rows.some((r) => r.status === 'hwork') ? ` · ${rows.filter((r) => r.status === 'hwork').length} موظف داوموا` : '') : ''}</small></div><button type="button" class="hr-dayimg" id="hrDayImg" aria-label="صورة حالة الدوام اليومية">${icon('image')}<span>صورة اليوم</span></button>`));
+    $('hrDayImg').onclick = () => openDaily(today());
     // بحث شامل: يفتح قائمة الفريق مفلترة
     const gs = el('form', 'hr2-search', `${icon('search')}<input id="hrGS" type="search" enterkeyhint="search" placeholder="ابحث عن موظف: اسم، رقم، هاتف، قسم…" autocomplete="off">`);
     gs.onsubmit = (ev) => { ev.preventDefault(); const v = $('hrGS').value.trim(); if (!v) return; tab = 'emp'; f.es = 'all'; f.q = v; store.set('hrTab', tab); render(); };
@@ -726,12 +749,13 @@
     search(body, 'ابحث بالاسم أو الرقم أو القسم');
     const rows = base.filter((r) => (f.st === 'all' || (f.st === 'in' ? r.list.length : f.st === 'noasg' ? !r.hasAsg : f.st === 'outside' ? r.outside : f.st.startsWith('rq_') ? r.reqs.some((q) => q.kind === f.st.slice(3)) : r.status === f.st)) && match(f.q, r.e.name, r.e.empId, r.e.dept, r.e.nid))
       .sort((a, b) => (b.lateMin - a.lateMin) || String(a.firstIn || 'z').localeCompare(String(b.firstIn || 'z')) || a.e.name.localeCompare(b.e.name, 'ar'));
-    const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><span><button class="hr-tmap">${icon('pin')}الخريطة</button><button class="hr-tshare">${icon('share')}مشاركة</button></span>`);
+    const tools = el('div', 'hr-tools', `<small>${rows.length} موظف</small><span><button class="hr-timg">${icon('image')}صورة</button><button class="hr-tmap">${icon('pin')}الخريطة</button><button class="hr-tshare">${icon('share')}مشاركة</button></span>`);
     if ((f.st === 'late' || f.st === 'absent') && f.day === today() && rows.length) {
       const rb = el('button', 'hr-tremind', `${icon('note')}تذكير جماعي (${rows.length})`); rb.type = 'button';
       rb.onclick = () => openCompose(rows.map((r) => ({ empId: r.e.id })), f.st);
       tools.querySelector('span').prepend(rb);
     }
+    tools.querySelector('.hr-timg').onclick = () => openDaily(f.day);
     tools.querySelector('.hr-tmap').onclick = () => openAllMap(rows, f.day);
     tools.querySelector('.hr-tshare').onclick = () => shareList(`الحضور ${fd(f.day)} (${rows.length})`, rows.map((r, i) => `${i + 1}. ${r.e.name}${r.firstIn ? ' — ' + tf.format(new Date(r.firstIn)) : ''}${r.lastOut ? ' ← ' + tf.format(new Date(r.lastOut)) : ''}${r.workMin ? ' [' + hrs(r.workMin) + ']' : ''}${r.lateMin ? ' (تأخير ' + r.lateMin + ' د)' : ''}${r.outside ? ' (خارج الموقع)' : ''}${r.reqs.length ? ' — ' + r.reqs.map((q) => RQ[q.kind][0] + (q.start ? ' ' + q.start + (q.end ? '-' + q.end : '') : '')).join('، ') : ''}${r.leave ? ' — ' + leaveLbl(r.leave) : ''}`));
     body.appendChild(tools);

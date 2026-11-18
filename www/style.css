@@ -1724,3 +1724,9 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-salv{font-size:1.15rem;font-weight:800;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
 .hr-salr small{opacity:.75;line-height:1.5}
 .hr-salnote{opacity:.7;text-align:center}
+
+/* صورة الدوام اليومية */
+.hr-day{flex-direction:row!important;align-items:center;justify-content:space-between;gap:10px}
+.hr-dayt{display:flex;flex-direction:column;min-width:0}
+.hr-dayimg{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--gold,#d9b56b) 55%,transparent);background:color-mix(in srgb,var(--gold,#d9b56b) 14%,transparent);color:var(--text,#fff);font:inherit;font-size:.82rem;font-weight:700}
+.hr-dayimg svg{width:18px;height:18px;color:var(--gold,#d9b56b)}
