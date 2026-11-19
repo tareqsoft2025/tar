@@ -719,6 +719,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String autoReportGet() { return AutoReport.get(MainActivity.this); }
         @JavascriptInterface public void autoReportSet(String json) { AutoReport.save(MainActivity.this, json); }
         @JavascriptInterface public void autoReportRunNow() { AutoReport.run(MainActivity.this); }
+        @JavascriptInterface public boolean autoReportSendPrepared() { return AutoReport.sendPrepared(MainActivity.this); }
 
         @JavascriptInterface
         public boolean exactAlarmsAllowed() {

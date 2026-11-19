@@ -143,8 +143,68 @@ public class AutoReport extends BroadcastReceiver {
         sendNext(app);
     }
 
+    private static final String[] DAYS = { "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت" };
+
+    /** نص الشرح: «مرفق التقرير اليومي» + اليوم والتاريخ والساعة + آخر تحديث للبيانات. */
+    static String caption(long stampMs) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        String t = new java.text.SimpleDateFormat("h:mm", java.util.Locale.US).format(c.getTime()) + (c.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM ? " ص" : " م");
+        String d = DAYS[c.get(java.util.Calendar.DAY_OF_WEEK) - 1] + " " + new java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(c.getTime());
+        String s = "مرفق التقرير اليومي\n" + d + " — الساعة " + t;
+        if (stampMs > 0) {
+            java.util.Calendar u = java.util.Calendar.getInstance(); u.setTimeInMillis(stampMs);
+            s += "\nآخر تحديث للبيانات: " + new java.text.SimpleDateFormat("h:mm", java.util.Locale.US).format(u.getTime()) + (u.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM ? " ص" : " م");
+        }
+        return s;
+    }
+
+    static String stampText(long ms) {
+        if (ms <= 0) return "";
+        java.util.Calendar u = java.util.Calendar.getInstance(); u.setTimeInMillis(ms);
+        return new java.text.SimpleDateFormat("h:mm", java.util.Locale.US).format(u.getTime()) + (u.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM ? " ص" : " م");
+    }
+
+    /** يبدأ إرسال آخر ملف جاهز إلى كل الأرقام (يُستدعى عند ضغط المستخدم «إرسال» في الإشعار أو النافذة). */
+    static boolean sendPrepared(Context c) {
+        Context app = c.getApplicationContext();
+        String fn = sp(app).getString("pName", "");
+        File f = new File(new File(app.getCacheDir(), "share"), fn);
+        if (fn.isEmpty() || !f.isFile()) { status(app, false, "لا يوجد ملف جاهز للإرسال"); return false; }
+        java.util.List<String> nums = numbersOf(cfg(app));
+        if (nums.isEmpty()) { status(app, false, "لا توجد أرقام مستلمين: أضفها من الإعدادات"); return false; }
+        String pkg = null; String[] ps = { "com.whatsapp", "com.whatsapp.w4b" };
+        for (int i = 0; i < ps.length && pkg == null; i++) { try { app.getPackageManager().getPackageInfo(ps[i], 0); pkg = ps[i]; } catch (Exception e) { /* next */ } }
+        if (pkg == null) { status(app, false, "واتساب غير مثبّت"); return false; }
+        if (qCur != null) return true;   // إرسال جارٍ
+        qUri = Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
+        qMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; qPkg = pkg;
+        qCap = caption(sp(app).getLong("pStamp", 0)); qInfo = "أُرسل " + fn;
+        qOk = 0; qFail = 0; qTotal = nums.size(); QUEUE.clear(); QUEUE.addAll(nums);
+        WaAutoService.caption = qCap;
+        sendNext(app);
+        return true;
+    }
+
+    /** إشعار + نافذة منبثقة في منتصف الشاشة: «التقرير اليومي جاهز» مع آخر تحديث وزر إرسال (يعمل والتطبيق مغلق). */
+    static void notifyReady(Context app, String name, long stampMs) {
+        String upd = stampText(stampMs), body = "مرفق التقرير اليومي" + (upd.isEmpty() ? "" : "\nآخر تحديث للبيانات: " + upd) + "\nالملف: " + name;
+        Intent go = new Intent(app, SendReportActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
+        PendingIntent pi = PendingIntent.getActivity(app, 7614, go, f | PendingIntent.FLAG_UPDATE_CURRENT);
+        NotificationManager nm = (NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE);
+        Notification.Builder nb;
+        if (Build.VERSION.SDK_INT >= 26) { NotificationChannel ch = new NotificationChannel("hr_autorep2", "التقرير اليومي جاهز", NotificationManager.IMPORTANCE_HIGH); nm.createNotificationChannel(ch); nb = new Notification.Builder(app, "hr_autorep2"); }
+        else nb = new Notification.Builder(app).setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+        nb.setContentTitle("📊 أرسل التقرير اليومي").setContentText(upd.isEmpty() ? "اضغط للإرسال" : "آخر تحديث " + upd + " — اضغط للإرسال")
+          .setStyle(new Notification.BigTextStyle().bigText(body)).setSmallIcon(R.drawable.ic_stat_digest).setContentIntent(pi)
+          .addAction(new Notification.Action.Builder(R.drawable.ic_stat_digest, "إرسال", pi).build()).setCategory(Notification.CATEGORY_REMINDER)
+          .setFullScreenIntent(pi, true).setAutoCancel(true);
+        nm.notify(NOTIF_ID, nb.build());
+        ReminderActivity.popup(app, "report", "أرسل التقرير اليومي", body, "sendreport");
+    }
+
     /** يسلّم الملف: واتساب تلقائي إن أمكن، وإشعار للمشاركة اليدوية دائماً. */
-    static void deliver(Context c, String b64, String name, String info) {
+    static void deliver(Context c, String b64, String name, String info, long stamp) {
         Context app = c.getApplicationContext();
         JSONObject o = cfg(app);
         String fn = name.replaceAll("[^A-Za-z0-9._-]", "_"), msg = "تم تجهيز الملف (" + info + ")";
@@ -153,7 +213,9 @@ public class AutoReport extends BroadcastReceiver {
             File dir = new File(app.getCacheDir(), "share"); dir.mkdirs();
             FileOutputStream fo = new FileOutputStream(new File(dir, fn)); fo.write(data); fo.close();
             Uri u = Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
-            String mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", cap = "كشف الدوام — " + fn.replaceAll("[^0-9-]", "").replaceAll("^-+|-+$", "");
+            String mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", cap = caption(stamp);
+            sp(app).edit().putString("pName", fn).putLong("pStamp", stamp).putLong("pAt", System.currentTimeMillis()).apply();
+            if (!"auto".equals(o.optString("mode", "ask"))) { status(app, true, msg + " — بانتظار ضغطك على «إرسال» في الإشعار"); notifyReady(app, fn, stamp); return; }
             java.util.List<String> nums = numbersOf(o);
             boolean sentWa = false;
             if (!nums.isEmpty()) {
@@ -161,7 +223,7 @@ public class AutoReport extends BroadcastReceiver {
                 String[] ps = { "com.whatsapp", "com.whatsapp.w4b" };
                 for (int i = 0; i < ps.length && pkg == null; i++) { try { app.getPackageManager().getPackageInfo(ps[i], 0); pkg = ps[i]; } catch (Exception e) { /* next */ } }
                 if (pkg != null && qCur == null) {
-                    qUri = u; qMime = mime; qCap = cap; qPkg = pkg; qInfo = msg; qOk = 0; qFail = 0; qTotal = nums.size();
+                    qUri = u; qMime = mime; qCap = cap; WaAutoService.caption = cap; qPkg = pkg; qInfo = msg; qOk = 0; qFail = 0; qTotal = nums.size();
                     QUEUE.clear(); QUEUE.addAll(nums);
                     sentWa = true; msg += " وسيُرسل إلى " + nums.size() + " رقم بالتتابع";
                     sendNext(app);

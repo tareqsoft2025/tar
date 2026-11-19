@@ -41,8 +41,8 @@ public class AutoReportJob extends JobService {
                 @JavascriptInterface public boolean hrPut(String name, String data) { try { ErpClient.put(AutoReportJob.this, name, data); return true; } catch (Exception e) { return false; } }
                 @JavascriptInterface public String hrGet(String name) { return ErpClient.read(AutoReportJob.this, name); }
                 @JavascriptInterface public String autoReportConfig() { return AutoReport.get(AutoReportJob.this); }
-                @JavascriptInterface public void autoReportDone(final boolean ok, final String b64, final String name, final String msg) {
-                    if (ok) AutoReport.deliver(AutoReportJob.this, b64, name, msg); else AutoReport.status(AutoReportJob.this, false, "فشل بناء الملف: " + msg);
+                @JavascriptInterface public void autoReportDone(final boolean ok, final String b64, final String name, final String msg, final double stamp) {
+                    if (ok) AutoReport.deliver(AutoReportJob.this, b64, name, msg, (long) stamp); else AutoReport.status(AutoReportJob.this, false, "فشل بناء الملف: " + msg);
                     h.post(finish);
                 }
             }, "AndroidBridge");

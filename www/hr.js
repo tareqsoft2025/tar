@@ -51,11 +51,11 @@
     const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small><small id="hrLive" class="hr-live"></small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
     box.appendChild(acc);
     // خمسة أقسام ثابتة، وتحتها شرائح فرعية لقسم التقارير
-    const secOf = () => tab === 'dash' ? 'today' : tab === 'emp' ? 'team' : (tab === 'set' || tab === 'rev') ? 'more' : (tab === 'lv' && f.lv === 'req') ? 'req' : 'rep';
+    const secOf = () => tab === 'dash' ? 'today' : tab === 'act' ? 'act' : tab === 'emp' ? 'team' : (tab === 'set' || tab === 'rev') ? 'more' : (tab === 'lv' && f.lv === 'req') ? 'req' : 'rep';
     const pend = pendingReqs().length;
     const nav = el('div', 'hr2-nav');
     [['today', 'اليوم', 'grid', () => { tab = 'dash'; }], ['team', 'الفريق', 'users', () => { tab = 'emp'; }], ['req', 'الطلبات', 'inbox', () => { tab = 'lv'; f.lv = 'req'; }],
-      ['rep', 'التقارير', 'chart', () => { if (secOf() !== 'rep') tab = 'att'; }], ['more', 'المزيد', 'sliders', () => { tab = 'set'; }]].forEach(([k, n, ic, go]) => {
+      ['act', 'الإجراءات', 'alert', () => { tab = 'act'; }], ['rep', 'التقارير', 'chart', () => { if (secOf() !== 'rep') tab = 'att'; }], ['more', 'المزيد', 'sliders', () => { tab = 'set'; }]].forEach(([k, n, ic, go]) => {
       const b = el('button', 'hr2-n' + (secOf() === k ? ' on' : ''), `${icon(ic)}<span>${n}</span>${k === 'req' && pend ? `<i class="hr2-bd">${pend > 99 ? '99+' : pend}</i>` : ''}`);
       b.type = 'button';
       b.onclick = () => { go(); f.q = ''; store.set('hrTab', tab); selOff(); render(); window.scrollTo && window.scrollTo(0, 0); };
@@ -75,7 +75,7 @@
     const body = el('div', 'hr-view'); box.appendChild(body);
     if (tab !== 'rev') revOpen = 0;
     if (!meta.lastSync && tab !== 'set') { renderFirst(body); return; }
-    ({ dash: renderDash, sites: renderSites, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet, rev: renderRev }[tab] || renderDash)(body);
+    ({ act: renderAct, dash: renderDash, sites: renderSites, att: renderAtt, wk: renderWeek, lv: renderLv, emp: renderEmp, con: renderCon, asg: renderAsg, set: renderSet, rev: renderRev }[tab] || renderDash)(body);
     const on = box.querySelector('.hr-tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
     // زر "تحديد" في شريط أدوات القائمة
     const ts = body.querySelectorAll('.hr-tools');
@@ -511,7 +511,7 @@
   function openAutoReport(back) {
     const Bx = window.AndroidBridge, has = !!(Bx && Bx.autoReportSet);
     const DN = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    let c = { on: false, h: 15, m: 0, days: [0, 1, 2, 3, 4], number: '', contacts: [], scope: 'both', day: 'today' };
+    let c = { on: false, h: 15, m: 0, days: [0, 1, 2, 3, 4], number: '', contacts: [], scope: 'both', day: 'today', mode: 'ask' };
     try { Object.assign(c, JSON.parse((has ? Bx.autoReportGet() : localStorage.getItem('hrAutoRep')) || '{}')); } catch (e) { /* افتراضي */ }
     if (!Array.isArray(c.contacts) || !c.contacts.length) c.contacts = (Array.isArray(c.numbers) ? c.numbers : (c.number ? [c.number] : [])).map((n) => ({ n: String(n), name: '' }));
     const keys = (store.get('hrXlKeys', null) || HRReport.SHEET_KEYS.map((x) => x[0])).filter((k) => HRReport.SHEET_KEYS.some((x) => x[0] === k));
@@ -529,6 +529,8 @@
           <div class="hr3-nums">${c.contacts.map((x, i) => `<div class="hr3-num"><span><b>${esc(x.name || 'مستلم ' + (i + 1))}</b><small dir="ltr">+${esc(x.n)}</small></span><button type="button" data-rn="${i}" aria-label="حذف">✕</button></div>`).join('') || '<small class="hr3-none">لا أرقام بعد — أضف رقماً أدناه</small>'}</div>
           <div class="hr3-sv2"><input id="arName" class="hr-in" placeholder="الاسم (اختياري)" style="max-width:38%"><input id="arNum" class="hr-in" inputmode="tel" placeholder="970599123456"><button type="button" class="btn-outline" id="arAdd">+ أضف</button></div>
           <small class="hr3-none">اكتب الرقم مع رمز الدولة بلا + أو أصفار في البداية (مثال: 970598815128).</small></div>
+        <div class="hr3-sec"><small>طريقة الإرسال عند الموعد</small><div class="chips hr-fc">${[['ask', '🔔 نافذة منبثقة وأضغط «إرسال» (موصى)'], ['auto', '⚡ تلقائي كامل بلا تدخل']].map(([v, n]) => `<button type="button" class="chip sm${c.mode === v ? ' on' : ''}" data-md="${v}">${n}</button>`).join('')}</div>
+          <small class="hr3-none">${c.mode === 'auto' ? 'يفتح واتساب ويرسل وحده — قد يمنعه النظام إن كانت الشاشة مقفلة.' : 'عند الموعد تظهر نافذة في منتصف الشاشة (حتى والتطبيق مغلق) فيها آخر تحديث وزر «إرسال»، فيُفتح واتساب ويُرسل الملف مع نص «مرفق التقرير اليومي» والتاريخ والساعة.'}</small></div>
         <div class="hr3-sec"><small>محتوى الملف</small><div class="chips hr-fc">${[['both', 'PEF + HHO'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['all', 'الكل (ملخص)']].map(([v, n]) => `<button type="button" class="chip sm${c.scope === v ? ' on' : ''}" data-sc="${v}">${n}</button>`).join('')}</div>
           <div class="chips hr-fc">${[['today', 'كشف اليوم'], ['yesterday', 'كشف أمس']].map(([v, n]) => `<button type="button" class="chip sm${c.day === v ? ' on' : ''}" data-dy="${v}">${n}</button>`).join('')}</div>
           <small class="hr3-none">الأوراق المضمّنة: ${keys.length} من ${HRReport.SHEET_KEYS.length} (تُحدَّد من لوحة «التصدير» ← الأوراق التي تظهر في Excel)</small></div>
@@ -536,6 +538,7 @@
           ${perm(waOn, 'خدمة الإرسال التلقائي (إمكانية الوصول)', 'تفعيل', 'arWa')}${perm(ovOn, 'العرض فوق التطبيقات (لفتح واتساب والتطبيق مغلق)', 'السماح', 'arOv')}${perm(exOn, 'المنبّهات الدقيقة (ليبدأ في الدقيقة المحددة)', '', '')}</div>
         ${c.lastAt ? `<div class="hr3-last ${c.lastOk ? 'ok' : 'no'}">آخر تشغيل: ${esc(new Intl.DateTimeFormat('ar-PS-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: Core.TZ }).format(new Date(c.lastAt)))} — ${esc(c.lastMsg || '')}</div>` : ''}
         <div class="hr-gact"><button type="button" class="btn-primary" id="arSave">حفظ</button><button type="button" class="btn-outline" id="arTest"${has ? '' : ' disabled'}>جرّب الآن</button></div>
+        <button type="button" class="btn-outline wide" id="arSendNow" style="margin-top:8px"${has ? '' : ' disabled'}>📤 إرسال آخر تقرير جاهز الآن</button>
         <button type="button" class="btn-outline wide" id="arBack" style="margin-top:8px">رجوع</button>
         <small class="hr-pgn">يبني التطبيق الملف من آخر بيانات يزامنها من النظام ثم يفتح واتساب على الرقم ويضغط «إرسال». يحتاج الجوال مفتوحاً غير مقفل شاشته لأفضل نتيجة، واتصالاً بالإنترنت، وألا يوقف النظام التطبيق (استثنِه من توفير البطارية).</small>`);
       const b = $('hrSheetBody');
@@ -546,14 +549,16 @@
       b.querySelectorAll('[data-rn]').forEach((x) => { x.onclick = () => { rd(); c.contacts.splice(+x.dataset.rn, 1); draw(); }; });
       b.querySelectorAll('[data-dw]').forEach((x) => { x.onclick = () => { rd(); const d = +x.dataset.dw, i = c.days.indexOf(d); if (i >= 0) c.days.splice(i, 1); else c.days.push(d); draw(); }; });
       b.querySelectorAll('[data-sc]').forEach((x) => { x.onclick = () => { rd(); c.scope = x.dataset.sc; draw(); }; });
+      b.querySelectorAll('[data-md]').forEach((x) => { x.onclick = () => { rd(); c.mode = x.dataset.md; draw(); }; });
       b.querySelectorAll('[data-dy]').forEach((x) => { x.onclick = () => { rd(); c.day = x.dataset.dy; draw(); }; });
       if ($('arWa')) $('arWa').onclick = () => Bx.waAutoSettings && Bx.waAutoSettings();
       if ($('arOv')) $('arOv').onclick = () => Bx.requestOverlay && Bx.requestOverlay();
       const save = () => { rd(); if (!addNum()) return false; if (c.on && !c.contacts.length) { toast('أضف رقماً واحداً على الأقل'); return false; } if (c.on && !c.days.length) { toast('اختر يوماً واحداً على الأقل'); return false; }
-        const o = { on: c.on, h: c.h, m: c.m, days: c.days.slice().sort(), numbers: c.contacts.map((x) => x.n), contacts: c.contacts, scope: c.scope, day: c.day, keys };
+        const o = { on: c.on, h: c.h, m: c.m, days: c.days.slice().sort(), numbers: c.contacts.map((x) => x.n), contacts: c.contacts, scope: c.scope, day: c.day, mode: c.mode, keys };
         localStorage.setItem('hrAutoRep', JSON.stringify(o)); if (has) Bx.autoReportSet(JSON.stringify(o)); return true; };
       $('arSave').onclick = () => { if (!save()) return; toast(c.on ? 'تم الحفظ — سيُرسل يومياً في ' + $('arTime').value : 'تم الحفظ (متوقف)'); if (has) { try { c = Object.assign(c, JSON.parse(Bx.autoReportGet())); } catch (e) { /* ignore */ } } draw(); };
       $('arTest').onclick = () => { if (!save()) return; Bx.autoReportRunNow(); toast('جارٍ بناء الملف وإرساله… سيصلك إشعار عند الجاهزية'); };
+      $('arSendNow').onclick = () => { if (!save()) return; if (!Bx.autoReportSendPrepared()) toast('لا يوجد ملف جاهز بعد — اضغط «جرّب الآن» أولاً'); else toast('جارٍ فتح واتساب…'); };
       $('arBack').onclick = () => (back ? back() : closeSheet());
     };
     draw();
@@ -1124,6 +1129,61 @@
       const orgB = e.org ? `<span class="hr3-tag ${e.org === 'HHO' ? 'hho' : 'pef'}">${esc(e.org)}</span>` : '';
       return personRow(e, right, `${esc([e.pos, e.dept].filter(Boolean).join(' · ') || TYPE[e.type] || '')} ${orgB}${st ? `<span class="hr3-strip">${st}</span>` : ''}`);
     }), 'لا نتائج');
+  }
+
+
+  /* ---------- الإجراءات: الحالات المخالِفة والإجراء الواجب حسب سياسة الموارد البشرية ---------- */
+  let actYm = today().slice(0, 7), actView = 'cases', actKind = 'all', actOpen = {};
+  const ACT_GRP = { late: ['grace5', 'grace8', 'grace9', 'over'], early: ['earlyB', 'earlyS'], abs: ['absent', 'absentLate', 'run3'], rec: ['noOut'], disc: ['notice', 'discipline', 'asAbsence', 'permits'], ot: ['holiday', 'ot4', 'ot12'], lv: ['emerg', 'sick'] };
+  const ACT_KINDS = [['all', 'الكل'], ['late', 'تأخير'], ['early', 'مغادرة مبكرة'], ['abs', 'غياب وانقطاع'], ['rec', 'سجلات ناقصة'], ['disc', 'تأديب'], ['ot', 'عمل بعطلة/إضافي'], ['lv', 'إجازات']];
+  const SEVL = { high: ['حرج', 'bad'], mid: ['يحتاج إجراء', 'warn'], low: ['للعلم', 'info'] };
+  function composeWith(empId, text) { openCompose([{ empId }], 'free', {}); if (cmp) { cmp.text = text; drawCompose(); } }
+  function renderAct(body) {
+    const ym0 = today().slice(0, 7);
+    const head = el('div', 'hr-dnav', `<button class="icon-btn flip" data-d="-1" aria-label="الشهر السابق">${icon('chev')}</button><label><b>${mLbl.format(new Date(actYm + '-15T12:00:00Z'))}</b><small>الإجراءات الواجبة حسب سياسة الموارد البشرية</small></label><button class="icon-btn" data-d="1" aria-label="الشهر التالي" ${actYm >= ym0 ? 'disabled' : ''}>${icon('chev')}</button>`);
+    head.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => { const [y, m] = actYm.split('-').map(Number); actYm = new Date(Date.UTC(y, m - 1 + +b.dataset.d, 1)).toISOString().slice(0, 7); render(); }; });
+    body.appendChild(head);
+    const seg = el('div', 'chips hr-fc', [['cases', 'حالات الموظفين'], ['guide', 'دليل السياسة']].map(([v, n]) => `<button type="button" class="chip sm${actView === v ? ' on' : ''}" data-v="${v}">${n}</button>`).join(''));
+    seg.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => { actView = b.dataset.v; render(); }; });
+    body.appendChild(seg);
+    if (actView === 'guide') { renderGuide(body); return; }
+    filterBar(body);
+    const ex = repExcl(), R = HRPolicy.analyse(actYm, (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)));
+    const all = R.list, cnt = (sv) => all.reduce((a, x) => a + x.items.filter((i) => i.sev === sv).length, 0);
+    body.appendChild(el('div', 'hr3-kpi', [['حرج', cnt('high'), '#F2716A'], ['يحتاج إجراء', cnt('mid'), '#F0A64B'], ['للعلم', cnt('low'), '#6FB7FF']].map(([l, n, c]) => `<div class="hr3-k" style="--c:${c}"><b style="color:${c}">${n}</b><small>${l}</small></div>`).join('')));
+    body.appendChild(el('div', 'hr-tools', `<small>${all.length} موظف بحالات من ${R.total}${R.unsynced.length ? ' · ' + R.unsynced.length + ' يوم غير مزامَن (الأرقام ناقصة)' : ''}</small>`));
+    const kc = el('div', 'chips hr-fc'); ACT_KINDS.forEach(([v, n]) => { const b = el('button', 'chip sm' + (actKind === v ? ' on' : ''), n); b.type = 'button'; b.onclick = () => { actKind = v; render(); }; kc.appendChild(b); }); body.appendChild(kc);
+    const rows = all.map((x) => ({ x, items: actKind === 'all' ? x.items : x.items.filter((i) => (ACT_GRP[actKind] || []).includes(i.code)) })).filter((r) => r.items.length);
+    if (!rows.length) { body.appendChild(el('div', 'hr2-ok', `${icon('check')}<span>لا حالات تحتاج إجراءً في هذا الشهر</span>`)); return; }
+    rows.forEach(({ x, items }) => {
+      const e = x.e, open = !!actOpen[e.id], top = items.reduce((m, i) => (i.sev === 'high' ? 'high' : i.sev === 'mid' && m !== 'high' ? 'mid' : m), 'low');
+      const card = el('div', 'hr4-card sev-' + top);
+      card.innerHTML = `<button type="button" class="hr4-h"><span class="hr-ava ${SEVL[top][1]}">${esc(initials(e.name))}</span><span class="hr-rt"><b>${esc(e.name)} ${e.org ? `<span class="hr3-tag ${e.org === 'HHO' ? 'hho' : 'pef'}">${esc(e.org)}</span>` : ''}</b><small>${esc([e.pos, e.dept].filter(Boolean).join(' · '))}</small></span><span class="hr-b ${SEVL[top][1]}">${items.length} ${items.length === 1 ? 'حالة' : 'حالات'}</span></button>`;
+      card.querySelector('.hr4-h').onclick = () => { actOpen[e.id] = !actOpen[e.id]; render(); };
+      if (open) items.forEach((it, k) => {
+        const d = el('div', 'hr4-it sev-' + it.sev);
+        d.innerHTML = `<div class="hr4-ih"><b>${esc(it.title)}</b><span class="hr-b ${SEVL[it.sev][1]}">${SEVL[it.sev][0]}</span></div>
+          <small class="hr4-d">${esc(it.detail)}</small>
+          <div class="hr4-lb">الإجراء الواجب</div><ol class="hr4-st">${it.steps.map((t) => `<li>${esc(t)}</li>`).join('')}</ol>
+          <div class="hr4-meta"><span>الجهة: ${esc(it.who)}</span><span>المهلة: ${esc(it.when)}</span><span>المرجع: ${esc(it.ref)}</span></div>
+          <div class="hr-gact"><button type="button" class="btn-outline" data-m="${k}">${icon('note')} رسالة للموظف</button><button type="button" class="btn-outline" data-o="1">${icon('users')} ملف الموظف</button></div>`;
+        d.querySelector('[data-m]').onclick = () => composeWith(e.id, HRPolicy.msgFor(e.name, it));
+        d.querySelector('[data-o]').onclick = () => openEmp(e.id);
+        card.appendChild(d);
+      });
+      body.appendChild(card);
+    });
+    body.appendChild(el('small', 'hr-pgn', 'الحالات محسوبة من سجلات الحضور المحفوظة وفق سياسة الموارد البشرية (الإصدار 3.0): الدوام 08:00–16:00 من الأحد إلى الخميس، وفترة السماح 15 دقيقة. من لديه طلب إذن مغادرة/تأخير أو مهمة في اليوم لا تُحسب عليه مخالفة. هذه توصيات للمراجعة وليست قراراً نهائياً، والقرار للموارد البشرية والإدارة.'));
+  }
+  function renderGuide(body) {
+    HRPolicy.GUIDE.forEach((g) => {
+      const sec = el('div', 'hr4-g');
+      sec.appendChild(el('div', 'hr-sec', `<span>${icon(g.ic)} ${esc(g.title)}</span><small>${g.rows.length} حالات</small>`));
+      sec.appendChild(el('p', 'hr4-intro', esc(g.intro)));
+      g.rows.forEach(([c, a, who, when, ref]) => sec.appendChild(el('div', 'hr4-gr', `<b>${esc(c)}</b><p>${esc(a)}</p><div class="hr4-meta"><span>الجهة: ${esc(who)}</span><span>المهلة: ${esc(when)}</span><span>المرجع: ${esc(ref)}</span></div>`)));
+      body.appendChild(sec);
+    });
+    body.appendChild(el('small', 'hr-pgn', 'المصدر: سياسة الموارد البشرية — جمعية أصدقاء البيئة الفلسطينية، الإصدار 3.0 (2025/2026). الأرقام بين الأقواس هي أرقام البنود في الوثيقة.'));
   }
 
   /* ---------- العقود ---------- */
