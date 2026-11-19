@@ -511,8 +511,9 @@
   function openAutoReport(back) {
     const Bx = window.AndroidBridge, has = !!(Bx && Bx.autoReportSet);
     const DN = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    let c = { on: false, h: 15, m: 0, days: [0, 1, 2, 3, 4], number: '', scope: 'both', day: 'today' };
+    let c = { on: false, h: 15, m: 0, days: [0, 1, 2, 3, 4], number: '', contacts: [], scope: 'both', day: 'today' };
     try { Object.assign(c, JSON.parse((has ? Bx.autoReportGet() : localStorage.getItem('hrAutoRep')) || '{}')); } catch (e) { /* افتراضي */ }
+    if (!Array.isArray(c.contacts) || !c.contacts.length) c.contacts = (Array.isArray(c.numbers) ? c.numbers : (c.number ? [c.number] : [])).map((n) => ({ n: String(n), name: '' }));
     const keys = (store.get('hrXlKeys', null) || HRReport.SHEET_KEYS.map((x) => x[0])).filter((k) => HRReport.SHEET_KEYS.some((x) => x[0] === k));
     const perm = (ok, t, act, id) => `<div class="hr3-perm ${ok ? 'ok' : 'no'}"><span>${ok ? '✓' : '!'} ${t}</span>${ok || !act ? '' : `<button type="button" id="${id}">${act}</button>`}</div>`;
     const draw = () => {
@@ -524,7 +525,10 @@
         <div class="hr3-sec"><div class="chips hr-fc"><button type="button" class="chip sm${c.on ? ' on' : ''}" id="arOn">${c.on ? '● مفعّل' : 'متوقف — اضغط للتفعيل'}</button></div></div>
         <div class="hr3-sec"><small>وقت الإرسال</small><input id="arTime" type="time" class="hr-in" value="${tm}"></div>
         <div class="hr3-sec"><small>أيام الإرسال</small><div class="chips hr-fc">${DN.map((n, i) => `<button type="button" class="chip sm${c.days.includes(i) ? ' on' : ''}" data-dw="${i}">${n}</button>`).join('')}</div></div>
-        <div class="hr3-sec"><small>رقم واتساب المستلم (مع رمز الدولة، مثل 970599123456)</small><input id="arNum" class="hr-in" inputmode="tel" placeholder="970…" value="${esc(c.number || '')}"></div>
+        <div class="hr3-sec"><small>أرقام واتساب المستلمين (${c.contacts.length}) — يُرسل الملف لكل رقم بالتتابع</small>
+          <div class="hr3-nums">${c.contacts.map((x, i) => `<div class="hr3-num"><span><b>${esc(x.name || 'مستلم ' + (i + 1))}</b><small dir="ltr">+${esc(x.n)}</small></span><button type="button" data-rn="${i}" aria-label="حذف">✕</button></div>`).join('') || '<small class="hr3-none">لا أرقام بعد — أضف رقماً أدناه</small>'}</div>
+          <div class="hr3-sv2"><input id="arName" class="hr-in" placeholder="الاسم (اختياري)" style="max-width:38%"><input id="arNum" class="hr-in" inputmode="tel" placeholder="970599123456"><button type="button" class="btn-outline" id="arAdd">+ أضف</button></div>
+          <small class="hr3-none">اكتب الرقم مع رمز الدولة بلا + أو أصفار في البداية (مثال: 970598815128).</small></div>
         <div class="hr3-sec"><small>محتوى الملف</small><div class="chips hr-fc">${[['both', 'PEF + HHO'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['all', 'الكل (ملخص)']].map(([v, n]) => `<button type="button" class="chip sm${c.scope === v ? ' on' : ''}" data-sc="${v}">${n}</button>`).join('')}</div>
           <div class="chips hr-fc">${[['today', 'كشف اليوم'], ['yesterday', 'كشف أمس']].map(([v, n]) => `<button type="button" class="chip sm${c.day === v ? ' on' : ''}" data-dy="${v}">${n}</button>`).join('')}</div>
           <small class="hr3-none">الأوراق المضمّنة: ${keys.length} من ${HRReport.SHEET_KEYS.length} (تُحدَّد من لوحة «التصدير» ← الأوراق التي تظهر في Excel)</small></div>
@@ -535,15 +539,18 @@
         <button type="button" class="btn-outline wide" id="arBack" style="margin-top:8px">رجوع</button>
         <small class="hr-pgn">يبني التطبيق الملف من آخر بيانات يزامنها من النظام ثم يفتح واتساب على الرقم ويضغط «إرسال». يحتاج الجوال مفتوحاً غير مقفل شاشته لأفضل نتيجة، واتصالاً بالإنترنت، وألا يوقف النظام التطبيق (استثنِه من توفير البطارية).</small>`);
       const b = $('hrSheetBody');
-      const rd = () => { c.number = $('arNum').value.trim(); const t = ($('arTime').value || '15:00').split(':'); c.h = +t[0]; c.m = +t[1]; };
+      const rd = () => { const t = ($('arTime').value || '15:00').split(':'); c.h = +t[0]; c.m = +t[1]; };
       $('arOn').onclick = () => { rd(); c.on = !c.on; draw(); };
+      const addNum = () => { const d = $('arNum').value.replace(/\D/g, '').replace(/^0+/, ''); if (!d) return true; if (d.length < 8) { toast('الرقم قصير: اكتبه مع رمز الدولة'); return false; } if (!c.contacts.some((x) => x.n === d)) c.contacts.push({ n: d, name: $('arName').value.trim() }); $('arNum').value = ''; $('arName').value = ''; return true; };
+      $('arAdd').onclick = () => { rd(); if (addNum()) draw(); };
+      b.querySelectorAll('[data-rn]').forEach((x) => { x.onclick = () => { rd(); c.contacts.splice(+x.dataset.rn, 1); draw(); }; });
       b.querySelectorAll('[data-dw]').forEach((x) => { x.onclick = () => { rd(); const d = +x.dataset.dw, i = c.days.indexOf(d); if (i >= 0) c.days.splice(i, 1); else c.days.push(d); draw(); }; });
       b.querySelectorAll('[data-sc]').forEach((x) => { x.onclick = () => { rd(); c.scope = x.dataset.sc; draw(); }; });
       b.querySelectorAll('[data-dy]').forEach((x) => { x.onclick = () => { rd(); c.day = x.dataset.dy; draw(); }; });
       if ($('arWa')) $('arWa').onclick = () => Bx.waAutoSettings && Bx.waAutoSettings();
       if ($('arOv')) $('arOv').onclick = () => Bx.requestOverlay && Bx.requestOverlay();
-      const save = () => { rd(); if (c.on && String(c.number).replace(/\D/g, '').length < 8) { toast('اكتب رقم واتساب صحيحاً مع رمز الدولة'); return false; } if (c.on && !c.days.length) { toast('اختر يوماً واحداً على الأقل'); return false; }
-        const o = { on: c.on, h: c.h, m: c.m, days: c.days.slice().sort(), number: c.number.replace(/[^\d]/g, ''), scope: c.scope, day: c.day, keys };
+      const save = () => { rd(); if (!addNum()) return false; if (c.on && !c.contacts.length) { toast('أضف رقماً واحداً على الأقل'); return false; } if (c.on && !c.days.length) { toast('اختر يوماً واحداً على الأقل'); return false; }
+        const o = { on: c.on, h: c.h, m: c.m, days: c.days.slice().sort(), numbers: c.contacts.map((x) => x.n), contacts: c.contacts, scope: c.scope, day: c.day, keys };
         localStorage.setItem('hrAutoRep', JSON.stringify(o)); if (has) Bx.autoReportSet(JSON.stringify(o)); return true; };
       $('arSave').onclick = () => { if (!save()) return; toast(c.on ? 'تم الحفظ — سيُرسل يومياً في ' + $('arTime').value : 'تم الحفظ (متوقف)'); if (has) { try { c = Object.assign(c, JSON.parse(Bx.autoReportGet())); } catch (e) { /* ignore */ } } draw(); };
       $('arTest').onclick = () => { if (!save()) return; Bx.autoReportRunNow(); toast('جارٍ بناء الملف وإرساله… سيصلك إشعار عند الجاهزية'); };
@@ -1900,6 +1907,7 @@
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
       <button type="button" class="btn-outline wide" id="waOpen">${icon('share')}<span>الإرسال التلقائي إلى واتساب (الأرقام والتفعيل)</span></button>
       <button type="button" class="btn-outline wide" id="rxOpen">${icon('x')}<span>أسماء مستثناة من تسجيل الحضور (${repExcl().size})</span></button>
+      <button type="button" class="btn-outline wide" id="arOpen">${icon('clock')}<span>التقرير اليومي التلقائي والأرقام المرسَل إليها</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
       <label class="hr-srow"><span>إشعار لكل طلب جديد (إجازة، مغادرة، مهمة، عمل إضافي، عمل بعطلة)</span><input type="checkbox" id="rqOn" class="hr-tog" ${s.reqNotify === false ? '' : 'checked'}></label>
       <label class="hr-srow"><span>الوضع المباشر (تحديث الحضور كل ~20 ثانية وقت الدوام والشاشة مفتوحة)</span><input type="checkbox" id="lvOn" class="hr-tog" ${s.live === false ? '' : 'checked'}></label>
@@ -1911,6 +1919,7 @@
     body.appendChild(dg);
     $('wkRep').onclick = () => openWeekly('prev');
     $('rxOpen').onclick = () => openRepExcl(null);
+    $('arOpen').onclick = () => openAutoReport(null);
     $('waOpen').onclick = () => openWaAuto(null, null);
     $('wnLog').onclick = openWarnLog;
     $('rvOpen').onclick = () => { tab = 'rev'; store.set('hrTab', 'set'); revFlt = 'need'; render(); };
