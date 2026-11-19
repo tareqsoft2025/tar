@@ -33,7 +33,7 @@
     const meta = { title: 'كشف الدوام — ' + ds };
     const u8 = HRReport.xlsxOf(HRReport.pickSheets(sheets, keys), meta);
     const tag = cfg.scope === 'both' || !cfg.scope ? 'pef-hho' : cfg.scope === 'all' ? 'daily' : cfg.scope.toLowerCase();
-    return { u8, ds, name: `hr-${tag}-${ds}.xlsx`, sheets: sheets.length };
+    return { u8, ds, name: `hr-${tag}-${ds}.xlsx`, sheets: sheets.length, stamp: stamp || 0 };
   }
   window.HRAuto = { build };
 })();

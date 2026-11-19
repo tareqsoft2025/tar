@@ -20,8 +20,8 @@
     const r = await HRAuto.build(cfg);
     let bin = '', ch = 0x8000;
     for (let i = 0; i < r.u8.length; i += ch) bin += String.fromCharCode.apply(null, r.u8.subarray(i, i + ch));
-    B.autoReportDone(true, btoa(bin), r.name, r.sheets + ' ورقة');
-  } catch (e) { B.autoReportDone(false, '', '', String(e && e.message || e)); }
+    B.autoReportDone(true, btoa(bin), r.name, r.sheets + ' ورقة', r.stamp || 0);
+  } catch (e) { B.autoReportDone(false, '', '', String(e && e.message || e), 0); }
 })();
 </script>
 </body></html>

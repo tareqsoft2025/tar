@@ -1327,7 +1327,7 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-bd-r .ok{color:var(--ok)}.hr-bd-r .warn{color:#F0A64B}.hr-bd-r .bad{color:#F2716A}.hr-bd-r .info{color:#5B9DFF}
 
 /* ---- تصميم الموارد البشرية الجديد (v8) ---- */
-.hr2-nav{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;position:sticky;top:0;z-index:5;background:var(--bg);padding:6px 0 8px;margin:0 0 4px;border-bottom:1px solid var(--line)}
+.hr2-nav{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;position:sticky;top:0;z-index:5;background:var(--bg);padding:6px 0 8px;margin:0 0 4px;border-bottom:1px solid var(--line)}
 .hr2-n{position:relative;display:grid;justify-items:center;gap:2px;padding:7px 2px;border-radius:14px;color:var(--muted);font-size:.72rem;font-weight:700;background:transparent;border:0;cursor:pointer}
 .hr2-n svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .hr2-n.on{color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent)}
@@ -1799,3 +1799,15 @@ html:has(#tab-times.active){overflow:hidden}
 .hr3-num{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
 .hr3-num span{display:grid;flex:1;min-width:0}.hr3-num small{color:var(--muted);direction:ltr;text-align:start}
 .hr3-num button{background:none;border:0;color:#F2716A;font-size:1rem;cursor:pointer;padding:4px 8px}
+
+.hr4-card{background:var(--card);border:1px solid var(--line);border-inline-start:4px solid #6FB7FF;border-radius:16px;margin:8px 0;overflow:hidden}
+.hr4-card.sev-high{border-inline-start-color:#F2716A}.hr4-card.sev-mid{border-inline-start-color:#F0A64B}
+.hr4-h{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;background:none;border:0;color:inherit;font:inherit;text-align:start;cursor:pointer}
+.hr4-it{border-top:1px solid var(--line);padding:11px 14px;display:grid;gap:6px}
+.hr4-ih{display:flex;align-items:center;gap:8px;justify-content:space-between}.hr4-ih b{font-size:.9rem}
+.hr4-d{color:var(--muted);line-height:1.6}.hr4-lb{font-size:.74rem;color:var(--gold);font-weight:700;margin-top:2px}
+.hr4-st{margin:0;padding-inline-start:20px;display:grid;gap:4px;font-size:.84rem;line-height:1.7}
+.hr4-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.72rem;color:var(--muted)}
+.hr4-g{margin-bottom:14px}.hr4-intro{font-size:.82rem;color:var(--muted);line-height:1.7;margin:4px 2px 8px}
+.hr4-gr{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 13px;margin:7px 0}.hr4-gr b{font-size:.9rem}.hr4-gr p{margin:6px 0;font-size:.84rem;line-height:1.7}
+.hr2-n{font-size:.66rem}

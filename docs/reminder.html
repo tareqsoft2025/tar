@@ -28,7 +28,7 @@
   if (data.type === 'notice') {
     RemindUI.showNotice(document.getElementById('host'), data, {
       close: close,
-      view: function () { if (R && R.openGo) R.openGo(data.go || 'inbox'); else close(); }
+      view: function () { if (data.go === 'sendreport' && R && R.sendReport) R.sendReport(); else if (R && R.openGo) R.openGo(data.go || 'inbox'); else close(); }
     });
     return;
   }
