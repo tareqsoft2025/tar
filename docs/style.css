@@ -1747,3 +1747,11 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-wa-steps{border:1px solid var(--line,#2a3b3d);border-radius:14px;padding:10px 12px;margin:6px 0 10px;display:grid;gap:6px;font-size:.88rem;line-height:1.6}
 .hr-wa-steps p{margin:0;display:block}
 .hr-wa-steps i{width:22px;height:22px;border-radius:50%;background:var(--gold,#d9b56b);color:#1a1405;font-style:normal;font-weight:800;display:inline-grid;place-items:center;font-size:.8rem;vertical-align:middle;margin-inline-end:8px}
+
+/* بطاقة اليوم في ملف الموظف */
+.hr-todayc{border:1px solid var(--line,#2a3b3d);border-radius:18px;padding:12px;margin:10px 0;display:grid;gap:8px;background:linear-gradient(160deg,color-mix(in srgb,var(--gold,#d9b56b) 10%,transparent),transparent)}
+.hr-todayc.ok{border-color:color-mix(in srgb,#4fbf8a 55%,transparent)}.hr-todayc.warn{border-color:color-mix(in srgb,#e0a03c 60%,transparent)}.hr-todayc.bad{border-color:color-mix(in srgb,#e0645a 60%,transparent)}
+.hr-todh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hr-todh b{font-size:1.05rem}.hr-todh small{opacity:.75;margin-inline-end:auto}
+.hr-cal14 i.tday{outline:2px solid var(--gold,#d9b56b);outline-offset:2px;position:relative}
+.hr-cal14 i.tday::after{content:"اليوم";position:absolute;inset-inline:0;bottom:-15px;text-align:center;font-size:.6rem;font-style:normal;color:var(--gold,#d9b56b);font-weight:800}
+.hr-cal14{padding-bottom:14px}
