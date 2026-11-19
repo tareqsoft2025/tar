@@ -399,7 +399,8 @@
     draw();
   }
   let dyView = 'sum', dyMon = '';
-  const expSel = { fmt: 'xlsx', scope: 'cur', send: 'share', parts: ['att', 'late', 'req', 'weeks'] };
+  const ALLK = () => HRReport.SHEET_KEYS.map((x) => x[0]);
+  const expSel = { fmt: 'xlsx', scope: 'cur', send: 'share', keys: (store.get('hrXlKeys', null) || ALLK()).filter((k) => ALLK().includes(k)) };
   // آخر 6 أشهر (الحالي أولاً) لورقة التأخر الشهري
   const monOpts = () => { const t = today(), [y, m] = t.split('-').map(Number), out = []; for (let i = 0; i < 6; i++) { const d = new Date(Date.UTC(y, m - 1 - i, 1)), ym = d.toISOString().slice(0, 7); out.push([ym, HRReport.mName(ym) + (i === 0 ? ' — الحالي' : '')]); } return out; };
   function openDaily(ds, view) {
@@ -423,10 +424,11 @@
       <div class="hr3-exp" id="dyExpP" hidden>
         <div class="hr3-sec"><small>١ · الصيغة</small><div class="chips hr-fc">${[['img', 'صورة'], ['pdf', 'PDF'], ['xlsx', 'Excel']].map(([v, n]) => `<button type="button" class="chip sm${expSel.fmt === v ? ' on' : ''}" data-x="fmt" data-v="${v}">${n}</button>`).join('')}</div></div>
         <div class="hr3-sec"><small>٢ · النطاق</small><div class="chips hr-fc">${[['cur', 'الكشف المعروض'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['both', 'PEF + HHO']].map(([v, n]) => `<button type="button" class="chip sm${expSel.scope === v ? ' on' : ''}" data-x="scope" data-v="${v}">${n}</button>`).join('')}</div></div>
-        <div class="hr3-sec" id="dyXP"><small>٣ · الأوراق (Excel)</small>${[['att', 'الحضور والكشف'], ['late', 'التأخر الشهري وتفاصيله'], ['req', 'الطلبات (اليوم والشهر)'], ['weeks', 'ساعات الأسبوعين']].map(([v, n]) => `<label class="hr3-ck"><input type="checkbox" data-p="${v}"${expSel.parts.includes(v) ? ' checked' : ''}><span>${n}</span></label>`).join('')}
+        <div class="hr3-sec" id="dyXP"><small>٣ · الأوراق التي تظهر في Excel <button type="button" class="hr3-lnk" id="xkAll">الكل</button><button type="button" class="hr3-lnk" id="xkNone">لا شيء</button></small><div class="hr3-ks">${HRReport.SHEET_KEYS.map(([v, n]) => `<label class="hr3-ck"><input type="checkbox" data-p="${v}"${expSel.keys.includes(v) ? ' checked' : ''}><span>${n}</span></label>`).join('')}</div>
           <label class="hr3-mon">شهر «التأخر الشهري»<select id="dyMon" class="hr-in">${monOpts().map(([v, n]) => `<option value="${v}"${v === dyMon ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div>
         <div class="hr3-sec"><small>${'٤'} · الإرسال</small><div class="chips hr-fc">${[['share', 'مشاركة'], ['wa', 'واتساب تلقائي (PDF)']].map(([v, n]) => `<button type="button" class="chip sm${expSel.send === v ? ' on' : ''}" data-x="send" data-v="${v}">${n}</button>`).join('')}</div></div>
         <button type="button" class="btn-primary wide" id="dyGo">تصدير الملف</button>
+        <button type="button" class="btn-outline wide" id="dyAuto" style="margin-top:8px">⏰ إرسال تلقائي يومي لملف Excel…</button>
       </div>
       <small class="hr-pgn">PDF بصفحات A4 مهيأة للطباعة بترويسة وتذييل المؤسسة · Excel بأوراق منفصلة لكل قسم</small>`);
     const body = $('hrSheetBody');
@@ -465,12 +467,16 @@
     };
     const reqSh = (filter, pre, org) => HRReport.sheetsRequests(HRReport.requestsOf({ filter, exclude: ex, leaveLbl, rqStatus }), { pre, org });
     const pagesOf = async (v) => { const lh = await HRReport.loadLetterhead(); return v === 'sum' ? cur.pages : HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true, letterhead: lh }); };
+    $('dyAuto').onclick = () => openAutoReport(() => openDaily(ds, dyView));
     // ===== التصدير الموحّد: صيغة ← نطاق ← أوراق ← إرسال =====
     const panel = $('dyExpP');
     $('dyExp').onclick = () => { panel.hidden = !panel.hidden; if (!panel.hidden) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
     const syncPanel = () => { $('dyXP').hidden = expSel.fmt !== 'xlsx'; panel.querySelectorAll('[data-x]').forEach((b) => b.classList.toggle('on', expSel[b.dataset.x] === b.dataset.v)); };
     panel.querySelectorAll('[data-x]').forEach((b) => { b.onclick = () => { expSel[b.dataset.x] = b.dataset.v; if (expSel.send === 'wa' && expSel.fmt !== 'pdf') expSel.fmt = 'pdf'; syncPanel(); }; });
-    panel.querySelectorAll('[data-p]').forEach((c) => { c.onchange = () => { const a = expSel.parts, k = c.dataset.p, n = a.indexOf(k); if (c.checked && n < 0) a.push(k); else if (!c.checked && n >= 0) a.splice(n, 1); }; });
+    const saveK = () => store.set('hrXlKeys', expSel.keys);
+    panel.querySelectorAll('[data-p]').forEach((c) => { c.onchange = () => { const a = expSel.keys, k = c.dataset.p, n = a.indexOf(k); if (c.checked && n < 0) a.push(k); else if (!c.checked && n >= 0) a.splice(n, 1); saveK(); }; });
+    const setAll = (on) => { expSel.keys = on ? ALLK() : []; panel.querySelectorAll('[data-p]').forEach((c) => { c.checked = on; }); saveK(); };
+    $('xkAll').onclick = () => setAll(true); $('xkNone').onclick = () => setAll(false);
     syncPanel();
     $('dyGo').onclick = async () => {
       const { fmt, scope, send } = expSel, orgs = scope === 'both' ? ['PEF', 'HHO'] : scope === 'cur' ? null : [scope];
@@ -484,20 +490,66 @@
       }
       if (fmt === 'img') { shareFiles(orgs ? [].concat(...orgs.map((v) => itemsOf(v, mk(v).pages))) : itemsOf(dyView, cur.pages)); return; }
       if (fmt === 'pdf') { toast('جارٍ إنشاء ملف PDF…'); const pg = [].concat(...await Promise.all((orgs || [dyView]).map((v) => pagesOf(v)))); sharePdf(HRReport.pdfOf(pg), `hr-${base}-${ds}.pdf`); return; }
-      const has = (k) => expSel.parts.includes(k);
-      if (!expSel.parts.length) { toast('اختر ورقة واحدة على الأقل'); return; }
+      const has = (...ks) => ks.some((k) => expSel.keys.includes(k));
+      if (!expSel.keys.length) { toast('اختر ورقة واحدة على الأقل'); return; }
       let sheets = [];
       const one = async (v) => {   // v: 'PEF' | 'HHO' | null (الكشف المعروض)
         const sum = !v && dyView === 'sum', f = v ? (e) => e.org === v : (dyView === 'sum' ? (e) => orgOk(e) && typeOk(e) : (e) => e.org === dyView), pre = v || (dyView === 'sum' ? '' : dyView), org = pre;
-        if (has('att')) sheets = sheets.concat(sum ? HRReport.sheetsSummary(cur.D) : HRReport.sheetsDetail(v ? dOf(v) : cur.D, pre));
-        if (has('late')) sheets = sheets.concat(await lateSh(f, pre, org));
-        if (has('req')) sheets = sheets.concat(reqSh(f, pre, org));
-        if (has('weeks')) sheets = sheets.concat(weeksFor(f, pre));
+        sheets = sheets.concat(sum ? HRReport.sheetsSummary(cur.D) : HRReport.sheetsDetail(v ? dOf(v) : cur.D, pre));
+        if (has('lm')) sheets = sheets.concat(await lateSh(f, pre, org));
+        if (has('rqT', 'rqM')) sheets = sheets.concat(reqSh(f, pre, org));
+        if (has('wkC', 'wkP')) sheets = sheets.concat(weeksFor(f, pre));
       };
       for (const v of (orgs || [null])) await one(v);
-      shareBytes(HRReport.xlsxOf(sheets, xmeta), `hr-${base}-${ds}.xlsx`, XLSX_MIME);
+      shareBytes(HRReport.xlsxOf(HRReport.pickSheets(sheets, expSel.keys), xmeta), `hr-${base}-${ds}.xlsx`, XLSX_MIME);
     };
     const tx = $('dyText'); if (tx) tx.onclick = () => { const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
+  }
+
+
+  /* ---------- إرسال تلقائي يومي لملف Excel (يعمل والتطبيق مغلق) ---------- */
+  function openAutoReport(back) {
+    const Bx = window.AndroidBridge, has = !!(Bx && Bx.autoReportSet);
+    const DN = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    let c = { on: false, h: 15, m: 0, days: [0, 1, 2, 3, 4], number: '', scope: 'both', day: 'today' };
+    try { Object.assign(c, JSON.parse((has ? Bx.autoReportGet() : localStorage.getItem('hrAutoRep')) || '{}')); } catch (e) { /* افتراضي */ }
+    const keys = (store.get('hrXlKeys', null) || HRReport.SHEET_KEYS.map((x) => x[0])).filter((k) => HRReport.SHEET_KEYS.some((x) => x[0] === k));
+    const perm = (ok, t, act, id) => `<div class="hr3-perm ${ok ? 'ok' : 'no'}"><span>${ok ? '✓' : '!'} ${t}</span>${ok || !act ? '' : `<button type="button" id="${id}">${act}</button>`}</div>`;
+    const draw = () => {
+      const tm = String(c.h).padStart(2, '0') + ':' + String(c.m).padStart(2, '0');
+      const waOn = has && Bx.waAutoEnabled && Bx.waAutoEnabled(), ovOn = has && Bx.canOverlay && Bx.canOverlay(), exOn = has && Bx.exactAlarmsAllowed ? Bx.exactAlarmsAllowed() : true;
+      const nx = c.next ? new Intl.DateTimeFormat('ar-PS-u-nu-latn', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: Core.TZ }).format(new Date(c.next)) : '';
+      sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('clock')}</span><div><b>إرسال تلقائي يومي</b><small>${c.on && nx ? 'التالي: ' + esc(nx) : 'متوقف'}</small></div></div>
+        ${has ? '' : '<div class="hr-warnbox">' + icon('alert') + '<span>الإرسال التلقائي يعمل داخل تطبيق الأندرويد فقط (لا في المتصفح).</span></div>'}
+        <div class="hr3-sec"><div class="chips hr-fc"><button type="button" class="chip sm${c.on ? ' on' : ''}" id="arOn">${c.on ? '● مفعّل' : 'متوقف — اضغط للتفعيل'}</button></div></div>
+        <div class="hr3-sec"><small>وقت الإرسال</small><input id="arTime" type="time" class="hr-in" value="${tm}"></div>
+        <div class="hr3-sec"><small>أيام الإرسال</small><div class="chips hr-fc">${DN.map((n, i) => `<button type="button" class="chip sm${c.days.includes(i) ? ' on' : ''}" data-dw="${i}">${n}</button>`).join('')}</div></div>
+        <div class="hr3-sec"><small>رقم واتساب المستلم (مع رمز الدولة، مثل 970599123456)</small><input id="arNum" class="hr-in" inputmode="tel" placeholder="970…" value="${esc(c.number || '')}"></div>
+        <div class="hr3-sec"><small>محتوى الملف</small><div class="chips hr-fc">${[['both', 'PEF + HHO'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['all', 'الكل (ملخص)']].map(([v, n]) => `<button type="button" class="chip sm${c.scope === v ? ' on' : ''}" data-sc="${v}">${n}</button>`).join('')}</div>
+          <div class="chips hr-fc">${[['today', 'كشف اليوم'], ['yesterday', 'كشف أمس']].map(([v, n]) => `<button type="button" class="chip sm${c.day === v ? ' on' : ''}" data-dy="${v}">${n}</button>`).join('')}</div>
+          <small class="hr3-none">الأوراق المضمّنة: ${keys.length} من ${HRReport.SHEET_KEYS.length} (تُحدَّد من لوحة «التصدير» ← الأوراق التي تظهر في Excel)</small></div>
+        <div class="hr3-sec"><small>الصلاحيات المطلوبة</small>
+          ${perm(waOn, 'خدمة الإرسال التلقائي (إمكانية الوصول)', 'تفعيل', 'arWa')}${perm(ovOn, 'العرض فوق التطبيقات (لفتح واتساب والتطبيق مغلق)', 'السماح', 'arOv')}${perm(exOn, 'المنبّهات الدقيقة (ليبدأ في الدقيقة المحددة)', '', '')}</div>
+        ${c.lastAt ? `<div class="hr3-last ${c.lastOk ? 'ok' : 'no'}">آخر تشغيل: ${esc(new Intl.DateTimeFormat('ar-PS-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: Core.TZ }).format(new Date(c.lastAt)))} — ${esc(c.lastMsg || '')}</div>` : ''}
+        <div class="hr-gact"><button type="button" class="btn-primary" id="arSave">حفظ</button><button type="button" class="btn-outline" id="arTest"${has ? '' : ' disabled'}>جرّب الآن</button></div>
+        <button type="button" class="btn-outline wide" id="arBack" style="margin-top:8px">رجوع</button>
+        <small class="hr-pgn">يبني التطبيق الملف من آخر بيانات يزامنها من النظام ثم يفتح واتساب على الرقم ويضغط «إرسال». يحتاج الجوال مفتوحاً غير مقفل شاشته لأفضل نتيجة، واتصالاً بالإنترنت، وألا يوقف النظام التطبيق (استثنِه من توفير البطارية).</small>`);
+      const b = $('hrSheetBody');
+      const rd = () => { c.number = $('arNum').value.trim(); const t = ($('arTime').value || '15:00').split(':'); c.h = +t[0]; c.m = +t[1]; };
+      $('arOn').onclick = () => { rd(); c.on = !c.on; draw(); };
+      b.querySelectorAll('[data-dw]').forEach((x) => { x.onclick = () => { rd(); const d = +x.dataset.dw, i = c.days.indexOf(d); if (i >= 0) c.days.splice(i, 1); else c.days.push(d); draw(); }; });
+      b.querySelectorAll('[data-sc]').forEach((x) => { x.onclick = () => { rd(); c.scope = x.dataset.sc; draw(); }; });
+      b.querySelectorAll('[data-dy]').forEach((x) => { x.onclick = () => { rd(); c.day = x.dataset.dy; draw(); }; });
+      if ($('arWa')) $('arWa').onclick = () => Bx.waAutoSettings && Bx.waAutoSettings();
+      if ($('arOv')) $('arOv').onclick = () => Bx.requestOverlay && Bx.requestOverlay();
+      const save = () => { rd(); if (c.on && String(c.number).replace(/\D/g, '').length < 8) { toast('اكتب رقم واتساب صحيحاً مع رمز الدولة'); return false; } if (c.on && !c.days.length) { toast('اختر يوماً واحداً على الأقل'); return false; }
+        const o = { on: c.on, h: c.h, m: c.m, days: c.days.slice().sort(), number: c.number.replace(/[^\d]/g, ''), scope: c.scope, day: c.day, keys };
+        localStorage.setItem('hrAutoRep', JSON.stringify(o)); if (has) Bx.autoReportSet(JSON.stringify(o)); return true; };
+      $('arSave').onclick = () => { if (!save()) return; toast(c.on ? 'تم الحفظ — سيُرسل يومياً في ' + $('arTime').value : 'تم الحفظ (متوقف)'); if (has) { try { c = Object.assign(c, JSON.parse(Bx.autoReportGet())); } catch (e) { /* ignore */ } } draw(); };
+      $('arTest').onclick = () => { if (!save()) return; Bx.autoReportRunNow(); toast('جارٍ بناء الملف وإرساله… سيصلك إشعار عند الجاهزية'); };
+      $('arBack').onclick = () => (back ? back() : closeSheet());
+    };
+    draw();
   }
 
   /* ---------- التقرير الأسبوعي للمدير (صورة للمشاركة) ---------- */

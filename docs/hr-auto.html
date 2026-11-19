@@ -1,0 +1,27 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>hr-auto</title></head>
+<body>
+<script src="lib/adhan.umd.min.js"></script>
+<script src="places.js"></script>
+<script src="core.js"></script>
+<script src="tracker.js"></script>
+<script src="hr-data.js"></script>
+<script src="hr-xlsx.js"></script>
+<script src="hr-report.js"></script>
+<script src="hr-review.js"></script>
+<script src="hr-auto.js"></script>
+<script>
+// تُشغَّل من AutoReportJob في الوقت المحدد: تبني ملف Excel وتسلّمه للنظام ليرسله
+(async function () {
+  const B = window.AndroidBridge;
+  if (!B) return;
+  try {
+    const cfg = JSON.parse(B.autoReportConfig() || '{}');
+    const r = await HRAuto.build(cfg);
+    let bin = '', ch = 0x8000;
+    for (let i = 0; i < r.u8.length; i += ch) bin += String.fromCharCode.apply(null, r.u8.subarray(i, i + ch));
+    B.autoReportDone(true, btoa(bin), r.name, r.sheets + ' ورقة');
+  } catch (e) { B.autoReportDone(false, '', '', String(e && e.message || e)); }
+})();
+</script>
+</body></html>

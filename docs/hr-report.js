@@ -610,9 +610,20 @@
   }
   const jobMap = () => { const m = {}; HR.employees().forEach((e) => { const k = String(e.name || '').trim(); if (k && !m[k]) m[k] = { dept: e.dept || '', pos: e.pos || '' }; }); return m; };
 
+  /* ---------- اختيار الأوراق التي تظهر في ملف Excel ---------- */
+  // key ← تسمية ← نمط اسم الورقة (بعد حذف بادئة PEF - / HHO -)؛ «التأخر الشهري» يشمل ورقة تفاصيله لأن الرابط بينهما
+  const SHEET_KEYS = [
+    ['att', 'الحضور', /^الحضور$/], ['late', 'المتأخرون (اليوم)', /^المتأخرون$/], ['leave', 'الإجازات', /^الإجازات$/], ['mis', 'المهام والمغادرات', /^المهام والمغادرات$/],
+    ['unreg', 'بلا تسجيل', /^بلا تسجيل$/], ['excl', 'المستثنون', /^المستثنون$/], ['sum', 'الملخص', /^ملخص$/],
+    ['lm', 'التأخر الشهري وتفاصيله', /^(التأخر الشهري|تفاصيل التأخير)$/], ['rqT', 'الطلبات اليوم', /^الطلبات اليوم$/], ['rqM', 'طلبات الشهر', /^طلبات الشهر$/],
+    ['wkC', 'ساعات الأسبوع الحالي', /^ساعات الأسبوع الحالي$/], ['wkP', 'ساعات الأسبوع السابق', /^ساعات الأسبوع السابق$/]
+  ];
+  const keyOfSheet = (sh) => { const n = String(sh.name || '').replace(/^(PEF|HHO) - /, ''); const k = SHEET_KEYS.find(([, , re]) => re.test(n)); return k ? k[0] : null; };
+  const pickSheets = (sheets, keys) => (keys && keys.length ? sheets.filter((sh) => { const k = keyOfSheet(sh); return !k || keys.includes(k); }) : sheets);
+
   // ألوان لسان الأوراق بحسب نوعها
   const TABS = [[/حضور|الحضور/, 'FF1D5A4B'], [/متأخر/, 'FFC0392B'], [/إجاز/, 'FF2A68AD'], [/مهام|مغادر/, 'FF7446A8'], [/بلا تسجيل/, 'FFB4690E'], [/مستثن/, 'FF6B7B8C'], [/ملخص|أسبوعي/, 'FF8F6B1C']];
   const xlsxOf = (sheets, meta) => { const jm = jobMap(); sheets = sheets.map((sh) => addJobCols(sh, jm)); sheets.forEach((sh) => { if (!sh.tab) { const t = TABS.find(([re]) => re.test(sh.name)); if (t) sh.tab = t[1]; } }); return window.HRXlsx.build(sheets, meta); };
 
-  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64, loadLetterhead, sheetsDetail, sheetsSummary, sheetsWeekly, weekHours, sheetsWeekHours, lateMonth, sheetsLateMonth, mName, requestsOf, sheetsRequests, xlsxOf };
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64, loadLetterhead, sheetsDetail, sheetsSummary, sheetsWeekly, weekHours, sheetsWeekHours, lateMonth, sheetsLateMonth, mName, requestsOf, sheetsRequests, SHEET_KEYS, pickSheets, xlsxOf };
 })();
