@@ -34,10 +34,11 @@
   const fmtDist = (d) => d == null ? '' : d >= 1000 ? (d / 1000).toFixed(1) + ' كم' : d + ' م';
 
   let tab = store.get('hrTab', 'dash');
-  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', ws: 'hours', wf: 'all', as: 'month', av: 'emp', am: today().slice(0, 7), proj: 'all', grp: 'all' }, store.get('hrF', {}));
+  const f = Object.assign({ day: today(), org: 'all', type: 'all', st: 'all', q: '', es: 'active', ck: 'all', cs: 'active', cf: 'all', ws: 'hours', wf: 'all', as: 'month', av: 'emp', am: today().slice(0, 7), proj: 'all', grp: 'all', depts: [], poss: [], sts: [] }, store.get('hrF', {}));
+  ['depts', 'poss', 'sts'].forEach((k) => { if (!Array.isArray(f[k])) f[k] = []; });
   if (!/^\d{4}-\d{2}$/.test(f.am || '')) f.am = today().slice(0, 7);
   f.day = today(); f.q = '';
-  const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, cf: f.cf, as: f.as, av: f.av, grp: f.grp });
+  const saveF = () => store.set('hrF', { org: f.org, type: f.type, es: f.es, ck: f.ck, cs: f.cs, cf: f.cf, as: f.as, av: f.av, grp: f.grp, depts: f.depts, poss: f.poss });
 
   /* ---------- الهيكل ---------- */
   function render() {
@@ -398,6 +399,7 @@
     draw();
   }
   let dyView = 'sum', dyMon = '';
+  const expSel = { fmt: 'xlsx', scope: 'cur', send: 'share', parts: ['att', 'late', 'req', 'weeks'] };
   // آخر 6 أشهر (الحالي أولاً) لورقة التأخر الشهري
   const monOpts = () => { const t = today(), [y, m] = t.split('-').map(Number), out = []; for (let i = 0; i < 6; i++) { const d = new Date(Date.UTC(y, m - 1 - i, 1)), ym = d.toISOString().slice(0, 7); out.push([ym, HRReport.mName(ym) + (i === 0 ? ' — الحالي' : '')]); } return out; };
   function openDaily(ds, view) {
@@ -417,11 +419,15 @@
       ${nP > 1 ? `<small class="hr-pgn">${nP} صفحات — تُرسل كلها معاً</small>` : ''}
       ${urls.map((u, k) => `<img class="hr-wimg" alt="صفحة ${k + 1}" src="${u}">`).join('')}
       <div class="hr-gact"><button type="button" class="btn-primary" id="dyShare">${icon('share')} ${nP > 1 ? `مشاركة الصفحات (${nP})` : 'مشاركة هذه الصورة'}</button>${dyView !== 'sum' ? '' : `<button type="button" class="btn-outline" id="dyText">مشاركة كنص</button>`}</div>
-      <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} المستثنون من الحضور (${ex.size})</button></div>
-      <div class="hr-gact"><button type="button" class="btn-outline" id="dyPdf">${icon('note')} ملف PDF لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyPdf2">${icon('note')} PDF واحد لـ PEF و HHO</button>`}</div>
-      <div class="hr-gact"><button type="button" class="btn-outline" id="dyWa">${icon('share')} إرسال PDF تلقائياً إلى واتساب</button></div>
-      <div class="hr-gact"><label style="display:flex;gap:8px;align-items:center;flex:1;font-size:13px;color:var(--mute,#5c6f72)">شهر ورقة «التأخر الشهري» في Excel<select id="dyMon" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--line,#cfdbd8);background:var(--card,#fff);color:inherit;font:inherit">${monOpts().map(([v, n]) => `<option value="${v}"${v === dyMon ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div>
-      <div class="hr-gact"><button type="button" class="btn-outline" id="dyXl">${icon('chart')} ملف Excel لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyXl2">${icon('chart')} Excel واحد لـ PEF و HHO</button>`}</div>
+      <div class="hr-gact"><button type="button" class="btn-primary" id="dyExp">${icon('share')} تصدير…</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} المستثنون من الحضور (${ex.size})</button></div>
+      <div class="hr3-exp" id="dyExpP" hidden>
+        <div class="hr3-sec"><small>١ · الصيغة</small><div class="chips hr-fc">${[['img', 'صورة'], ['pdf', 'PDF'], ['xlsx', 'Excel']].map(([v, n]) => `<button type="button" class="chip sm${expSel.fmt === v ? ' on' : ''}" data-x="fmt" data-v="${v}">${n}</button>`).join('')}</div></div>
+        <div class="hr3-sec"><small>٢ · النطاق</small><div class="chips hr-fc">${[['cur', 'الكشف المعروض'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['both', 'PEF + HHO']].map(([v, n]) => `<button type="button" class="chip sm${expSel.scope === v ? ' on' : ''}" data-x="scope" data-v="${v}">${n}</button>`).join('')}</div></div>
+        <div class="hr3-sec" id="dyXP"><small>٣ · الأوراق (Excel)</small>${[['att', 'الحضور والكشف'], ['late', 'التأخر الشهري وتفاصيله'], ['req', 'الطلبات (اليوم والشهر)'], ['weeks', 'ساعات الأسبوعين']].map(([v, n]) => `<label class="hr3-ck"><input type="checkbox" data-p="${v}"${expSel.parts.includes(v) ? ' checked' : ''}><span>${n}</span></label>`).join('')}
+          <label class="hr3-mon">شهر «التأخر الشهري»<select id="dyMon" class="hr-in">${monOpts().map(([v, n]) => `<option value="${v}"${v === dyMon ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div>
+        <div class="hr3-sec"><small>${'٤'} · الإرسال</small><div class="chips hr-fc">${[['share', 'مشاركة'], ['wa', 'واتساب تلقائي (PDF)']].map(([v, n]) => `<button type="button" class="chip sm${expSel.send === v ? ' on' : ''}" data-x="send" data-v="${v}">${n}</button>`).join('')}</div></div>
+        <button type="button" class="btn-primary wide" id="dyGo">تصدير الملف</button>
+      </div>
       <small class="hr-pgn">PDF بصفحات A4 مهيأة للطباعة بترويسة وتذييل المؤسسة · Excel بأوراق منفصلة لكل قسم</small>`);
     const body = $('hrSheetBody');
     body.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => openDaily(addDays(ds, +b.dataset.d)); });
@@ -436,7 +442,6 @@
       });
     };
     $('dyShare').onclick = () => shareFiles(itemsOf(dyView, cur.pages));
-    $('dyBoth').onclick = () => { const a = mk('PEF'), b = mk('HHO'); shareFiles(itemsOf('PEF', a.pages).concat(itemsOf('HHO', b.pages))); };
     $('dyEx').onclick = () => openRepExcl(() => openDaily(ds));
     // PDF: صفحات A4 (كشوف الجهات بخلفية بيضاء للطباعة)
     const sharePdf = (u8, name) => {
@@ -445,11 +450,6 @@
       if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file] }).catch(() => {});
       else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click(); }
     };
-    $('dyWa').onclick = () => openWaAuto(async () => {
-      const lh = await HRReport.loadLetterhead(), both = true;
-      const pg = (await Promise.all(['PEF', 'HHO'].map(async (v) => HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true, letterhead: lh })))).flat();
-      return { u8: HRReport.pdfOf(pg), name: `hr-pef-hho-${ds}.pdf`, mime: 'application/pdf', caption: `كشف الدوام — ${dLong.format(noon(ds))}` };
-    }, () => openDaily(ds));
     const dOf = (v) => HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() });
     // ورقتا ساعات الدوام (الأسبوع الحالي والسابق) بحسب الجهة المطلوبة
     const weeksFor = (filter, pre) => ['cur', 'prev'].map((k) => HRReport.sheetsWeekHours(HRReport.weekHours(k, { filter, exclude: ex, band: bandOf }), { pre }));
@@ -464,19 +464,39 @@
       return HRReport.sheetsLateMonth(L, { pre, org });
     };
     const reqSh = (filter, pre, org) => HRReport.sheetsRequests(HRReport.requestsOf({ filter, exclude: ex, leaveLbl, rqStatus }), { pre, org });
-    $('dyXl').onclick = async () => {
-      const f = dyView === 'sum' ? (e) => orgOk(e) && typeOk(e) : (e) => e.org === dyView, pre = dyView === 'sum' ? '' : dyView, org = dyView === 'sum' ? '' : dyView;
-      const base = dyView === 'sum' ? HRReport.sheetsSummary(cur.D) : HRReport.sheetsDetail(cur.D);
-      const late = await lateSh(f, pre, org);
-      shareBytes(HRReport.xlsxOf(base.concat(late, reqSh(f, pre, org), weeksFor(f, pre)), xmeta), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.xlsx`, XLSX_MIME);
-    };
-    const x2 = $('dyXl2'); if (x2) x2.onclick = async () => {
-      const fp = (e) => e.org === 'PEF', fh = (e) => e.org === 'HHO', lp = await lateSh(fp, 'PEF', 'PEF'), lh = await lateSh(fh, 'HHO', 'HHO');
-      shareBytes(HRReport.xlsxOf(HRReport.sheetsDetail(dOf('PEF'), 'PEF').concat(lp, reqSh(fp, 'PEF', 'PEF'), weeksFor(fp, 'PEF'), HRReport.sheetsDetail(dOf('HHO'), 'HHO'), lh, reqSh(fh, 'HHO', 'HHO'), weeksFor(fh, 'HHO')), xmeta), `hr-pef-hho-${ds}.xlsx`, XLSX_MIME);
-    };
     const pagesOf = async (v) => { const lh = await HRReport.loadLetterhead(); return v === 'sum' ? cur.pages : HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true, letterhead: lh }); };
-    $('dyPdf').onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = await pagesOf(dyView); sharePdf(HRReport.pdfOf(pg), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.pdf`); };
-    const p2 = $('dyPdf2'); if (p2) p2.onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = (await pagesOf('PEF')).concat(await pagesOf('HHO')); sharePdf(HRReport.pdfOf(pg), `hr-pef-hho-${ds}.pdf`); };
+    // ===== التصدير الموحّد: صيغة ← نطاق ← أوراق ← إرسال =====
+    const panel = $('dyExpP');
+    $('dyExp').onclick = () => { panel.hidden = !panel.hidden; if (!panel.hidden) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+    const syncPanel = () => { $('dyXP').hidden = expSel.fmt !== 'xlsx'; panel.querySelectorAll('[data-x]').forEach((b) => b.classList.toggle('on', expSel[b.dataset.x] === b.dataset.v)); };
+    panel.querySelectorAll('[data-x]').forEach((b) => { b.onclick = () => { expSel[b.dataset.x] = b.dataset.v; if (expSel.send === 'wa' && expSel.fmt !== 'pdf') expSel.fmt = 'pdf'; syncPanel(); }; });
+    panel.querySelectorAll('[data-p]').forEach((c) => { c.onchange = () => { const a = expSel.parts, k = c.dataset.p, n = a.indexOf(k); if (c.checked && n < 0) a.push(k); else if (!c.checked && n >= 0) a.splice(n, 1); }; });
+    syncPanel();
+    $('dyGo').onclick = async () => {
+      const { fmt, scope, send } = expSel, orgs = scope === 'both' ? ['PEF', 'HHO'] : scope === 'cur' ? null : [scope];
+      const base = scope === 'cur' ? (dyView === 'sum' ? 'daily' : dyView.toLowerCase()) : scope === 'both' ? 'pef-hho' : scope.toLowerCase();
+      if (send === 'wa') {
+        return openWaAuto(async () => {
+          const lh = await HRReport.loadLetterhead(), vs = orgs || [dyView];
+          const pg = (await Promise.all(vs.map((v) => pagesOf(v)))).flat();
+          return { u8: HRReport.pdfOf(pg), name: `hr-${base}-${ds}.pdf`, mime: 'application/pdf', caption: `كشف الدوام — ${dLong.format(noon(ds))}` };
+        }, () => openDaily(ds, dyView));
+      }
+      if (fmt === 'img') { shareFiles(orgs ? [].concat(...orgs.map((v) => itemsOf(v, mk(v).pages))) : itemsOf(dyView, cur.pages)); return; }
+      if (fmt === 'pdf') { toast('جارٍ إنشاء ملف PDF…'); const pg = [].concat(...await Promise.all((orgs || [dyView]).map((v) => pagesOf(v)))); sharePdf(HRReport.pdfOf(pg), `hr-${base}-${ds}.pdf`); return; }
+      const has = (k) => expSel.parts.includes(k);
+      if (!expSel.parts.length) { toast('اختر ورقة واحدة على الأقل'); return; }
+      let sheets = [];
+      const one = async (v) => {   // v: 'PEF' | 'HHO' | null (الكشف المعروض)
+        const sum = !v && dyView === 'sum', f = v ? (e) => e.org === v : (dyView === 'sum' ? (e) => orgOk(e) && typeOk(e) : (e) => e.org === dyView), pre = v || (dyView === 'sum' ? '' : dyView), org = pre;
+        if (has('att')) sheets = sheets.concat(sum ? HRReport.sheetsSummary(cur.D) : HRReport.sheetsDetail(v ? dOf(v) : cur.D, pre));
+        if (has('late')) sheets = sheets.concat(await lateSh(f, pre, org));
+        if (has('req')) sheets = sheets.concat(reqSh(f, pre, org));
+        if (has('weeks')) sheets = sheets.concat(weeksFor(f, pre));
+      };
+      for (const v of (orgs || [null])) await one(v);
+      shareBytes(HRReport.xlsxOf(sheets, xmeta), `hr-${base}-${ds}.xlsx`, XLSX_MIME);
+    };
     const tx = $('dyText'); if (tx) tx.onclick = () => { const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
 
@@ -522,8 +542,71 @@
   const grpIds = (g) => (g.rule ? ruleIds(g.rule) : g.ids);
   const grpOf = () => { if (f.grp === 'all') return null; if (!grpSet || grpSet.id !== f.grp) { const g = groups().find((x) => x.id === f.grp); grpSet = { id: f.grp, ids: new Set(g ? grpIds(g) : []) }; if (!g) f.grp = 'all'; } return f.grp === 'all' ? null : grpSet.ids; };
   const grpOk = (e) => { const s = grpOf(); return !s || s.has(String(e.id)); };
-  const orgOk = (e) => (f.org === 'all' || e.org === f.org) && grpOk(e);
+  const orgOk = (e) => (f.org === 'all' || e.org === f.org) && grpOk(e) && (!f.depts.length || f.depts.includes(e.dept || '')) && (!f.poss.length || f.poss.includes(e.pos || ''));
   const typeOk = (e) => f.type === 'all' || e.type === f.type;
+
+  /* ---------- الفلتر الموحّد (يظهر في اليوم والفريق والحضور ويبقى عند التنقل) ---------- */
+  const F_ST = [['present', 'حاضر'], ['late', 'متأخر'], ['absent', 'بلا تسجيل'], ['leave', 'إجازة / مهمة'], ['noin', 'بلا دخول']];
+  const savedF = () => store.get('hrSavedF', []);
+  const flN = () => (f.org !== 'all') + (f.type !== 'all') + f.depts.length + f.poss.length + (f.grp !== 'all' ? 1 : 0) + f.sts.length;
+  const clearF = () => { f.org = 'all'; f.type = 'all'; f.depts = []; f.poss = []; f.sts = []; f.grp = 'all'; saveF(); };
+  let tdMap = null;
+  const todayMap = () => { if (!tdMap || tdMap.k !== HR.meta().lastSync) { const m = {}; HR.dayReport(today()).rows.forEach((r) => { m[r.e.id] = r; }); tdMap = { k: HR.meta().lastSync, m }; } return tdMap.m; };
+  const stOk = (e) => !f.sts.length || (todayMap()[e.id] && f.sts.includes(todayMap()[e.id].status));
+  const chipTxt = (n, l, ones) => (ones.length ? `${l}: ${ones.length === 1 ? ones[0] : ones.length + ' ' + n}` : `${l} ▾`);
+  function filterBar(parent, o) {
+    o = o || {};
+    const row = el('div', 'chips hr-fc hr3-bar');
+    [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']].forEach(([v, n]) => { const b = el('button', 'chip sm' + (f.org === v ? ' on' : ''), n); b.type = 'button'; b.onclick = () => { f.org = v; saveF(); render(); }; row.appendChild(b); });
+    const add = (txt, on, focus) => { const b = el('button', 'chip sm hr3-dd' + (on ? ' on' : ''), esc(txt)); b.type = 'button'; b.onclick = () => openAdv(focus); row.appendChild(b); };
+    add(chipTxt('أقسام', 'القسم', f.depts), f.depts.length, 'dept');
+    add(chipTxt('مسميات', 'المسمى', f.poss), f.poss.length, 'pos');
+    if (o.status) add(chipTxt('حالات', 'الحالة', f.sts.map((k) => (F_ST.find((x) => x[0] === k) || [0, k])[1])), f.sts.length, 'st');
+    add('⭐ محفوظ' + (savedF().length ? ' (' + savedF().length + ')' : ''), 0, 'saved');
+    parent.appendChild(row);
+    const n = flN();
+    if (n) {
+      const info = el('div', 'hr3-act', `<span>${n} ${n === 1 ? 'فلتر فعّال' : 'فلاتر فعّالة'}</span><button type="button" class="hr3-clr">مسح الكل</button><button type="button" class="hr3-adv">${icon('sliders')}متقدمة</button>`);
+      info.querySelector('.hr3-clr').onclick = () => { clearF(); render(); };
+      info.querySelector('.hr3-adv').onclick = () => openAdv();
+      parent.appendChild(info);
+    } else {
+      const info = el('div', 'hr3-act', `<span>بلا فلاتر</span><button type="button" class="hr3-adv">${icon('sliders')}فلاتر متقدمة</button>`);
+      info.querySelector('.hr3-adv').onclick = () => openAdv();
+      parent.appendChild(info);
+    }
+  }
+  function openAdv(focus) {
+    const d = { org: f.org, type: f.type, depts: f.depts.slice(), poss: f.poss.slice(), sts: f.sts.slice(), grp: f.grp };
+    const emps = HR.employees().filter((e) => e.active), tm = todayMap();
+    const uniq = (k) => { const m = {}; emps.forEach((e) => { const v = e[k] || ''; if (v) m[v] = (m[v] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ar')); };
+    const D = uniq('dept'), P = uniq('pos');
+    const pass = (e) => (d.org === 'all' || e.org === d.org) && (d.type === 'all' || e.type === d.type) && (!d.depts.length || d.depts.includes(e.dept || '')) && (!d.poss.length || d.poss.includes(e.pos || '')) && (!d.sts.length || (tm[e.id] && d.sts.includes(tm[e.id].status))) && (d.grp === 'all' || (() => { const g = groups().find((x) => x.id === d.grp); return !g || grpIds(g).includes(String(e.id)); })());
+    const ck = (grp, v, n, on) => `<label class="hr3-ck"><input type="checkbox" data-g="${grp}" data-v="${esc(v)}"${on ? ' checked' : ''}><span>${esc(n)}</span></label>`;
+    const seg = (key, opts) => `<div class="chips hr-fc">${opts.map(([v, n]) => `<button type="button" class="chip sm${d[key] === v ? ' on' : ''}" data-k="${key}" data-v="${v}">${n}</button>`).join('')}</div>`;
+    const draw = () => {
+      $('hrSheetBody').innerHTML = `<div class="hr-ph"><span class="hr-ava big info">${icon('sliders')}</span><div><b>فلاتر متقدمة</b><small>تنطبق على اليوم والفريق والحضور والتقارير</small></div></div>
+        <div class="hr3-sec"><small>فلاتر محفوظة</small><div class="chips hr-fc" id="svRow">${savedF().length ? savedF().map((x) => `<span class="chip sm hr3-sv"><button type="button" data-ap="${x.id}">⭐ ${esc(x.name)}</button><button type="button" data-rm="${x.id}" aria-label="حذف">✕</button></span>`).join('') : '<small class="hr3-none">لا توجد بعد — اضبط فلاتر ثم احفظها باسم</small>'}</div></div>
+        <div class="hr3-sec"><small>السلم</small>${seg('org', [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']])}</div>
+        <div class="hr3-sec"><small>نوع الدوام</small>${seg('type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']])}</div>
+        <div class="hr3-sec" id="secDept"><small>القسم (متعدد)</small><div class="hr3-list">${D.map(([v, n]) => ck('depts', v, `${v} (${n})`, d.depts.includes(v))).join('') || '<small class="hr3-none">لا أقسام</small>'}</div></div>
+        <div class="hr3-sec" id="secPos"><small>المسمى الوظيفي (متعدد)</small><div class="hr3-list">${P.map(([v, n]) => ck('poss', v, `${v} (${n})`, d.poss.includes(v))).join('') || '<small class="hr3-none">لا مسميات</small>'}</div></div>
+        <div class="hr3-sec" id="secSt"><small>حالة اليوم (متعدد)</small><div class="hr3-list">${F_ST.map(([v, n]) => ck('sts', v, n, d.sts.includes(v))).join('')}</div></div>
+        <div class="hr3-sv2"><input id="svName" class="hr-in" placeholder="اسم الفلتر للحفظ (مثال: متأخرو PEF)"><button type="button" class="btn-outline" id="svSave">⭐ احفظ</button></div>
+        <div class="hr-gact"><button type="button" class="btn-primary" id="adGo"></button><button type="button" class="btn-outline" id="adClr">مسح</button></div>`;
+      const cnt = () => { $('adGo').textContent = `عرض ${emps.filter(pass).length} موظف`; };
+      const body = $('hrSheetBody'); cnt();
+      body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { d[b.dataset.k] = b.dataset.v; const sc = body.scrollTop; draw(); body.scrollTop = sc; }; });
+      body.querySelectorAll('input[data-g]').forEach((c) => { c.onchange = () => { const a = d[c.dataset.g], v = c.dataset.v, i = a.indexOf(v); if (c.checked && i < 0) a.push(v); else if (!c.checked && i >= 0) a.splice(i, 1); cnt(); }; });
+      body.querySelectorAll('[data-ap]').forEach((b) => { b.onclick = () => { const x = savedF().find((y) => y.id === b.dataset.ap); if (!x) return; Object.assign(f, { org: 'all', type: 'all', depts: [], poss: [], sts: [], grp: 'all' }, x.v); saveF(); closeSheet(); render(); toast('تم تطبيق «' + x.name + '»'); }; });
+      body.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => { store.set('hrSavedF', savedF().filter((y) => y.id !== b.dataset.rm)); draw(); }; });
+      $('svSave').onclick = () => { const n = $('svName').value.trim(); if (!n) { toast('اكتب اسماً للفلتر'); return; } store.set('hrSavedF', savedF().concat([{ id: 'sf' + Date.now(), name: n, v: { org: d.org, type: d.type, depts: d.depts, poss: d.poss, sts: d.sts, grp: d.grp } }])); toast('تم حفظ الفلتر'); draw(); };
+      $('adGo').onclick = () => { Object.assign(f, d); saveF(); closeSheet(); render(); };
+      $('adClr').onclick = () => { d.org = 'all'; d.type = 'all'; d.depts = []; d.poss = []; d.sts = []; d.grp = 'all'; draw(); };
+      if (focus) { const t = { dept: 'secDept', pos: 'secPos', st: 'secSt', saved: 'svRow' }[focus]; const n = t && $(t); if (n) setTimeout(() => n.scrollIntoView({ block: 'start' }), 60); }
+    };
+    sheet(''); draw();
+  }
   function personRow(e, right, sub, tone) {
     const r = el('button', 'hr-row');
     r.innerHTML = `<span class="hr-ava ${tone || ''}">${esc(initials(e.name))}</span><span class="hr-rt"><b>${esc(e.name)}</b><small>${sub != null ? sub : esc([e.pos || e.dept, TYPE[e.type], e.org].filter(Boolean).join(' · '))}</small></span><span class="hr-rr">${right || ''}</span>`;
@@ -821,7 +904,7 @@
   function renderDash(body) {
     const t = today();
     const rep = HR.dayReport(t);
-    const rows = rep.rows;
+    const rows = rep.rows.filter((r) => orgOk(r.e) && typeOk(r.e));   // الأرقام تتبع الفلتر الموحّد
     const cnt = (s) => rows.filter((r) => r.status === s).length;
     const cons = HR.contracts().filter((c) => c.end && daysTo(c.end) >= 0 && daysTo(c.end) <= 30);
     const asgs = HR.assignments().filter((a) => a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
@@ -831,6 +914,7 @@
     const gs = el('form', 'hr2-search', `${icon('search')}<input id="hrGS" type="search" enterkeyhint="search" placeholder="ابحث عن موظف: اسم، رقم، هاتف، قسم…" autocomplete="off">`);
     gs.onsubmit = (ev) => { ev.preventDefault(); const v = $('hrGS').value.trim(); if (!v) return; tab = 'emp'; f.es = 'all'; f.q = v; store.set('hrTab', tab); render(); };
     body.appendChild(gs);
+    filterBar(body);
     // حلقة حال اليوم
     const nPresent = cnt('present') + cnt('noin'), nLate = cnt('late'), nAbs = cnt('absent'), nLv = cnt('leave'), tot = rows.length || 1;
     const seg = [[nPresent, 'var(--ok)'], [nLate, '#F0A64B'], [nAbs, '#F2716A'], [nLv, '#5B9DFF']];
@@ -838,9 +922,15 @@
     if (acc < 100) stops.push(`var(--line) ${acc}% 100%`);
     const went = nPresent + nLate;
     const hero = el('div', 'hr2-hero', `<div class="hr2-ring" style="background:conic-gradient(${stops.join(',')})"><div><b>${went}</b><small>من ${rows.length} حضروا</small></div></div>
-      <div class="hr2-leg">${[['present', 'في الموعد', nPresent, 'var(--ok)', 'in'], ['late', 'متأخرون', nLate, '#F0A64B', 'late'], ['absent', 'بلا تسجيل', nAbs, '#F2716A', 'absent'], ['leave', 'إجازة / مهمة', nLv, '#5B9DFF', 'leave']].map(([k, l, n, c, st]) => `<button type="button" data-st="${st}"><i style="background:${c}"></i>${l}<b>${n}</b></button>`).join('')}</div>`);
-    hero.querySelectorAll('[data-st]').forEach((x) => x.onclick = () => { tab = 'att'; f.st = x.dataset.st; f.day = t; f.q = ''; render(); });
-    body.appendChild(hero);
+      <div class="hr2-sum"><b>${tot ? Math.round(went * 100 / (rows.filter((r) => r.status !== 'off' && r.status !== 'exempt').length || 1)) : 0}%</b><small>نسبة الحضور اليوم</small><small>${rows.length} موظف${flN() ? ' (حسب الفلتر)' : ''}</small></div>`);
+    const nMis = rows.filter((r) => (r.reqs || []).some((q) => q.kind === 'mission' || q.kind === 'hourly')).length, nPend = pendingReqs().length;
+    const kp = el('div', 'hr3-kpi');
+    [[nPresent, 'حضور', 'var(--ok)', () => { tab = 'att'; f.st = 'in'; }], [nLate, 'تأخر', '#F2716A', () => { tab = 'att'; f.st = 'late'; }], [nAbs, 'بلا تسجيل', '#F0A64B', () => { tab = 'att'; f.st = 'absent'; }],
+      [nLv, 'إجازة', '#8AA0A6', () => { tab = 'att'; f.st = 'leave'; }], [nMis, 'مهام ومغادرات', '#A579E0', () => { tab = 'att'; f.st = 'rq_mission'; }], [nPend, 'طلب معلّق', '#6FB7FF', () => { tab = 'lv'; f.lv = 'req'; f.rs = 'pending'; f.rk = 'all'; f.am = today().slice(0, 7); }]].forEach(([n, l, c, go]) => {
+      const k = el('button', 'hr3-k', `<b style="color:${c}">${n}</b><small>${l}</small>`); k.type = 'button'; k.style.setProperty('--c', c);
+      k.onclick = () => { go(); f.day = t; f.q = ''; store.set('hrTab', tab); render(); }; kp.appendChild(k);
+    });
+    body.appendChild(hero); body.appendChild(kp);
     // يحتاج انتباهك
     const att = [];
     const outside = rows.filter((r) => r.outside).length, pend = pendingReqs();
@@ -916,8 +1006,7 @@
     breakdown(body, rep.rows, f.day, (flt) => { f.org = flt.org; f.type = flt.type; render(); });
     const base = rep.rows.filter((r) => orgOk(r.e) && typeOk(r.e));
     groupBar(body);
-    filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'موظفو PEF'], ['HHO', 'موظفو HHO']]);
-    filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
+    filterBar(body);
     const c = (s) => base.filter((r) => s === 'in' ? r.list.length : r.status === s).length;
     filterChips(body, 'st', [['all', 'الكل'], ['late', 'متأخرون'], ['absent', 'بلا تسجيل'], ['in', 'حاضرون'], ['leave', 'إجازة/مهمة'], ['noin', 'بلا دخول'], ['hwork', 'دوام في عطلة'], ['outside', 'خارج الموقع'], ['rq_hourly', 'مغادرة ساعية'], ['rq_mission', 'مهمة عمل'], ['rq_overtime', 'عمل إضافي'], ['rq_holiday', 'عمل في عطلة'], ['noasg', 'بلا تكليف']],
       { all: base.length, late: c('late'), absent: c('absent'), in: c('in'), leave: c('leave'), noin: c('noin'), hwork: c('hwork'), outside: base.filter((r) => r.outside).length, rq_hourly: base.filter((r) => r.reqs.some((q) => q.kind === 'hourly')).length, rq_mission: base.filter((r) => r.reqs.some((q) => q.kind === 'mission')).length, rq_overtime: base.filter((r) => r.reqs.some((q) => q.kind === 'overtime')).length, rq_holiday: base.filter((r) => r.reqs.some((q) => q.kind === 'holiday')).length, noasg: base.filter((r) => !r.hasAsg).length });
@@ -955,22 +1044,26 @@
   function renderEmp(body) {
     const all = HR.employees();
     groupBar(body);
+    search(body, 'الاسم، الرقم الوظيفي، الهوية، القسم، المسمى');
+    filterBar(body, { status: true });
     filterChips(body, 'es', [['active', 'على رأس العمل'], ['ended', 'منتهية خدمتهم'], ['all', 'الكل']]);
-    filterChips(body, 'org', [['all', 'الكل'], ['PEF', 'PEF'], ['HHO', 'HHO']]);
-    filterChips(body, 'type', [['all', 'الكل'], ['office', 'مكتبي'], ['field', 'ميداني']]);
-    search(body, 'الاسم، الرقم الوظيفي، الهوية، القسم');
     const digits = (v) => String(v || '').replace(/\D/g, '');
     const qd = digits(f.q);
-    const rows = all.filter((e) => (f.es === 'all' || (f.es === 'active' ? e.active : !e.active)) && orgOk(e) && typeOk(e) && (match(f.q, e.name, e.nameEn, e.empId, e.nid, e.dept, e.pos) || (qd.length >= 4 && digits(e.phone).includes(qd.replace(/^0+/, '').replace(/^(970|972)/, '')))))
+    const rows = all.filter((e) => (f.es === 'all' || (f.es === 'active' ? e.active : !e.active)) && orgOk(e) && typeOk(e) && stOk(e) && (match(f.q, e.name, e.nameEn, e.empId, e.nid, e.dept, e.pos) || (qd.length >= 4 && digits(e.phone).includes(qd.replace(/^0+/, '').replace(/^(970|972)/, '')))))
       .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     body.appendChild(el('div', 'hr-tools', `<small>${rows.length} من ${all.length} موظف</small>`));
     // حالة اليوم بجانب كل موظف
     const trep = HR.dayReport(today()), tmap = {}; trep.rows.forEach((r) => { tmap[r.e.id] = r; });
+    // شريط آخر 14 يوماً لكل موظف (نقطة ملوّنة بحالة اليوم)
+    const strip = {}, SC = { present: 'ok', late: 'late', absent: 'abs', leave: 'lv', noin: 'late', hwork: 'ok', off: 'off', exempt: 'off' };
+    for (let i = 13; i >= 0; i--) { const ds = addDays(today(), -i), rp = HR.dayReport(ds); if (!rp.synced) { rows.forEach((e) => { strip[e.id] = (strip[e.id] || '') + '<i class="s-na"></i>'; }); continue; } const m = {}; rp.rows.forEach((r) => { m[r.e.id] = r.status; }); rows.forEach((e) => { strip[e.id] = (strip[e.id] || '') + `<i class="s-${SC[m[e.id]] || 'off'}"></i>`; }); }
     list(body, rows.map((e) => {
       const r = tmap[e.id];
       let right = e.empId ? `<small>#${esc(e.empId)}</small>` : '';
       if (r && trep.synced) { const st = STATUS[r.status]; right = (r.status === 'late' ? badge('+' + r.lateMin + ' د', 'warn') : r.status === 'leave' ? badge(leaveLbl(r.leave), 'info') : badge(st[0], st[1])) + (r.firstIn ? `<small>${tf.format(new Date(r.firstIn))}</small>` : ''); }
-      return personRow(e, right);
+      const st = strip[e.id] || '';
+      const orgB = e.org ? `<span class="hr3-tag ${e.org === 'HHO' ? 'hho' : 'pef'}">${esc(e.org)}</span>` : '';
+      return personRow(e, right, `${esc([e.pos, e.dept].filter(Boolean).join(' · ') || TYPE[e.type] || '')} ${orgB}${st ? `<span class="hr3-strip">${st}</span>` : ''}`);
     }), 'لا نتائج');
   }
 
