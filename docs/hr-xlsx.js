@@ -29,7 +29,8 @@
     };
     let r = 1, xml = '';
     xml += `<row r="${r}" ht="34" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(c === 0 ? title : '', colName(c) + r, ST.title)).join('') + '</row>'; r++;
-    xml += `<row r="${r}" ht="22" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(c === 0 ? sub : '', colName(c) + r, ST.sub)).join('') + '</row>'; r++;
+    const back = sh.back && nCols >= 4 ? sh.back : null;   // زر رجوع في أعلى الورقة (رابط داخلي) في A2:B2، والسطر الفرعي في C2 فما بعد
+    xml += `<row r="${r}" ht="22" customHeight="1">` + Array.from({ length: nCols }, (_, c) => (back ? (c === 0 ? cell({ v: back.label || '▸ رجوع إلى الورقة السابقة', link: back }, colName(c) + r, ST.link) : c === 1 ? cell('', colName(c) + r, ST.link) : cell(c === 2 ? sub : '', colName(c) + r, ST.sub)) : cell(c === 0 ? sub : '', colName(c) + r, ST.sub))).join('') + '</row>'; r++;
     const hr = r;
     xml += `<row r="${r}" ht="${head.some((h) => String(h || '').includes('\n')) ? 38 : 26}" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(head[c], colName(c) + r, ST.head)).join('') + '</row>'; r++;
     data.forEach((row, ri) => {
@@ -51,7 +52,7 @@
     if (hasFoot) { xml += `<row r="${r}" ht="26" customHeight="1">` + Array.from({ length: nCols }, (_, c) => { const fv = sh.foot[c], f = fv && typeof fv === 'object' ? fv.f : null; return cell(fv, colName(c) + r, f === 'pct' || f === 'hrs' ? ST[f + 'Tot'] : center[c] ? ST.totC : ST.tot); }).join('') + '</row>'; r++; }
     const scaleCols = [].concat(sh.scale == null ? [] : sh.scale);
     const cf = data.length ? scaleCols.map((c, k) => `<conditionalFormatting sqref="${colName(c)}${hr + 1}:${colName(c)}${lastData}"><cfRule type="colorScale" priority="${k + 1}"><colorScale><cfvo type="num" val="${sh.scaleMin == null ? 0 : sh.scaleMin}"/><cfvo type="num" val="${sh.scaleMid == null ? 60 : sh.scaleMid}"/><cfvo type="num" val="${sh.scaleMax == null ? 100 : sh.scaleMax}"/><color rgb="FFF6B7B0"/><color rgb="FFFBE7A6"/><color rgb="FF9FD9B6"/></colorScale></cfRule></conditionalFormatting>`).join('') : '';
-    const merges = `<mergeCells count="2"><mergeCell ref="A1:${last}1"/><mergeCell ref="A2:${last}2"/></mergeCells>`;
+    const merges = back ? `<mergeCells count="3"><mergeCell ref="A1:${last}1"/><mergeCell ref="A2:B2"/><mergeCell ref="C2:${last}2"/></mergeCells>` : `<mergeCells count="2"><mergeCell ref="A1:${last}1"/><mergeCell ref="A2:${last}2"/></mergeCells>`;
     const filter = data.length ? `<autoFilter ref="A${hr}:${last}${lastData}"/>` : '';
     const pane = `<pane ySplit="${hr}" topLeftCell="A${hr + 1}" activePane="bottomLeft" state="frozen"/>`;
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr>${sh.tab ? `<tabColor rgb="${sh.tab}"/>` : ''}<pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" rightToLeft="1" showGridLines="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${cols}</cols><sheetData>${xml}</sheetData>${filter}${merges}${cf}${links.length ? `<hyperlinks>${links.join('')}</hyperlinks>` : ''}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><headerFooter><oddFooter>&amp;Cصفحة &amp;P من &amp;N</oddFooter></headerFooter></worksheet>`;
