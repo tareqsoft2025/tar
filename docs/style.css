@@ -1760,3 +1760,29 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-cal14 i .cwd{font-style:normal;font-size:.58rem;opacity:.85;line-height:1;font-weight:600}
 .hr-cal14 i small{font-size:.95rem;line-height:1}
 .hr-cal14 i{font-style:normal!important}
+
+/* ---------- 8.50: الفلتر الموحّد وبطاقات المؤشرات ---------- */
+.hr3-bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.hr3-bar::-webkit-scrollbar{display:none}
+.hr3-bar .chip{flex:none}.hr3-dd.on{background:var(--gold);color:#241a05;font-weight:700}
+.hr3-act{display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted);margin:2px 2px 8px}
+.hr3-act button{background:none;border:0;color:var(--gold);font:inherit;font-size:.78rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:2px 4px}
+.hr3-act .hr3-adv{margin-inline-start:auto}.hr3-act svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
+.hr3-sec{margin:12px 0}.hr3-sec>small{display:block;color:var(--muted);font-size:.78rem;margin-bottom:6px}
+.hr3-list{max-height:190px;overflow:auto;display:grid;gap:5px;padding:2px}
+.hr3-ck{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:.86rem;cursor:pointer}
+.hr3-ck input{width:18px;height:18px;accent-color:var(--gold);flex:none}
+.hr3-sv{display:inline-flex;align-items:center;gap:0;padding:0}.hr3-sv button{background:none;border:0;color:inherit;font:inherit;padding:6px 10px;cursor:pointer}.hr3-sv button+button{padding-inline:8px;opacity:.7;border-inline-start:1px solid var(--line)}
+.hr3-none{color:var(--muted)}
+.hr3-sv2{display:flex;gap:8px;margin:12px 0}.hr3-sv2 input{flex:1;min-width:0}
+.hr2-sum{display:grid;gap:3px}.hr2-sum b{font-size:2rem;line-height:1}.hr2-sum small{color:var(--muted);font-size:.78rem}
+.hr3-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 12px}
+.hr3-k{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:14px;padding:10px 4px;text-align:center;color:var(--text);font:inherit;cursor:pointer}
+.hr3-k b{display:block;font-size:1.45rem;line-height:1.2}.hr3-k small{font-size:.7rem;color:var(--muted)}
+.hr3-k:active{transform:scale(.97)}
+
+.hr3-tag{font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:6px;margin-inline-start:4px}.hr3-tag.pef{background:#1b4f66;color:#7fd0ee}.hr3-tag.hho{background:#5a3d10;color:#f0bd6a}
+.hr3-strip{display:flex;gap:3px;margin-top:5px}.hr3-strip i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.hr3-strip .s-ok{background:var(--ok)}.hr3-strip .s-late{background:#F0A64B}.hr3-strip .s-abs{background:#F2716A}.hr3-strip .s-lv{background:#5B9DFF}.hr3-strip .s-off,.hr3-strip .s-na{background:transparent;border:1px solid var(--line)}
+
+.hr3-exp{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 14px 14px;margin:6px 0}
+.hr3-mon{display:flex;gap:8px;align-items:center;font-size:.8rem;color:var(--muted);margin-top:8px}.hr3-mon select{flex:1;min-width:0}
