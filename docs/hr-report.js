@@ -525,9 +525,90 @@
       { name: 'المستثنون', title: T('مستثنون من تسجيل الحضور'), subtitle: sub, widths: [6, 38, 30, 10], rows: [['#', 'الاسم (مستثنى من تسجيل الحضور)', 'القسم', 'السلم']].concat((D.exList || []).map((x, i) => [i + 1, x.name, x.dept, x.org])), foot: ['', `الإجمالي: ${(D.exList || []).length}`, '', ''] }
     ];
   }
+  /* ---------- التأخر الشهري: عدد مرات التأخر لكل موظف مع ورقة تفاصيل مرتبطة برابط داخلي ---------- */
+  // opt = { filter(e), exclude:Set } ← { ym, rows:[{name,org,dept,pos,count,min,items:[{ds,in,min}]}], unsynced:[ds], tot }
+  function lateMonth(ym, opt) {
+    opt = opt || {};
+    const ex = opt.exclude || new Set(), M = window.HRReview.month(ym, (e) => !ex.has(String(e.id)) && (!opt.filter || opt.filter(e)));
+    const rows = M.list.map((E) => {
+      const items = Object.values(E.d).filter((r) => r.status === 'late' && !r.holidayWork && !r.weekend).sort((a, b) => a.ds.localeCompare(b.ds))
+        .map((r) => ({ ds: r.ds, in: r.firstIn ? tmf.format(new Date(r.firstIn)) : '', min: r.lateMin || 0 }));
+      return { name: E.e.name, org: E.e.org, dept: E.e.dept || '', pos: E.e.pos || '', count: items.length, min: items.reduce((a, x) => a + x.min, 0), items };
+    }).sort((a, b) => b.count - a.count || b.min - a.min || a.name.localeCompare(b.name, 'ar'));
+    return { ym, rows, unsynced: M.unsynced || [], workDays: M.workDays };
+  }
+  const MONTHS_AR = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
+  const mName = (ym) => { const [y, m] = ym.split('-').map(Number); return `${MONTHS_AR[m - 1]} ${y}  (شهر ${m})`; };
+  function sheetsLateMonth(L, opt) {
+    opt = opt || {}; const P = opt.pre ? opt.pre + ' - ' : '', DET = P + 'تفاصيل التأخير';
+    const late = L.rows.filter((r) => r.count > 0), tot = late.reduce((a, r) => a + r.count, 0), totMin = late.reduce((a, r) => a + r.min, 0);
+    const sub = `${mName(L.ym)}  ·  ${late.length} موظف تأخر ${tot} مرة${L.unsynced.length ? '  ·  ' + L.unsynced.length + ' يوم غير مزامَن (الأرقام ناقصة)' : ''}  ·  أحمر = 3 مرات فأكثر  ·  اضغط «عرض التفاصيل»`;
+    let pos = 0; const first = {};
+    const det = [];
+    L.rows.forEach((r) => { if (!r.count) return; first[r.name + '|' + r.org] = pos; r.items.forEach((it) => { det.push([pos + 1, r.name, r.org, it.ds, DAYN[Tracker.dowOf(it.ds)], it.in, it.min]); pos++; }); });
+    const sum = L.rows.map((r, i) => [i + 1, r.name, r.org, r.count, r.count ? r.min : '', r.count ? Math.round(r.min / r.count) : '', r.count ? { v: 'عرض التفاصيل ◂', link: { to: DET, row: 4 + first[r.name + '|' + r.org] } } : '—']);
+    return [
+      { name: P + 'التأخر الشهري', title: `عدد مرات التأخر لكل موظف · ${opt.org || 'كل الموظفين'}`, subtitle: sub, tab: 'FFC0392B', widths: [6, 38, 10, 14, 14, 14, 18], rows: [['#', 'الاسم', 'السلم', 'عدد مرات التأخر', 'إجمالي الدقائق', 'متوسط التأخر (د)', 'التفاصيل']].concat(sum), rowSt: L.rows.map((r) => (r.count >= 3 ? 'late' : null)), foot: ['', `الإجمالي: ${L.rows.length} موظف`, '', tot, totMin, tot ? Math.round(totMin / tot) : '', ''] },
+      { name: DET, title: `تفاصيل التأخير · ${mName(L.ym)}`, subtitle: `${opt.org || 'كل الموظفين'}  ·  كل مرة تأخر فيها الموظف مع وقت الدخول ودقائق التأخر`, tab: 'FFC0392B', widths: [6, 38, 10, 16, 12, 14, 14], rows: [['#', 'الاسم', 'السلم', 'التاريخ', 'اليوم', 'وقت الدخول', 'دقائق التأخر']].concat(det), rowSt: det.map(() => 'late'), foot: ['', `الإجمالي: ${det.length} مرة`, '', '', '', '', totMin] }
+    ];
+  }
+
+  /* ---------- الطلبات: اليوم + الشهر حتى اليوم (مغادرات، إجازات، مهام) ---------- */
+  // opt = { filter(e), exclude:Set, leaveLbl(n), rqStatus(st) } ← { today:[row], month:[row], ds, from }
+  function requestsOf(opt) {
+    opt = opt || {};
+    const t = dayStr(), mFrom = t.slice(0, 7) + '-01', ex = opt.exclude || new Set(), E = {};
+    HR.employees().forEach((e) => { E[e.id] = e; });
+    const KIND = { hourly: ['مغادرة', 0], daily: ['إجازة', 1], mission: ['مهمة', 2] };
+    const BAD = ['cancelled', 'canceled', 'deleted', 'draft'];
+    const all = HR.requests().filter((q) => KIND[q.kind] && q.from && !BAD.includes(q.status)).map((q) => {
+      const e = E[q.empId]; if (!e || ex.has(String(e.id)) || (opt.filter && !opt.filter(e))) return null;
+      const st = opt.rqStatus ? opt.rqStatus(q.status) : null;
+      return { name: e.name, org: e.org, kind: KIND[q.kind][0], k: KIND[q.kind][1], what: q.kind === 'daily' ? (opt.leaveLbl ? opt.leaveLbl(q.nature) : (q.nature || '')) : '', from: q.from, to: q.to || q.from, time: q.planned || (q.start && q.end ? q.start + ' ← ' + q.end : q.start || ''), hours: q.hours != null && q.hours !== '' ? +q.hours : '', days: q.days != null && q.days !== '' ? +q.days : '', why: q.project || q.reason || '', status: st ? st[0] : (q.status || '') };
+    }).filter(Boolean);
+    const cmp = (a, b) => a.k - b.k || a.from.localeCompare(b.from) || a.name.localeCompare(b.name, 'ar');
+    const over = (q, lo, hi) => q.from <= hi && q.to >= lo;
+    return { ds: t, from: mFrom, today: all.filter((q) => over(q, t, t)).sort(cmp), month: all.filter((q) => over(q, mFrom, t)).sort(cmp) };
+  }
+  function sheetsRequests(R, opt) {
+    opt = opt || {}; const P = opt.pre ? opt.pre + ' - ' : '';
+    const cnt = (l) => ['مغادرة', 'إجازة', 'مهمة'].map((k) => ({ k, n: l.filter((q) => q.kind === k).length }));
+    const cs = (l) => cnt(l).map((x) => `${x.k === 'مغادرة' ? 'مغادرات' : x.k === 'إجازة' ? 'إجازات' : 'مهام'} ${x.n}`).join(' · ');
+    const mk = (name, title, sub, l) => ({
+      name: P + name, title, subtitle: sub, tab: 'FF7446A8', widths: [6, 38, 10, 12, 22, 13, 13, 20, 10, 9, 38, 16],
+      rows: [['#', 'الاسم', 'السلم', 'النوع', 'نوع الإجازة', 'من', 'إلى', 'الوقت', 'الساعات', 'الأيام', 'المشروع / السبب', 'الحالة']].concat(l.map((q, i) => [i + 1, q.name, q.org, q.kind, q.what, q.from, q.to, q.time, q.hours === '' ? '' : { v: q.hours, f: 'hrs' }, q.days, q.why, q.status])),
+      foot: ['', `الإجمالي: ${l.length} طلب`, '', '', '', '', '', '', '', '', '', '']
+    });
+    const org = opt.org || 'كل الموظفين';
+    return [
+      mk('الطلبات اليوم', `الطلبات اليوم · ${org}`, `${dfull.format(noon(R.ds))}  ·  ${cs(R.today)}`, R.today),
+      mk('طلبات الشهر', `طلبات الشهر حتى اليوم · ${org}`, `${fmtD(R.from)} ← ${fmtD(R.ds)}  ·  ${cs(R.month)}`, R.month)
+    ];
+  }
+
+  /* ---------- المسمى الوظيفي والقسم: يُضافان تلقائياً بجانب السلم/القسم في كل ورقة فيها عمود «الاسم» ---------- */
+  function addJobCols(sh, map) {
+    const head = (sh.rows || [])[0]; if (!head) return sh;
+    const ni = head.findIndex((h) => /^الاسم/.test(String(h || ''))); if (ni < 0) return sh;
+    const di = head.indexOf('القسم'), pi = head.indexOf('المسمى الوظيفي'); if (pi >= 0) return sh;
+    const oi = head.indexOf('السلم');
+    let at, add;   // at: موضع الإدراج، add: [{h,w,get}]
+    const DEPT = { h: 'القسم', w: 24, get: (m) => m.dept }, POS = { h: 'المسمى الوظيفي', w: 28, get: (m) => m.pos };
+    if (di >= 0) { at = di + 1; add = [POS]; } else { at = (oi >= 0 ? oi : ni) + 1; add = [DEPT, POS]; }
+    const nm = (r) => String(r[ni] == null ? '' : (typeof r[ni] === 'object' ? r[ni].v : r[ni])).trim();
+    const ins = (arr, vals) => { const a = arr.slice(); while (a.length < at) a.push(''); a.splice(at, 0, ...vals); return a; };
+    const o = Object.assign({}, sh);
+    o.rows = sh.rows.map((r, i) => (i === 0 ? ins(r, add.map((x) => x.h)) : ins(r, add.map((x) => { const m = map[nm(r)]; return m ? x.get(m) : ''; }))));
+    if (sh.foot) o.foot = ins(sh.foot, add.map(() => ''));
+    if (sh.widths) { const w = sh.widths.slice(); while (w.length < at) w.push(12); w.splice(at, 0, ...add.map((x) => x.w)); o.widths = w; }
+    if (sh.scale != null) { const sc = [].concat(sh.scale).map((c) => (c >= at ? c + add.length : c)); o.scale = Array.isArray(sh.scale) ? sc : sc[0]; }
+    return o;
+  }
+  const jobMap = () => { const m = {}; HR.employees().forEach((e) => { const k = String(e.name || '').trim(); if (k && !m[k]) m[k] = { dept: e.dept || '', pos: e.pos || '' }; }); return m; };
+
   // ألوان لسان الأوراق بحسب نوعها
   const TABS = [[/حضور|الحضور/, 'FF1D5A4B'], [/متأخر/, 'FFC0392B'], [/إجاز/, 'FF2A68AD'], [/مهام|مغادر/, 'FF7446A8'], [/بلا تسجيل/, 'FFB4690E'], [/مستثن/, 'FF6B7B8C'], [/ملخص|أسبوعي/, 'FF8F6B1C']];
-  const xlsxOf = (sheets, meta) => { sheets.forEach((sh) => { if (!sh.tab) { const t = TABS.find(([re]) => re.test(sh.name)); if (t) sh.tab = t[1]; } }); return window.HRXlsx.build(sheets, meta); };
+  const xlsxOf = (sheets, meta) => { const jm = jobMap(); sheets = sheets.map((sh) => addJobCols(sh, jm)); sheets.forEach((sh) => { if (!sh.tab) { const t = TABS.find(([re]) => re.test(sh.name)); if (t) sh.tab = t[1]; } }); return window.HRXlsx.build(sheets, meta); };
 
-  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64, loadLetterhead, sheetsDetail, sheetsSummary, sheetsWeekly, weekHours, sheetsWeekHours, xlsxOf };
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64, loadLetterhead, sheetsDetail, sheetsSummary, sheetsWeekly, weekHours, sheetsWeekHours, lateMonth, sheetsLateMonth, mName, requestsOf, sheetsRequests, xlsxOf };
 })();

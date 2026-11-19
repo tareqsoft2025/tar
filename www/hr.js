@@ -397,7 +397,9 @@
     $('exDone').onclick = () => { if (back) back(); else closeSheet(); };
     draw();
   }
-  let dyView = 'sum';
+  let dyView = 'sum', dyMon = '';
+  // آخر 6 أشهر (الحالي أولاً) لورقة التأخر الشهري
+  const monOpts = () => { const t = today(), [y, m] = t.split('-').map(Number), out = []; for (let i = 0; i < 6; i++) { const d = new Date(Date.UTC(y, m - 1 - i, 1)), ym = d.toISOString().slice(0, 7); out.push([ym, HRReport.mName(ym) + (i === 0 ? ' — الحالي' : '')]); } return out; };
   function openDaily(ds, view) {
     ds = ds || today(); if (view) dyView = view;
     const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null, ex = repExcl();
@@ -418,6 +420,7 @@
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyBoth">${icon('image')} مشاركة كشفي PEF و HHO معاً</button><button type="button" class="btn-outline" id="dyEx">${icon('x')} المستثنون من الحضور (${ex.size})</button></div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyPdf">${icon('note')} ملف PDF لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyPdf2">${icon('note')} PDF واحد لـ PEF و HHO</button>`}</div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyWa">${icon('share')} إرسال PDF تلقائياً إلى واتساب</button></div>
+      <div class="hr-gact"><label style="display:flex;gap:8px;align-items:center;flex:1;font-size:13px;color:var(--mute,#5c6f72)">شهر ورقة «التأخر الشهري» في Excel<select id="dyMon" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--line,#cfdbd8);background:var(--card,#fff);color:inherit;font:inherit">${monOpts().map(([v, n]) => `<option value="${v}"${v === dyMon ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="dyXl">${icon('chart')} ملف Excel لهذا الكشف</button>${dyView === 'sum' ? '' : `<button type="button" class="btn-outline" id="dyXl2">${icon('chart')} Excel واحد لـ PEF و HHO</button>`}</div>
       <small class="hr-pgn">PDF بصفحات A4 مهيأة للطباعة بترويسة وتذييل المؤسسة · Excel بأوراق منفصلة لكل قسم</small>`);
     const body = $('hrSheetBody');
@@ -451,8 +454,26 @@
     // ورقتا ساعات الدوام (الأسبوع الحالي والسابق) بحسب الجهة المطلوبة
     const weeksFor = (filter, pre) => ['cur', 'prev'].map((k) => HRReport.sheetsWeekHours(HRReport.weekHours(k, { filter, exclude: ex, band: bandOf }), { pre }));
     const xmeta = { title: `كشف الدوام — ${fd(ds)}` };
-    $('dyXl').onclick = () => shareBytes(HRReport.xlsxOf(dyView === 'sum' ? HRReport.sheetsSummary(cur.D).concat(weeksFor((e) => orgOk(e) && typeOk(e))) : HRReport.sheetsDetail(cur.D).concat(weeksFor((e) => e.org === dyView, dyView)), xmeta), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.xlsx`, XLSX_MIME);
-    const x2 = $('dyXl2'); if (x2) x2.onclick = () => shareBytes(HRReport.xlsxOf(HRReport.sheetsDetail(dOf('PEF'), 'PEF').concat(weeksFor((e) => e.org === 'PEF', 'PEF'), HRReport.sheetsDetail(dOf('HHO'), 'HHO'), weeksFor((e) => e.org === 'HHO', 'HHO')), xmeta), `hr-pef-hho-${ds}.xlsx`, XLSX_MIME);
+    // ورقة التأخر الشهري (مع مزامنة أيام الشهر الناقصة تلقائياً) + ورقتا الطلبات (اليوم والشهر حتى اليوم)
+    $('dyMon').onchange = (ev) => { dyMon = ev.target.value; };
+    const lateSh = async (filter, pre, org) => {
+      const ym = dyMon || monOpts()[0][0], o = { filter, exclude: ex };
+      if (HRReport.lateMonth(ym, o).unsynced.length) { toast('جارٍ مزامنة أيام الشهر الناقصة…'); try { await HR.sync(null, { from: ym + '-01' }); } catch (e) { /* نكمل بما هو محفوظ */ } }
+      const L = HRReport.lateMonth(ym, o);
+      if (L.unsynced.length) toast(`تنبيه: ${L.unsynced.length} يوم غير مزامَن في هذا الشهر — الأرقام ناقصة`);
+      return HRReport.sheetsLateMonth(L, { pre, org });
+    };
+    const reqSh = (filter, pre, org) => HRReport.sheetsRequests(HRReport.requestsOf({ filter, exclude: ex, leaveLbl, rqStatus }), { pre, org });
+    $('dyXl').onclick = async () => {
+      const f = dyView === 'sum' ? (e) => orgOk(e) && typeOk(e) : (e) => e.org === dyView, pre = dyView === 'sum' ? '' : dyView, org = dyView === 'sum' ? '' : dyView;
+      const base = dyView === 'sum' ? HRReport.sheetsSummary(cur.D) : HRReport.sheetsDetail(cur.D);
+      const late = await lateSh(f, pre, org);
+      shareBytes(HRReport.xlsxOf(base.concat(late, reqSh(f, pre, org), weeksFor(f, pre)), xmeta), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.xlsx`, XLSX_MIME);
+    };
+    const x2 = $('dyXl2'); if (x2) x2.onclick = async () => {
+      const fp = (e) => e.org === 'PEF', fh = (e) => e.org === 'HHO', lp = await lateSh(fp, 'PEF', 'PEF'), lh = await lateSh(fh, 'HHO', 'HHO');
+      shareBytes(HRReport.xlsxOf(HRReport.sheetsDetail(dOf('PEF'), 'PEF').concat(lp, reqSh(fp, 'PEF', 'PEF'), weeksFor(fp, 'PEF'), HRReport.sheetsDetail(dOf('HHO'), 'HHO'), lh, reqSh(fh, 'HHO', 'HHO'), weeksFor(fh, 'HHO')), xmeta), `hr-pef-hho-${ds}.xlsx`, XLSX_MIME);
+    };
     const pagesOf = async (v) => { const lh = await HRReport.loadLetterhead(); return v === 'sum' ? cur.pages : HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true, letterhead: lh }); };
     $('dyPdf').onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = await pagesOf(dyView); sharePdf(HRReport.pdfOf(pg), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.pdf`); };
     const p2 = $('dyPdf2'); if (p2) p2.onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = (await pagesOf('PEF')).concat(await pagesOf('HHO')); sharePdf(HRReport.pdfOf(pg), `hr-pef-hho-${ds}.pdf`); };
