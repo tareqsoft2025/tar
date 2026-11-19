@@ -543,14 +543,22 @@
     opt = opt || {}; const P = opt.pre ? opt.pre + ' - ' : '', DET = P + 'تفاصيل التأخير';
     const late = L.rows.filter((r) => r.count > 0), tot = late.reduce((a, r) => a + r.count, 0), totMin = late.reduce((a, r) => a + r.min, 0);
     const sub = `${mName(L.ym)}  ·  ${late.length} موظف تأخر ${tot} مرة${L.unsynced.length ? '  ·  ' + L.unsynced.length + ' يوم غير مزامَن (الأرقام ناقصة)' : ''}  ·  أحمر = 3 مرات فأكثر  ·  اضغط «عرض التفاصيل»`;
-    let pos = 0; const first = {};
-    const det = [];
-    L.rows.forEach((r) => { if (!r.count) return; first[r.name + '|' + r.org] = pos; r.items.forEach((it) => { det.push([pos + 1, r.name, r.org, it.ds, DAYN[Tracker.dowOf(it.ds)], it.in, it.min]); pos++; }); });
-    const sum = L.rows.map((r, i) => [i + 1, r.name, r.org, r.count, r.count ? r.min : '', r.count ? Math.round(r.min / r.count) : '', r.count ? { v: 'عرض التفاصيل ◂', link: { to: DET, row: 4 + first[r.name + '|' + r.org] } } : '—']);
-    return [
-      { name: P + 'التأخر الشهري', title: `عدد مرات التأخر لكل موظف · ${opt.org || 'كل الموظفين'}`, subtitle: sub, tab: 'FFC0392B', widths: [6, 38, 10, 14, 14, 14, 18], rows: [['#', 'الاسم', 'السلم', 'عدد مرات التأخر', 'إجمالي الدقائق', 'متوسط التأخر (د)', 'التفاصيل']].concat(sum), rowSt: L.rows.map((r) => (r.count >= 3 ? 'late' : null)), foot: ['', `الإجمالي: ${L.rows.length} موظف`, '', tot, totMin, tot ? Math.round(totMin / tot) : '', ''] },
-      { name: DET, title: `تفاصيل التأخير · ${mName(L.ym)}`, subtitle: `${opt.org || 'كل الموظفين'}  ·  كل مرة تأخر فيها الموظف مع وقت الدخول ودقائق التأخر`, tab: 'FFC0392B', widths: [6, 38, 10, 16, 12, 14, 14], rows: [['#', 'الاسم', 'السلم', 'التاريخ', 'اليوم', 'وقت الدخول', 'دقائق التأخر']].concat(det), rowSt: det.map(() => 'late'), foot: ['', `الإجمالي: ${det.length} مرة`, '', '', '', '', totMin] }
+    const SUM = P + 'التأخر الشهري', hdr = ['#', 'الاسم', 'السلم', 'التاريخ', 'اليوم', 'وقت الدخول', 'دقائق التأخر'];
+    const lateRows = L.rows.filter((r) => r.count > 0), key = (r) => r.name + '|' + r.org, sheetOf = {};
+    lateRows.forEach((r, i) => { sheetOf[key(r)] = `${P}ت${i + 1} ${r.name.replace(/[\\\/\?\*\[\]:]/g, ' ')}`.slice(0, 31).trim(); });
+    // الورقة العامة: كل المرات لكل الموظفين (فيها فلتر الاسم يدوياً)
+    const det = []; lateRows.forEach((r) => r.items.forEach((it) => det.push([det.length + 1, r.name, r.org, it.ds, DAYN[Tracker.dowOf(it.ds)], it.in, it.min])));
+    const sum = L.rows.map((r, i) => [i + 1, r.name, r.org, r.count, r.count ? r.min : '', r.count ? Math.round(r.min / r.count) : '', r.count ? { v: 'عرض التفاصيل ◂', link: { to: sheetOf[key(r)], row: 4 } } : '—']);
+    const rowOf = {}; L.rows.forEach((r, i) => { rowOf[key(r)] = 4 + i; });
+    const out = [
+      { name: SUM, title: `عدد مرات التأخر لكل موظف · ${opt.org || 'كل الموظفين'}`, subtitle: sub, tab: 'FFC0392B', widths: [6, 38, 10, 14, 14, 14, 18], rows: [['#', 'الاسم', 'السلم', 'عدد مرات التأخر', 'إجمالي الدقائق', 'متوسط التأخر (د)', 'التفاصيل']].concat(sum), rowSt: L.rows.map((r) => (r.count >= 3 ? 'late' : null)), foot: ['', `الإجمالي: ${L.rows.length} موظف`, '', tot, totMin, tot ? Math.round(totMin / tot) : '', ''] },
+      { name: DET, title: `تفاصيل التأخير (كل الموظفين) · ${mName(L.ym)}`, subtitle: `${opt.org || 'كل الموظفين'}  ·  لعرض موظف واحد استخدم فلتر عمود «الاسم»`, back: { to: SUM, row: 3, label: '▸ رجوع إلى التأخر الشهري' }, tab: 'FFC0392B', widths: [6, 38, 10, 16, 12, 14, 14], rows: [hdr].concat(det), rowSt: det.map(() => 'late'), foot: ['', `الإجمالي: ${det.length} مرة`, '', '', '', '', totMin] }
     ];
+    // ورقة مفلترة لكل موظف تأخر: الرابط ينقل إليها مباشرة وفيها زر الرجوع إلى صفه في «التأخر الشهري»
+    lateRows.forEach((r) => {
+      out.push({ name: sheetOf[key(r)], title: `تفاصيل التأخير — ${r.name}`, subtitle: `${mName(L.ym)}  ·  ${r.count} مرة · ${r.min} دقيقة`, back: { to: SUM, row: rowOf[key(r)], label: '▸ رجوع إلى التأخر الشهري' }, tab: 'FFE8A39B', widths: [6, 38, 10, 16, 12, 14, 14], rows: [hdr].concat(r.items.map((it, i) => [i + 1, r.name, r.org, it.ds, DAYN[Tracker.dowOf(it.ds)], it.in, it.min])), rowSt: r.items.map(() => 'late'), foot: ['', `الإجمالي: ${r.count} مرة`, '', '', '', '', r.min] });
+    });
+    return out;
   }
 
   /* ---------- الطلبات: اليوم + الشهر حتى اليوم (مغادرات، إجازات، مهام) ---------- */
