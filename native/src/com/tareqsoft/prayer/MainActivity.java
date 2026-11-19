@@ -715,6 +715,11 @@ public class MainActivity extends Activity {
                 "ستصلك تنبيهات الصلاة قبل موعدها وعند دخول الوقت. بارك الله فيك.");
         }
 
+        /** إعدادات التقرير التلقائي اليومي (JSON) وحالة آخر تشغيل. */
+        @JavascriptInterface public String autoReportGet() { return AutoReport.get(MainActivity.this); }
+        @JavascriptInterface public void autoReportSet(String json) { AutoReport.save(MainActivity.this, json); }
+        @JavascriptInterface public void autoReportRunNow() { AutoReport.run(MainActivity.this); }
+
         @JavascriptInterface
         public boolean exactAlarmsAllowed() {
             if (Build.VERSION.SDK_INT < 31) return true;

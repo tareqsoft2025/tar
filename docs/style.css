@@ -1786,3 +1786,11 @@ html:has(#tab-times.active){overflow:hidden}
 
 .hr3-exp{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 14px 14px;margin:6px 0}
 .hr3-mon{display:flex;gap:8px;align-items:center;font-size:.8rem;color:var(--muted);margin-top:8px}.hr3-mon select{flex:1;min-width:0}
+
+.hr3-ks{display:grid;grid-template-columns:1fr 1fr;gap:6px}.hr3-ks .hr3-ck{padding:8px 9px;font-size:.78rem}
+.hr3-lnk{background:none;border:0;color:var(--gold);font:inherit;font-size:.74rem;margin-inline-start:10px;cursor:pointer}
+
+.hr3-perm{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin:5px 0;font-size:.82rem}
+.hr3-perm.ok{border-color:color-mix(in srgb,var(--ok) 50%,var(--line))}.hr3-perm.no{border-color:#F0A64B}
+.hr3-perm button{margin-inline-start:auto;background:var(--gold);color:#241a05;border:0;border-radius:9px;padding:5px 12px;font:inherit;font-weight:700;cursor:pointer}
+.hr3-last{font-size:.78rem;padding:9px 12px;border-radius:12px;margin:8px 0;background:var(--card);border:1px solid var(--line)}.hr3-last.no{color:#F2716A}
