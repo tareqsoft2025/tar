@@ -448,8 +448,11 @@
       return { u8: HRReport.pdfOf(pg), name: `hr-pef-hho-${ds}.pdf`, mime: 'application/pdf', caption: `كشف الدوام — ${dLong.format(noon(ds))}` };
     }, () => openDaily(ds));
     const dOf = (v) => HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() });
-    $('dyXl').onclick = () => shareBytes(HRReport.xlsxOf(dyView === 'sum' ? HRReport.sheetsSummary(cur.D) : HRReport.sheetsDetail(cur.D)), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.xlsx`, XLSX_MIME);
-    const x2 = $('dyXl2'); if (x2) x2.onclick = () => shareBytes(HRReport.xlsxOf(HRReport.sheetsDetail(dOf('PEF'), 'PEF').concat(HRReport.sheetsDetail(dOf('HHO'), 'HHO'))), `hr-pef-hho-${ds}.xlsx`, XLSX_MIME);
+    // ورقتا ساعات الدوام (الأسبوع الحالي والسابق) بحسب الجهة المطلوبة
+    const weeksFor = (filter, pre) => ['cur', 'prev'].map((k) => HRReport.sheetsWeekHours(HRReport.weekHours(k, { filter, exclude: ex, band: bandOf }), { pre }));
+    const xmeta = { title: `كشف الدوام — ${fd(ds)}` };
+    $('dyXl').onclick = () => shareBytes(HRReport.xlsxOf(dyView === 'sum' ? HRReport.sheetsSummary(cur.D).concat(weeksFor((e) => orgOk(e) && typeOk(e))) : HRReport.sheetsDetail(cur.D).concat(weeksFor((e) => e.org === dyView, dyView)), xmeta), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.xlsx`, XLSX_MIME);
+    const x2 = $('dyXl2'); if (x2) x2.onclick = () => shareBytes(HRReport.xlsxOf(HRReport.sheetsDetail(dOf('PEF'), 'PEF').concat(weeksFor((e) => e.org === 'PEF', 'PEF'), HRReport.sheetsDetail(dOf('HHO'), 'HHO'), weeksFor((e) => e.org === 'HHO', 'HHO')), xmeta), `hr-pef-hho-${ds}.xlsx`, XLSX_MIME);
     const pagesOf = async (v) => { const lh = await HRReport.loadLetterhead(); return v === 'sum' ? cur.pages : HRReport.detailPages(HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }), { light: true, letterhead: lh }); };
     $('dyPdf').onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = await pagesOf(dyView); sharePdf(HRReport.pdfOf(pg), `hr-${dyView === 'sum' ? 'daily' : dyView.toLowerCase()}-${ds}.pdf`); };
     const p2 = $('dyPdf2'); if (p2) p2.onclick = async () => { toast('جارٍ إنشاء ملف PDF…'); const pg = (await pagesOf('PEF')).concat(await pagesOf('HHO')); sharePdf(HRReport.pdfOf(pg), `hr-pef-hho-${ds}.pdf`); };

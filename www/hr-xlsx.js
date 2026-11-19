@@ -10,7 +10,7 @@
 
   // sheet = { name, title?, subtitle?, widths?, rows:[رأس، بيانات…], rowSt?:[null|'late' لكل صف بيانات], foot?:[خلايا إجمالي] }
   // التخطيط: عنوان مدمج، سطر فرعي، رأس ملوّن، صفوف بخطوط شبكية وتظليل متناوب، صفوف المتأخرين بالأحمر، إجمالي، فلتر، تجميد، طباعة أفقية.
-  const ST = { head: 1, body: 2, zebra: 3, bodyC: 4, zebraC: 5, late: 6, lateC: 7, title: 8, sub: 9, tot: 10, totC: 11 };
+  const ST = { head: 1, body: 2, zebra: 3, bodyC: 4, zebraC: 5, late: 6, lateC: 7, title: 8, sub: 9, tot: 10, totC: 11, pct: 12, pctZ: 13, pctLate: 14, pctTot: 15, hrs: 16, hrsZ: 17, hrsLate: 18, hrsTot: 19, tagPEF: 20, tagHHO: 21 };
   function sheetXml(sh, idx) {
     const rows = sh.rows || [], head = rows[0] || [], data = rows.slice(1), nCols = Math.max(1, ...rows.map((r) => r.length), (sh.foot || []).length);
     const title = sh.title || sh.name, sub = sh.subtitle || '', hasFoot = !!(sh.foot && sh.foot.length);
@@ -20,6 +20,7 @@
     const cols = widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${Math.round(w * 10) / 10}" customWidth="1"/>`).join('');
     const last = colName(nCols - 1);
     const cell = (v, ref, st) => {
+      if (v && typeof v === 'object' && 'v' in v) v = v.v;
       if (v == null || v === '') return `<c r="${ref}" s="${st}"/>`;
       if (typeof v === 'number' && isFinite(v)) return `<c r="${ref}" s="${st}"><v>${v}</v></c>`;
       return `<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
@@ -28,23 +29,33 @@
     xml += `<row r="${r}" ht="34" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(c === 0 ? title : '', colName(c) + r, ST.title)).join('') + '</row>'; r++;
     xml += `<row r="${r}" ht="22" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(c === 0 ? sub : '', colName(c) + r, ST.sub)).join('') + '</row>'; r++;
     const hr = r;
-    xml += `<row r="${r}" ht="26" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(head[c], colName(c) + r, ST.head)).join('') + '</row>'; r++;
+    xml += `<row r="${r}" ht="${head.some((h) => String(h || '').includes('\n')) ? 38 : 26}" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(head[c], colName(c) + r, ST.head)).join('') + '</row>'; r++;
     data.forEach((row, ri) => {
-      const late = sh.rowSt && sh.rowSt[ri] === 'late', z = ri % 2 === 1;
-      xml += `<row r="${r}" ht="21" customHeight="1">` + Array.from({ length: nCols }, (_, c) => {
-        const st = late ? (center[c] ? ST.lateC : ST.late) : center[c] ? (z ? ST.zebraC : ST.bodyC) : (z ? ST.zebra : ST.body);
-        return cell(row[c], colName(c) + r, st);
+      const rs = sh.rowSt && sh.rowSt[ri], late = rs === 'late', subr = rs === 'sub', z = ri % 2 === 1;
+      xml += `<row r="${r}" ht="${subr ? 24 : 21}" customHeight="1">` + Array.from({ length: nCols }, (_, c) => {
+        const raw = row[c], f = raw && typeof raw === 'object' ? raw.f : null, val = raw && typeof raw === 'object' && 'v' in raw ? raw.v : raw;
+        let st;
+        if (f === 'pct' || f === 'hrs') st = subr ? ST[f + 'Tot'] : late ? ST[f + 'Late'] : z ? ST[f + 'Z'] : ST[f];
+        else if (subr) st = center[c] ? ST.totC : ST.tot;
+        else if (late) st = center[c] ? ST.lateC : ST.late;
+        else if (val === 'PEF') st = ST.tagPEF;
+        else if (val === 'HHO') st = ST.tagHHO;
+        else st = center[c] ? (z ? ST.zebraC : ST.bodyC) : (z ? ST.zebra : ST.body);
+        return cell(raw, colName(c) + r, st);
       }).join('') + '</row>'; r++;
     });
     const lastData = r - 1;
-    if (hasFoot) { xml += `<row r="${r}" ht="24" customHeight="1">` + Array.from({ length: nCols }, (_, c) => cell(sh.foot[c], colName(c) + r, center[c] ? ST.totC : ST.tot)).join('') + '</row>'; r++; }
+    if (hasFoot) { xml += `<row r="${r}" ht="26" customHeight="1">` + Array.from({ length: nCols }, (_, c) => { const fv = sh.foot[c], f = fv && typeof fv === 'object' ? fv.f : null; return cell(fv, colName(c) + r, f === 'pct' || f === 'hrs' ? ST[f + 'Tot'] : center[c] ? ST.totC : ST.tot); }).join('') + '</row>'; r++; }
+    const scaleCols = [].concat(sh.scale == null ? [] : sh.scale);
+    const cf = data.length ? scaleCols.map((c, k) => `<conditionalFormatting sqref="${colName(c)}${hr + 1}:${colName(c)}${lastData}"><cfRule type="colorScale" priority="${k + 1}"><colorScale><cfvo type="num" val="${sh.scaleMin == null ? 0 : sh.scaleMin}"/><cfvo type="num" val="${sh.scaleMid == null ? 60 : sh.scaleMid}"/><cfvo type="num" val="${sh.scaleMax == null ? 100 : sh.scaleMax}"/><color rgb="FFF6B7B0"/><color rgb="FFFBE7A6"/><color rgb="FF9FD9B6"/></colorScale></cfRule></conditionalFormatting>`).join('') : '';
     const merges = `<mergeCells count="2"><mergeCell ref="A1:${last}1"/><mergeCell ref="A2:${last}2"/></mergeCells>`;
     const filter = data.length ? `<autoFilter ref="A${hr}:${last}${lastData}"/>` : '';
     const pane = `<pane ySplit="${hr}" topLeftCell="A${hr + 1}" activePane="bottomLeft" state="frozen"/>`;
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" rightToLeft="1" showGridLines="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${cols}</cols><sheetData>${xml}</sheetData>${filter}${merges}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><headerFooter><oddFooter>&amp;Cصفحة &amp;P من &amp;N</oddFooter></headerFooter></worksheet>`;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr>${sh.tab ? `<tabColor rgb="${sh.tab}"/>` : ''}<pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" rightToLeft="1" showGridLines="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${cols}</cols><sheetData>${xml}</sheetData>${filter}${merges}${cf}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><headerFooter><oddFooter>&amp;Cصفحة &amp;P من &amp;N</oddFooter></headerFooter></worksheet>`;
   }
   const STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-    + '<fonts count="7">'
+    + '<numFmts count="2"><numFmt numFmtId="164" formatCode="0&quot;%&quot;"/><numFmt numFmtId="165" formatCode="0.0"/></numFmts>'
+    + '<fonts count="9">'
     + '<font><sz val="11"/><color rgb="FF1B2B2E"/><name val="Arial"/></font>'                                   // 0 عادي
     + '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'                              // 1 رأس
     + '<font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'                              // 2 عنوان
@@ -52,16 +63,20 @@
     + '<font><b/><sz val="11"/><color rgb="FFC0392B"/><name val="Arial"/></font>'                              // 4 متأخر أحمر
     + '<font><b/><sz val="11"/><color rgb="FF12413A"/><name val="Arial"/></font>'                              // 5 إجمالي
     + '<font><sz val="11"/><color rgb="FF1B2B2E"/><name val="Arial"/></font>'
+    + '<font><b/><sz val="11"/><color rgb="FF0F5F73"/><name val="Arial"/></font>'   // 7 PEF
+    + '<font><b/><sz val="11"/><color rgb="FF9A5B00"/><name val="Arial"/></font>'   // 8 HHO
     + '</fonts>'
-    + '<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
+    + '<fills count="9"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
     + '<fill><patternFill patternType="solid"><fgColor rgb="FF1D5A4B"/><bgColor indexed="64"/></patternFill></fill>'   // 2 رأس
     + '<fill><patternFill patternType="solid"><fgColor rgb="FFF3F8F6"/><bgColor indexed="64"/></patternFill></fill>'   // 3 تظليل
     + '<fill><patternFill patternType="solid"><fgColor rgb="FFFDECEA"/><bgColor indexed="64"/></patternFill></fill>'   // 4 متأخر
     + '<fill><patternFill patternType="solid"><fgColor rgb="FF0F3D33"/><bgColor indexed="64"/></patternFill></fill>'   // 5 عنوان
-    + '<fill><patternFill patternType="solid"><fgColor rgb="FFDCEBE5"/><bgColor indexed="64"/></patternFill></fill></fills>' // 6 إجمالي
+    + '<fill><patternFill patternType="solid"><fgColor rgb="FFDCEBE5"/><bgColor indexed="64"/></patternFill></fill>'
+    + '<fill><patternFill patternType="solid"><fgColor rgb="FFE3F1F5"/><bgColor indexed="64"/></patternFill></fill>'   // 7 PEF
+    + '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF1DC"/><bgColor indexed="64"/></patternFill></fill></fills>'   // 8 HHO // 6 إجمالي
     + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFCFDBD8"/></left><right style="thin"><color rgb="FFCFDBD8"/></right><top style="thin"><color rgb="FFCFDBD8"/></top><bottom style="thin"><color rgb="FFCFDBD8"/></bottom><diagonal/></border></borders>'
     + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    + '<cellXfs count="12">'
+    + '<cellXfs count="22">'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'                                                                                                                                  // 0
     + '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'   // 1 رأس
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>'                  // 2 جسم
@@ -74,6 +89,16 @@
     + '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'                                          // 9 فرعي
     + '<xf numFmtId="0" fontId="5" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'            // 10 إجمالي
     + '<xf numFmtId="0" fontId="5" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'            // 11 إجمالي وسط
+    + '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="164" fontId="5" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="165" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="165" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="165" fontId="5" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="7" fillId="7" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="8" fillId="8" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
     + '</cellXfs></styleSheet>';
 
   function zip(files) {   // files = [{name, data:Uint8Array}] — تخزين بلا ضغط
@@ -93,11 +118,14 @@
     return out;
   }
 
-  function build(sheets) {
+  function build(sheets, meta) {
     const used = new Set(), names = sheets.map((s) => safeName(s.name, used)), F = [];
     const T = (n, x) => F.push({ name: n, data: enc.encode(x) });
-    T('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>');
-    T('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    T('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>');
+    const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+    T('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc((meta && meta.title) || 'تقرير الموارد البشرية')}</dc:title><dc:creator>${esc((meta && meta.author) || 'تطبيق الموارد البشرية')}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created></cp:coreProperties>`);
+    T('docProps/app.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application></Properties>');
+    T('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>');
     const dn = sheets.map((sh, i) => { const nc = Math.max(1, ...(sh.rows || []).map((r) => r.length), (sh.foot || []).length), last = colName(nc - 1), nd = Math.max(0, (sh.rows || []).length - 1), q = "'" + names[i].replace(/'/g, "''") + "'";
       return `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${esc(q)}!$3:$3</definedName>` + (nd ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${esc(q)}!$A$3:$${last}$${3 + nd}</definedName>` : ''); }).join('');
     T('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + names.map((n, i) => `<sheet name="${esc(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets><definedNames>' + dn + '</definedNames></workbook>');
