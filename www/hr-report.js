@@ -131,8 +131,10 @@
     const rep = HR.dayReport(ds), ok = (e) => !opt.filter || opt.filter(e);
     const rows = rep.rows.filter((r) => ok(r.e));
     const c = { total: rows.length, present: 0, late: 0, leave: 0, mission: 0, hwork: 0, unreg: 0, off: 0 };
-    const bands = {}, late = [], unreg = [], att = [], exList = [];
+    const bands = {}, late = [], unreg = [], att = [], exList = [], depts = {};
     rows.forEach((r) => {
+      const dk = (r.e.org || '—') + '|' + (r.e.dept || 'بلا قسم'), Dp = depts[dk] = depts[dk] || { org: r.e.org || '—', dept: r.e.dept || 'بلا قسم', total: 0, present: 0, late: 0, leave: 0, mission: 0, unreg: 0, off: 0, hwork: 0 };
+      Dp.total++;
       const band = (opt.band && opt.band(r.e)) || r.e.org || '—';
       const B = bands[band] = bands[band] || { name: band, total: 0, present: 0, late: 0, leave: 0, unreg: 0 };
       const other = (r.reqs || []).filter((q) => q.kind !== 'daily');          // مهمة/مغادرة/عمل إضافي…
@@ -142,6 +144,7 @@
         att.push({ name: r.e.name, org: r.e.org, band, in: r.firstIn ? tmf.format(new Date(r.firstIn)) : '', out: lo ? tmf.format(new Date(r.lastOut)) : '', place: opt.placeName ? opt.placeName(pl) : (pl.name || ''), late: r.status === 'late' ? r.lateMin : 0 });
       }
       B.total++;
+      Dp[r.status === 'late' ? 'late' : r.status === 'present' || r.status === 'noin' ? 'present' : r.status === 'leave' ? 'leave' : r.status === 'off' ? 'off' : r.status === 'hwork' ? 'hwork' : (r.status === 'absent' && other.length ? 'mission' : 'unreg')]++;
       if (r.status === 'late') { c.late++; B.late++; late.push({ name: r.e.name, min: r.lateMin || 0, at: r.firstIn, org: r.e.org }); }
       else if (r.status === 'present' || r.status === 'noin') { c.present++; B.present++; }
       else if (r.status === 'hwork') { c.hwork++; }
@@ -157,7 +160,7 @@
     return {
       ds, synced: rep.synced, weekend: !!rep.weekend, group: opt.group || '', syncedAt: opt.syncedAt || null, c,
       rate: expected > 0 ? Math.round(here * 100 / expected) : null,
-      bands: Object.values(bands).sort((a, b) => b.total - a.total),
+      bands: Object.values(bands).sort((a, b) => b.total - a.total), depts: Object.values(depts),
       late: late.sort((a, b) => b.min - a.min), unreg: unreg.sort((a, b) => a.name.localeCompare(b.name, 'ar')),
       att: att.sort((a, b) => a.name.localeCompare(b.name, 'ar')), exList: (opt.exList || [])
     };
@@ -421,6 +424,46 @@
   const toB64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 
 
+
+  /* ---------- ساعات الدوام الأسبوعية (الأسبوع الحالي والسابق) ---------- */
+  const DAYN = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const weekStartOf = (ds) => addDays(ds, -Tracker.dowOf(ds));   // بداية الأسبوع: الأحد
+  // opt = { filter(e), band(e), exclude:Set } ← { from, to, days:[{ds,weekend,synced,future}], rows:[{name,org,dept,hours:[..],total,workDays,expected,rate}] }
+  function weekHours(kind, opt) {
+    opt = opt || {};
+    const t = dayStr(), cur = weekStartOf(t), from = kind === 'prev' ? addDays(cur, -7) : cur, to = addDays(from, 6), cfg = HR.settings(), dh = (cfg.dayHours || 8) * 60;
+    const ex = opt.exclude || new Set(), ok = (e) => !ex.has(String(e.id)) && (!opt.filter || opt.filter(e));
+    const days = [], emps = {};
+    for (let i = 0; i < 7; i++) {
+      const ds = addDays(from, i), rep = HR.dayReport(ds), future = ds > t;
+      days.push({ ds, weekend: !!rep.weekend, synced: !!rep.synced, future });
+      if (!rep.synced) continue;
+      rep.rows.forEach((r) => {
+        if (!ok(r.e)) return;
+        const E = emps[r.e.id] = emps[r.e.id] || { e: r.e, min: Array(7).fill(null), exp: 0, wd: 0 };
+        E.min[i] = r.workMin || 0;
+        if (!rep.weekend && r.status !== 'leave' && r.status !== 'off' && r.status !== 'exempt') E.exp += dh;
+        if (r.workMin) E.wd++;
+      });
+    }
+    const rows = Object.values(emps).map((E) => {
+      const tot = E.min.reduce((a, m) => a + (m || 0), 0);
+      return { name: E.e.name, org: E.e.org, dept: E.e.dept || '', band: opt.band ? opt.band(E.e) : E.e.org, hours: E.min.map((m) => (m == null ? null : Math.round(m / 6) / 10)), total: Math.round(tot / 6) / 10, workDays: E.wd, expected: Math.round(E.exp / 6) / 10, rate: E.exp ? Math.round(tot * 100 / E.exp) : null };
+    }).sort((a, b) => a.org.localeCompare(b.org) || a.name.localeCompare(b.name, 'ar'));
+    return { kind, from, to, days, rows, unsynced: days.filter((d) => !d.synced && !d.weekend && !d.future).length };
+  }
+  function sheetsWeekHours(W, opt) {
+    opt = opt || {}; const label = W.kind === 'prev' ? 'الأسبوع السابق' : 'الأسبوع الحالي', pre = opt.pre ? opt.pre + ' - ' : '';
+    const sub = `${fmtD(W.from)} ← ${fmtD(W.to)}${W.unsynced ? '  ·  ' + W.unsynced + ' يوم غير مزامن' : ''}  ·  الساعات بالتقريب لأقرب 0.1`;
+    const head = ['#', 'الاسم', 'السلم', 'القسم'].concat(W.days.map((d, i) => DAYN[Tracker.dowOf(d.ds)] + '\n' + d.ds.slice(5).replace('-', '/'))).concat(['أيام الحضور', 'إجمالي الساعات', 'الساعات المتوقعة', 'نسبة الإنجاز']);
+    const rows = [head].concat(W.rows.map((r, i) => [i + 1, r.name, r.org, r.dept].concat(r.hours.map((h, k) => (h == null ? (W.days[k].weekend ? '—' : '') : { v: h, f: 'hrs' }))).concat([r.workDays, { v: r.total, f: 'hrs' }, { v: r.expected, f: 'hrs' }, r.rate == null ? '' : { v: r.rate, f: 'pct' }])));
+    const sumCol = (k) => Math.round(W.rows.reduce((a, r) => a + (r.hours[k] || 0), 0) * 10) / 10;
+    const tot = Math.round(W.rows.reduce((a, r) => a + r.total, 0) * 10) / 10, exp = Math.round(W.rows.reduce((a, r) => a + r.expected, 0) * 10) / 10;
+    const foot = ['', `الإجمالي: ${W.rows.length} موظف`, '', ''].concat(W.days.map((d, k) => ({ v: sumCol(k), f: 'hrs' }))).concat([W.rows.reduce((a, r) => a + r.workDays, 0), { v: tot, f: 'hrs' }, { v: exp, f: 'hrs' }, exp ? { v: Math.round(tot * 100 / exp), f: 'pct' } : '']);
+    const nd = 4 + 7;   // أعمدة قبل «أيام الحضور»
+    return { name: pre + 'ساعات ' + label, title: `ساعات الدوام — ${label}`, subtitle: sub, tab: W.kind === 'prev' ? 'FF6B7B8C' : 'FF1D5A4B', widths: [6, 36, 9, 24].concat(W.days.map(() => 11)).concat([11, 14, 14, 13]), rows, foot, scale: nd + 3, scaleMin: 0, scaleMid: 60, scaleMax: 100 };
+  }
+
   /* ---------- تصدير Excel: أوراق جاهزة لكل تقرير ---------- */
   function sheetsDetail(D, pre) {
     const P = pre ? pre + ' - ' : '', n = (i) => i + 1;
@@ -438,13 +481,30 @@
       { name: P + 'المستثنون', title: T('مستثنون من تسجيل الحضور'), subtitle: sub, widths: [6, 38, 10, 30], rows: [['#', 'الاسم (مستثنى من تسجيل الحضور)', 'السلم', 'القسم']].concat((D.exList || []).map((x, i) => [n(i), x.name, x.org || D.org, x.dept])), foot: ['', `الإجمالي: ${(D.exList || []).length}`, '', ''] }
     ];
   }
+
+  // ورقة «حسب السلم»: نوع السلم (PEF/HHO) ثم أقسامه مع نسبة الحضور لكل قسم، وصف إجمالي لكل سلم
+  function bySheet(D, sub, T) {
+    const rate = (g) => { const exp = g.total - g.off - g.hwork; return exp > 0 ? Math.round((g.present + g.late) * 100 / exp) : null; };
+    const orgs = ['PEF', 'HHO'].filter((o) => D.depts.some((d) => d.org === o)).concat([...new Set(D.depts.map((d) => d.org))].filter((o) => o !== 'PEF' && o !== 'HHO'));
+    const rows = [['السلم', 'القسم', 'الموظفون', 'حاضر', 'متأخر', 'إجازة', 'مهام/طلبات', 'بلا تسجيل', 'نسبة الحضور']], rowSt = [];
+    const sum = (l) => l.reduce((a, d) => ({ total: a.total + d.total, present: a.present + d.present, late: a.late + d.late, leave: a.leave + d.leave, mission: a.mission + d.mission, unreg: a.unreg + d.unreg, off: a.off + d.off, hwork: a.hwork + d.hwork }), { total: 0, present: 0, late: 0, leave: 0, mission: 0, unreg: 0, off: 0, hwork: 0 });
+    const line = (org, dept, g) => [org, dept, g.total, g.present + g.late, g.late, g.leave, g.mission, g.unreg, rate(g) == null ? '' : { v: rate(g), f: 'pct' }];
+    orgs.forEach((o) => {
+      const l = D.depts.filter((d) => d.org === o).sort((a, b) => b.total - a.total || a.dept.localeCompare(b.dept, 'ar'));
+      rows.push(line(o, 'إجمالي ' + o, sum(l))); rowSt.push('sub');
+      l.forEach((d) => { rows.push(line(o, d.dept, d)); rowSt.push(d.late > 0 ? 'late' : null); });
+    });
+    const all = sum(D.depts);
+    return { name: 'حسب السلم', title: T('نوع السلم والأقسام ونسبة الحضور'), subtitle: sub + '  ·  الصفوف الحمراء = أقسام فيها متأخرون', tab: 'FF0F5F73', widths: [10, 40, 12, 12, 12, 12, 14, 14, 14], rows, rowSt, foot: ['الكل', 'إجمالي كل الأقسام', all.total, all.present + all.late, all.late, all.leave, all.mission, all.unreg, rate(all) == null ? '' : { v: rate(all), f: 'pct' }], scale: 8 };
+  }
+
   function sheetsSummary(D) {
     const c = D.c, sub = `${dfull.format(noon(D.ds))}${D.syncedAt ? '  ·  بيانات حتى ' + tmf.format(new Date(D.syncedAt)) : ''}`, subLate = sub + '  ·  الصفوف الحمراء = متأخرون';
     const T = (sec) => `حالة الدوام اليومية · ${sec}`;
     const lateN = (D.att || []).filter((x) => x.late > 0).length;
     return [
       { name: 'ملخص اليوم', title: T('ملخص'), subtitle: sub, widths: [30, 34], rows: [['البند', 'القيمة'], ['التاريخ', dfull.format(noon(D.ds))], ['بيانات حتى', D.syncedAt ? tmf.format(new Date(D.syncedAt)) : ''], ['نسبة الحضور %', D.rate == null ? '' : D.rate], ['الموظفون', c.total], ['حاضر', c.present], ['متأخر', c.late], ['إجازة', c.leave], ['مهام/طلبات', c.mission], ['بلا تسجيل', c.unreg], ['دوام في عطلة', c.hwork]], rowSt: [null, null, null, null, null, null, c.late ? 'late' : null] },
-      { name: 'حسب السلم', title: T('حسب السلم'), subtitle: sub, widths: [36, 12, 12, 12, 14, 14], rows: [['السلم', 'الإجمالي', 'حضور', 'متأخر', 'إجازة/مهام', 'بلا تسجيل']].concat(D.bands.map((b) => [b.name, b.total, b.present + b.late, b.late, b.leave, b.unreg])), rowSt: D.bands.map((b) => (b.late > 0 ? 'late' : null)), foot: ['الإجمالي', D.bands.reduce((a, b) => a + b.total, 0), D.bands.reduce((a, b) => a + b.present + b.late, 0), D.bands.reduce((a, b) => a + b.late, 0), D.bands.reduce((a, b) => a + b.leave, 0), D.bands.reduce((a, b) => a + b.unreg, 0)] },
+      bySheet(D, sub, T),
       { name: 'الحضور', title: T('الحضور'), subtitle: subLate, widths: [6, 38, 10, 16, 13, 13, 36, 11], rows: [['#', 'الاسم', 'السلم', 'تاريخ الحضور', 'الدخول', 'الخروج', 'الموقع', 'تأخر (د)']].concat((D.att || []).map((x, i) => [i + 1, x.name, x.org, D.ds, x.in, x.out, x.place, x.late || ''])), rowSt: (D.att || []).map((x) => (x.late > 0 ? 'late' : null)), foot: ['', `الإجمالي: ${(D.att || []).length} حاضر`, '', '', '', '', '', lateN ? `${lateN} متأخر` : ''] },
       { name: 'المتأخرون', title: T('كشف المتأخرين'), subtitle: subLate, widths: [6, 38, 10, 16, 14, 14], rows: [['#', 'الاسم', 'السلم', 'التاريخ', 'وقت الدخول', 'دقائق التأخر']].concat(D.late.map((x, i) => [i + 1, x.name, x.org || '', D.ds, x.at ? tmf.format(new Date(x.at)) : '', x.min])), rowSt: D.late.map(() => 'late'), foot: ['', `الإجمالي: ${D.late.length} متأخر`, '', '', '', D.late.reduce((a, x) => a + x.min, 0) + ' د'] },
       { name: 'بلا تسجيل', title: T('بلا تسجيل'), subtitle: sub, widths: [6, 38, 10, 30, 28], rows: [['#', 'الاسم', 'السلم', 'القسم', 'اسم السلم في العقد']].concat(D.unreg.map((x, i) => [i + 1, x.name, x.org || '', x.dept, x.band])), foot: ['', `الإجمالي: ${D.unreg.length}`, '', '', ''] },
@@ -465,7 +525,9 @@
       { name: 'المستثنون', title: T('مستثنون من تسجيل الحضور'), subtitle: sub, widths: [6, 38, 30, 10], rows: [['#', 'الاسم (مستثنى من تسجيل الحضور)', 'القسم', 'السلم']].concat((D.exList || []).map((x, i) => [i + 1, x.name, x.dept, x.org])), foot: ['', `الإجمالي: ${(D.exList || []).length}`, '', ''] }
     ];
   }
-  const xlsxOf = (sheets) => window.HRXlsx.build(sheets);
+  // ألوان لسان الأوراق بحسب نوعها
+  const TABS = [[/حضور|الحضور/, 'FF1D5A4B'], [/متأخر/, 'FFC0392B'], [/إجاز/, 'FF2A68AD'], [/مهام|مغادر/, 'FF7446A8'], [/بلا تسجيل/, 'FFB4690E'], [/مستثن/, 'FF6B7B8C'], [/ملخص|أسبوعي/, 'FF8F6B1C']];
+  const xlsxOf = (sheets, meta) => { sheets.forEach((sh) => { if (!sh.tab) { const t = TABS.find(([re]) => re.test(sh.name)); if (t) sh.tab = t[1]; } }); return window.HRXlsx.build(sheets, meta); };
 
-  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64, loadLetterhead, sheetsDetail, sheetsSummary, sheetsWeekly, xlsxOf };
+  window.HRReport = { range, build, toText, toCanvas, daily, dailyText, dailyCanvas, detail, detailPages, pdfOf, toB64, loadLetterhead, sheetsDetail, sheetsSummary, sheetsWeekly, weekHours, sheetsWeekHours, xlsxOf };
 })();
