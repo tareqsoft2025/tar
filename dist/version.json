@@ -1,6 +1,6 @@
 {
-  "versionCode": 88,
-  "versionName": "8.42",
-  "notes": "بطاقة اليوم في ملف الموظف وتعليم اليوم في شريط الحضور",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-88.apk"
+  "versionCode": 89,
+  "versionName": "8.43",
+  "notes": "تاريخ اليوم بالرقم في بطاقة اليوم، واسم اليوم ورقمه في شريط الأيام",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-89.apk"
 }

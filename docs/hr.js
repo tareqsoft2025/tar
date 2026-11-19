@@ -1968,15 +1968,15 @@
       const ds = addDays(today(), -i);
       const r = HR.events(ds) ? HR.dayReport(ds).rows.find((x) => x.e.id === id) : null;
       const st = r ? STATUS[r.status] : ['غير مزامن', 'none'];
-      cells.push(`<i class="${st[1]}${i === 0 ? ' tday' : ''}" data-day="${ds}" title="${fd(ds)}: ${st[0]}${r && r.firstIn ? ' ' + tf.format(new Date(r.firstIn)) : ''}"><small>${+ds.slice(8)}</small></i>`);
+      cells.push(`<i class="${st[1]}${i === 0 ? ' tday' : ''}" data-day="${ds}" title="${fd(ds)}: ${st[0]}${r && r.firstIn ? ' ' + tf.format(new Date(r.firstIn)) : ''}"><em class="cwd">${wdSh.format(noon(ds))}</em><small>${+ds.slice(8)}</small></i>`);
     }
     // بطاقة «اليوم»: حالة الدوام ووقت الدخول والخروج والموقع والطلبات
     const tdy = today(), trep = HR.dayReport(tdy), tr = trep.synced ? trep.rows.find((x) => x.e.id === id) : null;
     let tcard;
-    if (!tr) tcard = `<div class="hr-todayc"><div class="hr-todh"><b>اليوم</b><small>${esc(dLong.format(new Date()))}</small></div><div class="hr-none">حضور اليوم غير مزامَن بعد — اضغط زر المزامنة أعلى الشاشة</div></div>`;
+    if (!tr) tcard = `<div class="hr-todayc"><div class="hr-todh"><b>اليوم</b><small>${esc(wdS.format(noon(tdy)))} ${fd(tdy)}</small></div><div class="hr-none">حضور اليوم غير مزامَن بعد — اضغط زر المزامنة أعلى الشاشة</div></div>`;
     else {
       const stt = STATUS[tr.status] || ['—', 'mute'], fe = tr.list.find((x) => x.eventType === 'check_in') || tr.list[0], pl = fe ? HR.place(fe) : null;
-      tcard = `<div class="hr-todayc ${stt[1]}"><div class="hr-todh"><b>اليوم</b><small>${esc(dLong.format(new Date()))}${trep.weekend ? ' · عطلة' : ''}</small>${badge(stt[0] + (tr.status === 'late' ? ' +' + tr.lateMin + ' د' : ''), stt[1])}</div>
+      tcard = `<div class="hr-todayc ${stt[1]}"><div class="hr-todh"><b>اليوم</b><small>${esc(wdS.format(noon(tdy)))} · ${fd(tdy)}${trep.weekend ? ' · عطلة' : ''}</small>${badge(stt[0] + (tr.status === 'late' ? ' +' + tr.lateMin + ' د' : ''), stt[1])}</div>
         <div class="hr-dsum"><div><small>الدخول</small><b>${tr.firstIn ? tf.format(new Date(tr.firstIn)) : '—'}</b></div><div><small>الخروج</small><b>${tr.lastOut ? tf.format(new Date(tr.lastOut)) : tr.firstIn ? 'لم يخرج بعد' : '—'}</b></div><div><small>ساعات العمل</small><b>${tr.workMin ? hrs(tr.workMin) : '—'}${tr.live ? ' <em>مستمر</em>' : ''}</b></div><div><small>التأخير</small><b class="${tr.lateMin ? 'warn' : ''}">${tr.lateMin ? tr.lateMin + ' دقيقة' : 'لا يوجد'}</b></div></div>
         ${pl ? `<div class="hr-evp ${PLACE[pl.st][1]}">${icon('pin')}<span>${esc(plName(pl))}</span>${pl.st !== 'unknown' ? badge(PLACE[pl.st][0] + (pl.dist != null ? ' · ' + fmtDist(pl.dist) : ''), PLACE[pl.st][1]) : ''}</div>` : ''}
         ${tr.reqs.length || tr.leave ? `<div class="hr-flags">${tr.leave ? badge(leaveLbl(tr.leave), 'info') : ''}${tr.reqs.filter((q) => !(q.kind === 'daily' && tr.leave)).map(rqChip).join('')}</div>` : ''}
