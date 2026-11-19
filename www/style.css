@@ -1755,3 +1755,8 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-cal14 i.tday{outline:2px solid var(--gold,#d9b56b);outline-offset:2px;position:relative}
 .hr-cal14 i.tday::after{content:"اليوم";position:absolute;inset-inline:0;bottom:-15px;text-align:center;font-size:.6rem;font-style:normal;color:var(--gold,#d9b56b);font-weight:800}
 .hr-cal14{padding-bottom:14px}
+
+.hr-cal14 i{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.hr-cal14 i .cwd{font-style:normal;font-size:.58rem;opacity:.85;line-height:1;font-weight:600}
+.hr-cal14 i small{font-size:.95rem;line-height:1}
+.hr-cal14 i{font-style:normal!important}
