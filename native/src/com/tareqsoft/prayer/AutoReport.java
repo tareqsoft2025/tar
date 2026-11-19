@@ -98,6 +98,51 @@ public class AutoReport extends BroadcastReceiver {
             .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setOverrideDeadline(120000).build());
     }
 
+    // ===== قائمة المستلمين: واتساب يُفتح لكل رقم بالتتابع، وتضغط الخدمة «إرسال» ثم ننتقل للتالي =====
+    private static final java.util.ArrayDeque<String> QUEUE = new java.util.ArrayDeque<String>();
+    private static final android.os.Handler H = new android.os.Handler(android.os.Looper.getMainLooper());
+    private static Uri qUri; private static String qMime, qCap, qPkg, qInfo, qCur;
+    private static int qOk, qFail, qTotal;
+    private static Runnable watchdog;
+
+    static boolean queueActive() { return qCur != null; }
+
+    private static java.util.List<String> numbersOf(JSONObject o) {
+        java.util.ArrayList<String> l = new java.util.ArrayList<String>();
+        org.json.JSONArray a = o.optJSONArray("numbers");
+        if (a != null) for (int i = 0; i < a.length(); i++) { String d = a.optString(i, "").replaceAll("[^0-9]", ""); if (d.length() >= 8 && !l.contains(d)) l.add(d); }
+        String one = o.optString("number", "").replaceAll("[^0-9]", "");
+        if (l.isEmpty() && one.length() >= 8) l.add(one);
+        return l;
+    }
+
+    /** يفتح واتساب على المستلم التالي، أو يُنهي ويكتب الحالة. */
+    static void sendNext(final Context app) {
+        if (watchdog != null) { H.removeCallbacks(watchdog); watchdog = null; }
+        String n = QUEUE.poll();
+        if (n == null) {
+            qCur = null;
+            status(app, qOk > 0, qInfo + " — أُرسل إلى " + qOk + " من " + qTotal + (qFail > 0 ? " (تعذّر " + qFail + ": فعّل خدمة الإرسال والعرض فوق التطبيقات)" : ""));
+            return;
+        }
+        qCur = n;
+        Intent i = new Intent(Intent.ACTION_SEND).setPackage(qPkg).setType(qMime).putExtra(Intent.EXTRA_STREAM, qUri).putExtra(Intent.EXTRA_TEXT, qCap).putExtra("jid", n + "@s.whatsapp.net");
+        i.setClipData(android.content.ClipData.newRawUri("", qUri));
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        try { WaAutoService.arm(60000); app.startActivity(i); }
+        catch (Exception e) { qFail++; sendNext(app); return; }
+        final Context c = app;
+        watchdog = new Runnable() { public void run() { watchdog = null; if (!"sent".equals(WaAutoService.state)) qFail++; else qOk++; sendNext(c); } };
+        H.postDelayed(watchdog, 66000);
+    }
+
+    /** تستدعيه خدمة الإمكانية بعد الضغط على «إرسال». */
+    static void onSent(Context app) {
+        if (watchdog != null) { H.removeCallbacks(watchdog); watchdog = null; }
+        qOk++;
+        sendNext(app);
+    }
+
     /** يسلّم الملف: واتساب تلقائي إن أمكن، وإشعار للمشاركة اليدوية دائماً. */
     static void deliver(Context c, String b64, String name, String info) {
         Context app = c.getApplicationContext();
@@ -109,18 +154,18 @@ public class AutoReport extends BroadcastReceiver {
             FileOutputStream fo = new FileOutputStream(new File(dir, fn)); fo.write(data); fo.close();
             Uri u = Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
             String mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", cap = "كشف الدوام — " + fn.replaceAll("[^0-9-]", "").replaceAll("^-+|-+$", "");
-            String digits = o.optString("number", "").replaceAll("[^0-9]", "");
+            java.util.List<String> nums = numbersOf(o);
             boolean sentWa = false;
-            if (digits.length() >= 8) {
+            if (!nums.isEmpty()) {
                 String pkg = null;
                 String[] ps = { "com.whatsapp", "com.whatsapp.w4b" };
                 for (int i = 0; i < ps.length && pkg == null; i++) { try { app.getPackageManager().getPackageInfo(ps[i], 0); pkg = ps[i]; } catch (Exception e) { /* next */ } }
-                if (pkg != null) {
-                    Intent i = new Intent(Intent.ACTION_SEND).setPackage(pkg).setType(mime).putExtra(Intent.EXTRA_STREAM, u).putExtra(Intent.EXTRA_TEXT, cap).putExtra("jid", digits + "@s.whatsapp.net");
-                    i.setClipData(android.content.ClipData.newRawUri("", u));
-                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                    try { WaAutoService.arm(90000); app.startActivity(i); sentWa = true; msg += " وفُتح واتساب للإرسال"; } catch (Exception e) { msg += " (تعذّر فتح واتساب من الخلفية: فعّل «العرض فوق التطبيقات»)"; }
-                } else msg += " (واتساب غير مثبّت)";
+                if (pkg != null && qCur == null) {
+                    qUri = u; qMime = mime; qCap = cap; qPkg = pkg; qInfo = msg; qOk = 0; qFail = 0; qTotal = nums.size();
+                    QUEUE.clear(); QUEUE.addAll(nums);
+                    sentWa = true; msg += " وسيُرسل إلى " + nums.size() + " رقم بالتتابع";
+                    sendNext(app);
+                } else if (pkg == null) msg += " (واتساب غير مثبّت)";
             }
             // إشعار: مشاركة يدوية بنقرة (احتياط إن لم يُرسَل تلقائياً)
             Intent sh = new Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -133,7 +178,7 @@ public class AutoReport extends BroadcastReceiver {
             else nb = new Notification.Builder(app);
             nb.setContentTitle("تقرير الدوام جاهز").setContentText(sentWa ? "أُرسل إلى واتساب — اضغط للمشاركة يدوياً إن لزم" : "اضغط لمشاركة ملف Excel").setSmallIcon(R.drawable.ic_stat_digest).setContentIntent(pi).setAutoCancel(true);
             nm.notify(NOTIF_ID, nb.build());
-            status(app, true, msg);
+            if (!sentWa) status(app, true, msg);
         } catch (Exception e) { status(app, false, "تعذّر تسليم الملف: " + e.getMessage()); }
     }
 }

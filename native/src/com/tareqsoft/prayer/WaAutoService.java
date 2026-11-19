@@ -41,12 +41,28 @@ public class WaAutoService extends AccessibilityService {
         if (n != null && click(n)) {
             state = "sent"; armUntil = 0;
             h.postDelayed(new Runnable() { public void run() {
+                if (AutoReport.queueActive()) { AutoReport.onSent(getApplicationContext()); return; }   // التقرير اليومي: المستلم التالي
                 try { startActivity(new Intent(WaAutoService.this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)); } catch (Exception e) { /* ignore */ }
-            } }, 2200);
+            } }, 2500);
         }
     }
 
+    /** بحث شامل في الشجرة: عقدة معرّفها send أو وصفها «إرسال/Send» وقابلة للنقر (زر معاينة المستند والصور). */
+    private AccessibilityNodeInfo walk(AccessibilityNodeInfo n, int depth) {
+        if (n == null || depth > 30) return null;
+        try {
+            CharSequence id = n.getViewIdResourceName(), d = n.getContentDescription();
+            String ids = id == null ? "" : id.toString(), ds = d == null ? "" : d.toString().trim();
+            boolean hit = ids.endsWith(":id/send") || ds.equals("إرسال") || ds.equals("ارسال") || ds.equalsIgnoreCase("send");
+            if (hit && n.isVisibleToUser() && n.isEnabled()) return n;
+            for (int i = 0; i < n.getChildCount(); i++) { AccessibilityNodeInfo r = walk(n.getChild(i), depth + 1); if (r != null) return r; }
+        } catch (Exception e) { /* تابع */ }
+        return null;
+    }
+
     private AccessibilityNodeInfo findSend(AccessibilityNodeInfo root, String pkg) {
+        AccessibilityNodeInfo wk = walk(root, 0);
+        if (wk != null) return wk;
         try {
             List<AccessibilityNodeInfo> l = root.findAccessibilityNodeInfosByViewId(pkg + ":id/send");
             if (l != null) for (AccessibilityNodeInfo x : l) if (x.isEnabled() && x.isVisibleToUser()) return x;
@@ -67,10 +83,22 @@ public class WaAutoService extends AccessibilityService {
 
     private boolean click(AccessibilityNodeInfo n) {
         AccessibilityNodeInfo c = n;
-        for (int i = 0; i < 4 && c != null; i++) {
+        for (int i = 0; i < 5 && c != null; i++) {
             if (c.isClickable() && c.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true;
             c = c.getParent();
         }
+        // احتياطي: نقرة بالإحداثيات على منتصف الزر
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 24) {
+                android.graphics.Rect r = new android.graphics.Rect(); n.getBoundsInScreen(r);
+                if (r.width() > 0 && r.height() > 0) {
+                    android.graphics.Path path = new android.graphics.Path(); path.moveTo(r.exactCenterX(), r.exactCenterY());
+                    android.accessibilityservice.GestureDescription.Builder b = new android.accessibilityservice.GestureDescription.Builder();
+                    b.addStroke(new android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 80));
+                    return dispatchGesture(b.build(), null, null);
+                }
+            }
+        } catch (Exception e) { /* ignore */ }
         return false;
     }
 
