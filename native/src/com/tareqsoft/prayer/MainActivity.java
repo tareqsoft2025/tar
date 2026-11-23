@@ -731,6 +731,34 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String autoReportGet() { return AutoReport.get(MainActivity.this); }
         @JavascriptInterface public void autoReportSet(String json) { AutoReport.save(MainActivity.this, json); }
         @JavascriptInterface public void autoReportRunNow() { AutoReport.run(MainActivity.this); }
+        /** إعدادات البريد (SMTP) — كلمة المرور تُحفظ مشفّرة ولا تعود للواجهة. */
+        @JavascriptInterface public String mailGet() { return MailSender.get(MainActivity.this); }
+        @JavascriptInterface public void mailSet(String json) { MailSender.set(MainActivity.this, json); }
+        @JavascriptInterface public boolean mailEnabled() { return MailSender.enabled(MainActivity.this); }
+        /** يرسل ملفاً بالبريد في الخلفية؛ النتيجة تصل إلى window.onMailResult(id, ok, msg). */
+        @JavascriptInterface public void mailSendFile(final String id, final String b64, final String name, final String subject, final String body) {
+            new Thread(new Runnable() { public void run() {
+                String err;
+                try { err = MailSender.send(MainActivity.this, subject, body, name.replaceAll("[^A-Za-z0-9._-]", "_"), android.util.Base64.decode(b64, android.util.Base64.DEFAULT)); }
+                catch (Exception e) { err = e.getMessage(); }
+                js("window.onMailResult&&window.onMailResult(" + org.json.JSONObject.quote(id) + "," + (err == null) + "," + org.json.JSONObject.quote(err == null ? "" : err) + ")");
+            } }).start();
+        }
+        /** احتياطي بلا إعدادات SMTP: يفتح تطبيق البريد والمرفق والموضوع والنص والمستلمون جاهزة. */
+        @JavascriptInterface public void mailIntent(final String b64, final String name, final String subject, final String body, final String toCsv) {
+            try {
+                byte[] data = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                java.io.File dir = new java.io.File(getCacheDir(), "share"); dir.mkdirs();
+                String fn = name.replaceAll("[^A-Za-z0-9._-]", "_");
+                java.io.FileOutputStream o = new java.io.FileOutputStream(new java.io.File(dir, fn)); o.write(data); o.close();
+                final android.net.Uri u = android.net.Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
+                final Intent i = new Intent(Intent.ACTION_SEND).setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                i.putExtra(Intent.EXTRA_STREAM, u).putExtra(Intent.EXTRA_SUBJECT, subject).putExtra(Intent.EXTRA_TEXT, body);
+                if (toCsv != null && !toCsv.isEmpty()) i.putExtra(Intent.EXTRA_EMAIL, toCsv.split(","));
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                runOnUiThread(new Runnable() { public void run() { startActivity(Intent.createChooser(i, "إرسال بالبريد")); } });
+            } catch (Exception e) { js("window.toast && window.toast('تعذّر فتح البريد')"); }
+        }
         @JavascriptInterface public boolean autoReportSendPrepared() { return AutoReport.sendPrepared(MainActivity.this); }
 
         @JavascriptInterface

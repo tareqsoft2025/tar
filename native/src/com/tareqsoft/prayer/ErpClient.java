@@ -247,6 +247,24 @@ final class ErpClient {
         } catch (Exception e) { return null; }
     }
 
+    /** تشفير/فك نص بمفتاح مخزن أندرويد (لكلمة مرور البريد). الصيغة: iv:cipher بـ Base64. */
+    static String encText(String t) {
+        try {
+            javax.crypto.Cipher ci = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            ci.init(javax.crypto.Cipher.ENCRYPT_MODE, key());
+            byte[] enc = ci.doFinal(t.getBytes("UTF-8"));
+            return android.util.Base64.encodeToString(ci.getIV(), android.util.Base64.NO_WRAP) + ":" + android.util.Base64.encodeToString(enc, android.util.Base64.NO_WRAP);
+        } catch (Exception e) { return ""; }
+    }
+    static String decText(String v) {
+        try {
+            int i = v.indexOf(':'); if (i < 0) return "";
+            javax.crypto.Cipher ci = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            ci.init(javax.crypto.Cipher.DECRYPT_MODE, key(), new javax.crypto.spec.GCMParameterSpec(128, android.util.Base64.decode(v.substring(0, i), android.util.Base64.NO_WRAP)));
+            return new String(ci.doFinal(android.util.Base64.decode(v.substring(i + 1), android.util.Base64.NO_WRAP)), "UTF-8");
+        } catch (Exception e) { return ""; }
+    }
+
     static boolean hasCreds(Context c) { return sp(c).contains("cr"); }
 
     static void forgetCreds(Context c) { sp(c).edit().remove("cr").remove("iv").apply(); }
