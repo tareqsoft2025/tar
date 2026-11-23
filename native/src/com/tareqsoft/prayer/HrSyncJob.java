@@ -35,6 +35,7 @@ public class HrSyncJob extends JobService {
 
     @Override
     public boolean onStartJob(final JobParameters params) {
+        if (ErpClient.paused(this)) return false;
         if (!ErpClient.hasSession(this) && !ErpClient.hasCreds(this)) return false;
         h.post(new Runnable() { public void run() {
             final Runnable finish = new Runnable() {
@@ -43,6 +44,7 @@ public class HrSyncJob extends JobService {
                     if (done) return; done = true;
                     try { if (web != null) web.destroy(); } catch (Exception e) { /* ignore */ }
                     web = null;
+                    new Thread(new Runnable() { public void run() { ErpClient.releaseIfIdle(getApplicationContext()); } }).start();
                     jobFinished(params, false);
                 }
             };

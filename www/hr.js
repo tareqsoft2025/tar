@@ -44,12 +44,18 @@
   function render() {
     const box = $('hrBody'); box.innerHTML = '';
     $('hrSync').hidden = !HR.hasSession();
+    $('hrOut').hidden = !HR.hasSession();
     $('hrBell').hidden = !HR.hasSession();
     updateBell();
     if (!HR.hasSession()) { renderLogin(box); return; }
     const meta = HR.meta();
     const acc = el('div', 'hr-acc', `<span class="hr-av">${icon('users')}</span><div><b>نظام PEF</b><small id="hrSyncTxt">${meta.lastSync ? 'آخر مزامنة ' + ago(meta.lastSync) : 'لم تتم المزامنة بعد'}</small><small id="hrLive" class="hr-live"></small></div><div class="hr-prog" id="hrProg" hidden><i></i></div>`);
     box.appendChild(acc);
+    if (HR.paused()) {
+      const pu = HR.pausedUntil(), pb = el('div', 'hr-warnbox hr3-paused', `${icon('unlock')}<span>تم تحرير الحساب — الربط في الخلفية متوقف${pu ? ' حتى ' + new Intl.DateTimeFormat('ar-PS-u-nu-latn', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: Core.TZ }).format(new Date(pu)) : ''}. يمكنك الدخول للنظام من المتصفح الآن.</span><button type="button" class="btn-gold">استئناف الربط</button>`);
+      pb.querySelector('button').onclick = () => { HR.resume(); toast('تم استئناف الربط'); render(); doSync(); };
+      box.appendChild(pb);
+    }
     // خمسة أقسام ثابتة، وتحتها شرائح فرعية لقسم التقارير
     const secOf = () => tab === 'dash' ? 'today' : tab === 'act' ? 'act' : tab === 'emp' ? 'team' : (tab === 'set' || tab === 'rev') ? 'more' : (tab === 'lv' && f.lv === 'req') ? 'req' : 'rep';
     const pend = pendingReqs().length;
@@ -114,7 +120,7 @@
       if (!r.ok) { err.textContent = HR.errText(r); err.hidden = false; return; }
       localStorage.setItem('hrUser', u);
       if (!B) localStorage.setItem('hrWebSession', '1');
-      toast('تم ربط حسابك بنجاح');
+      HR.resume(); toast('تم ربط حسابك بنجاح');
       tab = 'dash'; render(); applyBg(); doSync();
     };
   }
@@ -141,6 +147,7 @@
   }
   async function doSync(silent) {
     if (HR.isSyncing()) return;
+    HR.resume();   // مزامنة يطلبها المستخدم تنهي وضع «تحرير الحساب»
     silent = silent === true;
     const btn = $('hrSync'); btn.classList.add('spin');
     const prog = () => $('hrProg'), txt = () => $('hrSyncTxt');
@@ -2002,6 +2009,14 @@
       const now = Date.now();
       RemindUI.showAttendance($('remPop'), { events: [{ name: 'اسم الموظف التجريبي', dept: 'الإدارة', org: 'PEF', type: 'office', kind: 'in', ts: now, late: 12, st: 'matched', place: 'المكتب الرئيسي', dist: 35, work: 0, empId: '', ds: today() }] }, { view: () => {}, close: () => {} });
     };
+    // الجلسة: النظام يقبل جلسة واحدة
+    const ses = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('unlock')}الجلسة (النظام يقبل جلسة واحدة)</div>
+      <label class="ag-check hr-rem"><input id="ssIdle" type="checkbox"${HR.idleRelease() ? ' checked' : ''}> تحرير الحساب تلقائياً بعد دقيقتين من ترك التطبيق وبعد المزامنة الخلفية</label>
+      <small class="hr3-none">يتيح لك الدخول من المتصفح بلا تعارض. لا ينطبق عند تفعيل «المراقبة الحية للحضور» لأنها تُبقي الجلسة مفتوحة، ولا عند عدم حفظ بيانات الدخول.</small>
+      <button type="button" class="btn-outline wide" id="ssRel">${icon('unlock')}<span>تحرير الحساب الآن (للدخول من المتصفح)</span></button>`);
+    body.appendChild(ses);
+    $('ssIdle').onchange = (ev) => HR.setIdleRelease(ev.target.checked);
+    $('ssRel').onclick = openExit;
     // حساب الدخول
     const acc = el('div', 'group pad hr-set', `<div class="hr-sl">${icon('users')}الحساب</div>
       <div class="hr-srow"><span>رقم الهوية</span><b>${esc(localStorage.getItem('hrUser') || '—')}</b></div>
@@ -2572,6 +2587,20 @@
   let omDraw = null;
   if (window.OfflineMap) OfflineMap.onChange((st) => { if (omDraw) omDraw(st); });
   $('hrSync').onclick = () => doSync();
+  // الخروج من المنصة: النظام يقبل جلسة واحدة، فإمّا تحرير الحساب مؤقتاً وإما خروج كامل
+  function openExit() {
+    const cr = HR.hasCreds();
+    sheet(`<div class="hr-ph"><span class="hr-ava big warn">${icon('unlock')}</span><div><b>الخروج من المنصة</b><small>النظام يقبل جلسة واحدة فقط</small></div></div>
+      <p class="hr4-intro">إن كنت تريد الدخول لنظام PEF من المتصفح أو جهاز آخر فحرّر الحساب أولاً، وإلا يُرفض الدخول («الحساب مستخدم على جهاز آخر»).</p>
+      <div class="hr3-sec"><small>🔓 تحرير الحساب مؤقتاً — تبقى بياناتك محفوظة على الجوال ويتوقف الربط في الخلفية</small>
+        <div class="chips hr-fc">${[[30, '30 دقيقة'], [60, 'ساعة'], [180, '3 ساعات'], [0, 'حتى أستأنف']].map(([m, n]) => `<button type="button" class="chip sm" data-rel="${m}">${n}</button>`).join('')}</div>
+        ${cr ? '' : '<small class="hr3-none">لم تحفظ بيانات الدخول، فستحتاج لتسجيل الدخول من جديد عند الاستئناف.</small>'}</div>
+      <div class="hr3-sec"><small>🚪 خروج كامل — يحذف بيانات الدخول المحفوظة وبيانات الموارد البشرية من الجوال</small>
+        <button type="button" class="btn-outline wide" id="exFull">${icon('x')}<span>تسجيل الخروج الكامل</span></button></div>`);
+    $('hrSheetBody').querySelectorAll('[data-rel]').forEach((b) => { b.onclick = () => { HR.release(+b.dataset.rel); closeSheet(); toast('تم تحرير الحساب — ادخل من المتصفح الآن'); setTimeout(render, 400); }; });
+    $('exFull').onclick = () => { if (!confirm('سيتم حذف بيانات الدخول وكل بيانات الموارد البشرية من هذا الجوال. متابعة؟')) return; HR.logout(); closeSheet(); toast('تم تسجيل الخروج'); render(); };
+  }
+  $('hrOut').onclick = openExit;
   $('hrBell').onclick = () => { ntFilter = 'all'; openInbox(); };
   // المزامنة التلقائية: عند فتح القسم وأثناء استخدامه حسب الإعدادات، وفي الخلفية عبر أندرويد
   const due = () => { const s = HR.settings(); const m = HR.meta(); return HR.hasSession() && m.lastSync && s.auto !== 'off' && Date.now() - m.lastSync >= s.every * 60000; };

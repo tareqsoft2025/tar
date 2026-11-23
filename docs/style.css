@@ -1811,3 +1811,6 @@ html:has(#tab-times.active){overflow:hidden}
 .hr4-g{margin-bottom:14px}.hr4-intro{font-size:.82rem;color:var(--muted);line-height:1.7;margin:4px 2px 8px}
 .hr4-gr{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 13px;margin:7px 0}.hr4-gr b{font-size:.9rem}.hr4-gr p{margin:6px 0;font-size:.84rem;line-height:1.7}
 .hr2-n{font-size:.66rem}
+
+.hr3-paused{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hr3-paused .btn-gold{width:auto;padding:8px 16px;margin-inline-start:auto}
+.hr-outb svg{stroke:var(--gold)}

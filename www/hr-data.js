@@ -736,7 +736,14 @@
     hasCreds: () => !!(B && B.erpHasCreds && B.erpHasCreds()),
     forgetCreds: () => { if (B && B.erpForgetCreds) B.erpForgetCreds(); },
     setBackground: (min) => { if (B && B.hrSetBackground) B.hrSetBackground(min | 0); },
-    hasSession: () => B && B.erpSession ? B.erpSession() : !!localStorage.getItem('hrWebSession'),
+    hasSession: () => B && B.erpSession ? (B.erpSession() || !!(B.erpHasCreds && B.erpHasCreds())) : !!localStorage.getItem('hrWebSession'),
+    // النظام يقبل جلسة واحدة فقط: «تحرير الحساب» يُنهي جلسة التطبيق على الخادم (تبقى البيانات) ويوقف الربط في الخلفية
+    release(min) { if (B && B.erpRelease) B.erpRelease(min | 0); else { webCall('POST', '/api/auth/logout', {}); localStorage.removeItem('hrWebSession'); localStorage.setItem('hrPaused', String(min > 0 ? Date.now() + min * 60000 : 1)); } },
+    resume() { if (B && B.erpResume) B.erpResume(); else localStorage.removeItem('hrPaused'); },
+    paused() { if (B && B.erpPaused) return !!B.erpPaused(); const v = +localStorage.getItem('hrPaused') || 0; return v === 1 || v > Date.now(); },
+    pausedUntil() { if (B && B.erpPausedUntil) return +B.erpPausedUntil() || 0; const v = +localStorage.getItem('hrPaused') || 0; return v > 1 ? v : 0; },
+    idleRelease: () => !(B && B.erpIdleRelease) || !!B.erpIdleRelease(),
+    setIdleRelease: (on) => { if (B && B.erpSetIdleRelease) B.erpSetIdleRelease(!!on); },
     logout() { if (B && B.erpLogout) B.erpLogout(); else { webCall('POST', '/api/auth/logout', {}); localStorage.removeItem('hrWebSession'); } db.wipe(); localStorage.removeItem('hrUser'); },
     meta: () => db.get('meta', {}) };
 })();

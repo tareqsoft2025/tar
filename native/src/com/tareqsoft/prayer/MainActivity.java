@@ -140,6 +140,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         visible = true;
+        SessionRelease.cancel(getApplicationContext());
         if (web != null) checkUpdate();
         maybeSendTest();
         poll.removeCallbacks(pollTick);
@@ -150,6 +151,7 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         visible = false;
+        if (ErpClient.idleRelease(this) && ErpClient.hasSession(this)) SessionRelease.arm(getApplicationContext(), 120_000L);
         poll.removeCallbacks(pollTick);
     }
 
@@ -505,6 +507,16 @@ public class MainActivity extends Activity {
         public void erpLogout() {
             new Thread(new Runnable() { public void run() { ErpClient.logout(MainActivity.this); } }).start();
         }
+
+        /** تحرير الحساب: إنهاء جلسة التطبيق على الخادم وإيقاف الربط في الخلفية (minutes=0 حتى الاستئناف). */
+        @JavascriptInterface public void erpRelease(final int minutes) {
+            new Thread(new Runnable() { public void run() { ErpClient.release(MainActivity.this); ErpClient.pause(MainActivity.this, minutes); } }).start();
+        }
+        @JavascriptInterface public void erpResume() { ErpClient.resume(MainActivity.this); }
+        @JavascriptInterface public boolean erpPaused() { return ErpClient.paused(MainActivity.this); }
+        @JavascriptInterface public double erpPausedUntil() { return ErpClient.pausedUntil(MainActivity.this); }
+        @JavascriptInterface public boolean erpIdleRelease() { return ErpClient.idleRelease(MainActivity.this); }
+        @JavascriptInterface public void erpSetIdleRelease(boolean on) { ErpClient.setIdleRelease(MainActivity.this, on); }
 
         @JavascriptInterface
         public boolean erpSession() { return ErpClient.hasSession(MainActivity.this); }
