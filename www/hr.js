@@ -514,6 +514,56 @@
   }
 
 
+
+  /* ---------- مركز تصدير Excel اليدوي: نطاق + يوم + أوراق مخصّصة + قوالب جاهزة ---------- */
+  const XL_PRESETS = [['all', 'الكل', null], ['att', 'الحضور والمتأخرون', ['att', 'late', 'unreg', 'excl']], ['lv', 'الإجازات والمهام', ['leave', 'mis', 'rqT', 'rqM']], ['lm', 'التأخر الشهري', ['lm']], ['wk', 'ساعات الأسبوعين', ['wkC', 'wkP']]];
+  const xlAll = () => HRReport.SHEET_KEYS.map((x) => x[0]);
+  // قائمة أوراق بمربعات اختيار مع «الكل/لا شيء» والقوالب؛ onChange يُستدعى بعد كل تغيير
+  function sheetPicker(host, sel, onChange) {
+    const draw = () => {
+      host.innerHTML = `<div class="chips hr-fc">${XL_PRESETS.map(([id, n]) => `<button type="button" class="chip sm" data-pr="${id}">${n}</button>`).join('')}<button type="button" class="chip sm" data-pr="none">لا شيء</button></div>
+        <div class="hr3-ks">${HRReport.SHEET_KEYS.map(([v, n]) => `<label class="hr3-ck"><input type="checkbox" data-sk="${v}"${sel.includes(v) ? ' checked' : ''}><span>${n}</span></label>`).join('')}</div>`;
+      host.querySelectorAll('[data-sk]').forEach((c) => { c.onchange = () => { const i = sel.indexOf(c.dataset.sk); if (c.checked && i < 0) sel.push(c.dataset.sk); else if (!c.checked && i >= 0) sel.splice(i, 1); onChange(); }; });
+      host.querySelectorAll('[data-pr]').forEach((b) => { b.onclick = () => { const pr = XL_PRESETS.find((x) => x[0] === b.dataset.pr); sel.length = 0; (b.dataset.pr === 'none' ? [] : (pr[2] || xlAll())).forEach((k) => sel.push(k)); draw(); onChange(); }; });
+    };
+    draw();
+  }
+  function openXlCenter(back) {
+    const st = Object.assign({ scope: 'both', day: 'today', date: '', ym: '', keys: null }, store.get('hrXlCenter', {}));
+    if (!Array.isArray(st.keys)) st.keys = (store.get('hrXlKeys', null) || xlAll()).slice();
+    st.keys = st.keys.filter((k) => xlAll().includes(k));
+    const mons = (() => { const t = today(), [y, m] = t.split('-').map(Number), o = []; for (let i = 0; i < 6; i++) { const ym = new Date(Date.UTC(y, m - 1 - i, 1)).toISOString().slice(0, 7); o.push([ym, HRReport.mName(ym) + (i === 0 ? ' — الحالي' : '')]); } return o; })();
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('chart')}</span><div><b>تصدير Excel</b><small>اختر الأوراق والنطاق ثم صدّر وشارك</small></div></div>
+      <div class="hr3-sec"><small>النطاق</small><div class="chips hr-fc">${[['both', 'PEF + HHO'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['all', 'الكل (ملخص)']].map(([v, n]) => `<button type="button" class="chip sm" data-xs="${v}">${n}</button>`).join('')}</div></div>
+      <div class="hr3-sec"><small>تاريخ الكشف</small><div class="chips hr-fc">${[['today', 'اليوم'], ['yesterday', 'أمس'], ['date', 'تاريخ محدد']].map(([v, n]) => `<button type="button" class="chip sm" data-xd="${v}">${n}</button>`).join('')}</div><input id="xcDate" type="date" class="hr-in" max="${today()}" value="${st.date || today()}"></div>
+      <div class="hr3-sec"><small>الأوراق (<b id="xcN"></b>)</small><div id="xcPick"></div></div>
+      <div class="hr3-sec"><label class="hr3-mon">شهر «التأخر الشهري»<select id="xcMon" class="hr-in">${mons.map(([v, n]) => `<option value="${v}"${v === st.ym ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label class="ag-check hr-rem"><input id="xcSync" type="checkbox" checked> مزامنة آخر البيانات قبل التصدير</label></div>
+      <div class="hr-gact"><button type="button" class="btn-primary" id="xcGo">📊 تصدير ومشاركة</button><button type="button" class="btn-outline" id="xcAuto">⏰ الإرسال التلقائي</button></div>
+      <small class="hr-pgn" id="xcMsg"></small>`);
+    const b = $('hrSheetBody'), save = () => { store.set('hrXlCenter', { scope: st.scope, day: st.day, date: st.date, ym: st.ym, keys: st.keys.slice() }); $('xcN').textContent = st.keys.length + ' من ' + xlAll().length; };
+    const mark = () => { b.querySelectorAll('[data-xs]').forEach((x) => x.classList.toggle('on', x.dataset.xs === st.scope)); b.querySelectorAll('[data-xd]').forEach((x) => x.classList.toggle('on', x.dataset.xd === st.day)); $('xcDate').hidden = st.day !== 'date'; };
+    b.querySelectorAll('[data-xs]').forEach((x) => { x.onclick = () => { st.scope = x.dataset.xs; mark(); save(); }; });
+    b.querySelectorAll('[data-xd]').forEach((x) => { x.onclick = () => { st.day = x.dataset.xd; mark(); save(); }; });
+    $('xcDate').onchange = () => { st.date = $('xcDate').value; save(); };
+    $('xcMon').onchange = () => { st.ym = $('xcMon').value; save(); };
+    sheetPicker($('xcPick'), st.keys, save); mark(); save();
+    $('xcAuto').onclick = () => openAutoReport(() => openXlCenter(back));
+    $('xcGo').onclick = async () => {
+      if (!st.keys.length) { toast('اختر ورقة واحدة على الأقل'); return; }
+      $('xcGo').disabled = true; $('xcMsg').textContent = 'جارٍ بناء الملف…';
+      try {
+        const cfg = { scope: st.scope, keys: st.keys.slice(), noSync: !$('xcSync').checked };
+        if (st.day === 'date' && st.date) cfg.date = st.date; else cfg.day = st.day;
+        const r = await HRAuto.build(cfg);
+        store.set('hrXlKeys', st.keys.slice());
+        shareBytes(r.u8, r.name, XLSX_MIME);
+        $('xcMsg').textContent = `تم: ${r.name} — ${r.sheets} ورقة`;
+      } catch (e) { $('xcMsg').textContent = 'تعذّر إنشاء الملف: ' + (e && e.message || e); toast('تعذّر إنشاء الملف'); }
+      $('xcGo').disabled = false;
+    };
+  }
+
   /* ---------- إرسال تلقائي يومي لملف Excel (يعمل والتطبيق مغلق) ---------- */
   function openAutoReport(back) {
     const Bx = window.AndroidBridge, has = !!(Bx && Bx.autoReportSet);
@@ -521,7 +571,7 @@
     let c = { on: false, h: 15, m: 0, days: [0, 1, 2, 3, 4], number: '', contacts: [], scope: 'both', day: 'today', mode: 'ask' };
     try { Object.assign(c, JSON.parse((has ? Bx.autoReportGet() : localStorage.getItem('hrAutoRep')) || '{}')); } catch (e) { /* افتراضي */ }
     if (!Array.isArray(c.contacts) || !c.contacts.length) c.contacts = (Array.isArray(c.numbers) ? c.numbers : (c.number ? [c.number] : [])).map((n) => ({ n: String(n), name: '' }));
-    const keys = (store.get('hrXlKeys', null) || HRReport.SHEET_KEYS.map((x) => x[0])).filter((k) => HRReport.SHEET_KEYS.some((x) => x[0] === k));
+    c.keys = (Array.isArray(c.keys) && c.keys.length ? c.keys : (store.get('hrXlKeys', null) || HRReport.SHEET_KEYS.map((x) => x[0]))).filter((k) => HRReport.SHEET_KEYS.some((x) => x[0] === k));
     const perm = (ok, t, act, id) => `<div class="hr3-perm ${ok ? 'ok' : 'no'}"><span>${ok ? '✓' : '!'} ${t}</span>${ok || !act ? '' : `<button type="button" id="${id}">${act}</button>`}</div>`;
     const draw = () => {
       const tm = String(c.h).padStart(2, '0') + ':' + String(c.m).padStart(2, '0');
@@ -540,7 +590,7 @@
           <small class="hr3-none">${c.mode === 'auto' ? 'يفتح واتساب ويرسل وحده — قد يمنعه النظام إن كانت الشاشة مقفلة.' : 'عند الموعد تظهر نافذة في منتصف الشاشة (حتى والتطبيق مغلق) فيها آخر تحديث وزر «إرسال»، فيُفتح واتساب ويُرسل الملف مع نص «مرفق التقرير اليومي» والتاريخ والساعة.'}</small></div>
         <div class="hr3-sec"><small>محتوى الملف</small><div class="chips hr-fc">${[['both', 'PEF + HHO'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['all', 'الكل (ملخص)']].map(([v, n]) => `<button type="button" class="chip sm${c.scope === v ? ' on' : ''}" data-sc="${v}">${n}</button>`).join('')}</div>
           <div class="chips hr-fc">${[['today', 'كشف اليوم'], ['yesterday', 'كشف أمس']].map(([v, n]) => `<button type="button" class="chip sm${c.day === v ? ' on' : ''}" data-dy="${v}">${n}</button>`).join('')}</div>
-          <small class="hr3-none">الأوراق المضمّنة: ${keys.length} من ${HRReport.SHEET_KEYS.length} (تُحدَّد من لوحة «التصدير» ← الأوراق التي تظهر في Excel)</small></div>
+          <small class="hr3-none">الأوراق المضمّنة في الملف التلقائي: <b>${c.keys.length}</b> من ${HRReport.SHEET_KEYS.length}</small><div id="arPick"></div></div>
         <div class="hr3-sec"><small>الصلاحيات المطلوبة</small>
           ${perm(waOn, 'خدمة الإرسال التلقائي (إمكانية الوصول)', 'تفعيل', 'arWa')}${perm(ovOn, 'العرض فوق التطبيقات (لفتح واتساب والتطبيق مغلق)', 'السماح', 'arOv')}${perm(exOn, 'المنبّهات الدقيقة (ليبدأ في الدقيقة المحددة)', '', '')}</div>
         ${c.lastAt ? `<div class="hr3-last ${c.lastOk ? 'ok' : 'no'}">آخر تشغيل: ${esc(new Intl.DateTimeFormat('ar-PS-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: Core.TZ }).format(new Date(c.lastAt)))} — ${esc(c.lastMsg || '')}</div>` : ''}
@@ -561,10 +611,19 @@
       if ($('arWa')) $('arWa').onclick = () => Bx.waAutoSettings && Bx.waAutoSettings();
       if ($('arOv')) $('arOv').onclick = () => Bx.requestOverlay && Bx.requestOverlay();
       const save = () => { rd(); if (!addNum()) return false; if (c.on && !c.contacts.length) { toast('أضف رقماً واحداً على الأقل'); return false; } if (c.on && !c.days.length) { toast('اختر يوماً واحداً على الأقل'); return false; }
-        const o = { on: c.on, h: c.h, m: c.m, days: c.days.slice().sort(), numbers: c.contacts.map((x) => x.n), contacts: c.contacts, scope: c.scope, day: c.day, mode: c.mode, keys };
+        const o = { on: c.on, h: c.h, m: c.m, days: c.days.slice().sort(), numbers: c.contacts.map((x) => x.n), contacts: c.contacts, scope: c.scope, day: c.day, mode: c.mode, keys: c.keys.slice() };
         localStorage.setItem('hrAutoRep', JSON.stringify(o)); if (has) Bx.autoReportSet(JSON.stringify(o)); return true; };
       $('arSave').onclick = () => { if (!save()) return; toast(c.on ? 'تم الحفظ — سيُرسل يومياً في ' + $('arTime').value : 'تم الحفظ (متوقف)'); if (has) { try { c = Object.assign(c, JSON.parse(Bx.autoReportGet())); } catch (e) { /* ignore */ } } draw(); };
-      $('arTest').onclick = () => { if (!save()) return; Bx.autoReportRunNow(); toast('جارٍ بناء الملف وإرساله… سيصلك إشعار عند الجاهزية'); };
+      $('arTest').onclick = () => {
+        if (!save()) return;
+        const t0 = Date.now(); Bx.autoReportRunNow(); toast('جارٍ مزامنة البيانات وبناء الملف…'); $('arTest').disabled = true; $('arTest').textContent = 'جارٍ التنفيذ…';
+        const tick = setInterval(() => {
+          let g = {}; try { g = JSON.parse(Bx.autoReportGet()); } catch (e) { /* ignore */ }
+          const done = g.lastAt && g.lastAt >= t0 - 1000, timeout = Date.now() - t0 > 120000;
+          if (done || timeout) { clearInterval(tick); toast(done ? (g.lastOk ? '✓ ' : '✗ ') + (g.lastMsg || '') : 'لم يكتمل التنفيذ خلال دقيتين — تحقق من الاتصال وتحرير الحساب'); if ($('arTest')) draw(); }
+        }, 2000);
+      };
+      sheetPicker($('arPick'), c.keys, () => { const n = b.querySelector('.hr3-none b'); if (n) n.textContent = c.keys.length; });
       $('arSendNow').onclick = () => { if (!save()) return; if (!Bx.autoReportSendPrepared()) toast('لا يوجد ملف جاهز بعد — اضغط «جرّب الآن» أولاً'); else toast('جارٍ فتح واتساب…'); };
       $('arBack').onclick = () => (back ? back() : closeSheet());
     };
@@ -981,6 +1040,7 @@
     const asgs = HR.assignments().filter((a) => a.end && daysTo(a.end) >= 0 && daysTo(a.end) <= 30);
     body.appendChild(el('div', 'hr-day', `<div class="hr-dayt"><b>${dLong.format(new Date())}</b><small>${rep.synced ? 'حسب آخر مزامنة' : 'لم يُزامن حضور اليوم بعد'}${rep.weekend ? ' · عطلة' + (rows.some((r) => r.status === 'hwork') ? ` · ${rows.filter((r) => r.status === 'hwork').length} موظف داوموا` : '') : ''}</small></div><button type="button" class="hr-dayimg" id="hrDayImg" aria-label="صورة حالة الدوام اليومية">${icon('image')}<span>صورة اليوم</span></button>`));
     $('hrDayImg').onclick = () => openDaily(today());
+    { const xb = el('button', 'btn-outline hr3-xlb', `${icon('chart')}<span>تصدير Excel</span>`); xb.type = 'button'; xb.onclick = () => openXlCenter(null); $('hrDayImg').parentNode.appendChild(xb); }
     // بحث شامل: يفتح قائمة الفريق مفلترة
     const gs = el('form', 'hr2-search', `${icon('search')}<input id="hrGS" type="search" enterkeyhint="search" placeholder="ابحث عن موظف: اسم، رقم، هاتف، قسم…" autocomplete="off">`);
     gs.onsubmit = (ev) => { ev.preventDefault(); const v = $('hrGS').value.trim(); if (!v) return; tab = 'emp'; f.es = 'all'; f.q = v; store.set('hrTab', tab); render(); };
