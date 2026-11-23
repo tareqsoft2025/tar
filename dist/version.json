@@ -1,6 +1,6 @@
 {
-  "versionCode": 101,
-  "versionName": "8.55",
-  "notes": "مركز تصدير Excel اليدوي وتخصيص أوراق الإرسال التلقائي",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-101.apk"
+  "versionCode": 102,
+  "versionName": "8.56",
+  "notes": "جلب آخر السجلات تلقائياً قبل أي تصدير",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-102.apk"
 }

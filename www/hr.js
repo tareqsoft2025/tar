@@ -405,6 +405,22 @@
     $('exDone').onclick = () => { if (back) back(); else closeSheet(); };
     draw();
   }
+
+  /* ---------- جلب آخر السجلات قبل أي تصدير ---------- */
+  // يزامن الحضور والطلبات (اليوم أو من التاريخ المطلوب) ثم يعود؛ إن تعذّر يُستخدم المحفوظ مع تنبيه. يعيد true إن اكتملت المزامنة.
+  async function refreshData(ds, from) {
+    if (!HR.hasSession()) return false;
+    if (HR.paused()) { toast('الربط متوقف (تحرير الحساب) — يُستخدم آخر ما هو محفوظ'); return false; }
+    for (let i = 0; i < 30 && HR.isSyncing(); i++) await new Promise((r) => setTimeout(r, 1000));   // مزامنة جارية: ننتظرها
+    toast('جارٍ جلب آخر السجلات من النظام…');
+    const opts = { requests: true }; const d = from || ds; if (d && d < today()) opts.from = d;
+    try {
+      const st = await Promise.race([HR.sync(null, opts), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 60000))]);
+      HR.db.reload();
+      if (st && st.errors && st.errors.length) { toast('اكتمل التحديث جزئياً — بعض البيانات من آخر نسخة محفوظة'); return true; }
+      toast('تم تحديث السجلات'); return true;
+    } catch (e) { toast(e && e.message === 'timeout' ? 'استغرق التحديث وقتاً طويلاً — يُستخدم آخر ما هو محفوظ' : 'تعذّر التحديث (تحقق من الاتصال) — يُستخدم آخر ما هو محفوظ'); return false; }
+  }
   let dyView = 'sum', dyMon = '';
   const ALLK = () => HRReport.SHEET_KEYS.map((x) => x[0]);
   const expSel = { fmt: 'xlsx', scope: 'cur', send: 'share', keys: (store.get('hrXlKeys', null) || ALLK()).filter((k) => ALLK().includes(k)) };
@@ -413,12 +429,13 @@
   function openDaily(ds, view) {
     ds = ds || today(); if (view) dyView = view;
     const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null, ex = repExcl();
-    const stamp = HR.meta().lastSync;
+    let stamp = HR.meta().lastSync;
     const mk = (v) => {
       if (v === 'sum') { const D = HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, group: g ? g.name : '', syncedAt: stamp, placeName: plName, exList: exListOf() }); return { D, pages: [HRReport.dailyCanvas(D)] }; }
       const D = HRReport.detail(ds, v, { exclude: ex, leaveLbl, placeName: plName, syncedAt: stamp, cfg: HR.settings() }); return { D, pages: HRReport.detailPages(D) };
     };
-    const cur = mk(dyView), sum = dyView === 'sum' ? cur.D : HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, syncedAt: stamp });
+    let cur = mk(dyView);
+    const sum = dyView === 'sum' ? cur.D : HRReport.daily(ds, { filter: (e) => orgOk(e) && typeOk(e) && !ex.has(String(e.id)), band: bandOf, syncedAt: stamp });
     const urls = cur.pages.map((cv) => cv.toDataURL('image/png')), synced = HR.dayReport(ds).synced, nP = cur.pages.length;
     sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('image')}</span><div><b>صور حالة الدوام</b><small>${esc(dLong.format(noon(ds)))}${synced ? '' : ' · غير مزامَن'}</small></div></div>
       <div class="hr-dnav"><button class="icon-btn flip" data-d="-1" aria-label="اليوم السابق">${icon('chev')}</button><label><b>${ds === today() ? 'اليوم' : fd(ds)}</b><small>${sum.c.unreg} بلا تسجيل · ${sum.c.late} متأخر</small></label><button class="icon-btn" data-d="1" aria-label="اليوم التالي" ${ds >= today() ? 'disabled' : ''}>${icon('chev')}</button></div>
@@ -450,7 +467,14 @@
         else files.forEach((fl) => { const a = document.createElement('a'); a.href = URL.createObjectURL(fl); a.download = fl.name; a.click(); });
       });
     };
-    $('dyShare').onclick = () => shareFiles(itemsOf(dyView, cur.pages));
+    // قبل أي تصدير: جلب آخر السجلات ثم إعادة بناء الكشف وتحديث المعاينة
+    const fresh = async () => {
+      if (!(await refreshData(ds))) return false;
+      stamp = HR.meta().lastSync; cur = mk(dyView);
+      $('hrSheetBody').querySelectorAll('.hr-wimg').forEach((im, i) => { if (cur.pages[i]) im.src = cur.pages[i].toDataURL('image/png'); });
+      return true;
+    };
+    $('dyShare').onclick = async () => { await fresh(); shareFiles(itemsOf(dyView, cur.pages)); };
     $('dyEx').onclick = () => openRepExcl(() => openDaily(ds));
     // PDF: صفحات A4 (كشوف الجهات بخلفية بيضاء للطباعة)
     const sharePdf = (u8, name) => {
@@ -486,6 +510,7 @@
     $('xkAll').onclick = () => setAll(true); $('xkNone').onclick = () => setAll(false);
     syncPanel();
     $('dyGo').onclick = async () => {
+      $('dyGo').disabled = true; try { await fresh(); } finally { $('dyGo').disabled = false; }
       const { fmt, scope, send } = expSel, orgs = scope === 'both' ? ['PEF', 'HHO'] : scope === 'cur' ? null : [scope];
       const base = scope === 'cur' ? (dyView === 'sum' ? 'daily' : dyView.toLowerCase()) : scope === 'both' ? 'pef-hho' : scope.toLowerCase();
       if (send === 'wa') {
@@ -510,7 +535,7 @@
       for (const v of (orgs || [null])) await one(v);
       shareBytes(HRReport.xlsxOf(HRReport.pickSheets(sheets, expSel.keys), xmeta), `hr-${base}-${ds}.xlsx`, XLSX_MIME);
     };
-    const tx = $('dyText'); if (tx) tx.onclick = () => { const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
+    const tx = $('dyText'); if (tx) tx.onclick = async () => { await fresh(); const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
 
 
@@ -634,22 +659,24 @@
   function openWeekly(kind) {
     kind = kind || 'prev';
     const g = f.grp !== 'all' ? groups().find((x) => x.id === f.grp) : null;
-    const D = HRReport.build(HRReport.range(kind), { filter: (e) => orgOk(e) && repOk(e), group: g ? g.name : '', placeName: plName, exList: exListOf() });
-    const cv = HRReport.toCanvas(D), url = cv.toDataURL('image/png');
+    const rebuild = () => HRReport.build(HRReport.range(kind), { filter: (e) => orgOk(e) && repOk(e), group: g ? g.name : '', placeName: plName, exList: exListOf() });
+    let D = rebuild(), cv = HRReport.toCanvas(D), url = cv.toDataURL('image/png');
     sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('note')}</span><div><b>التقرير الأسبوعي</b><small>${esc(D.group || 'كل الموظفين')}${D.unsynced ? ' · ' + D.unsynced + ' يوم غير مزامن' : ''}</small></div></div>
       <div class="chips hr-fc"><button class="chip sm${kind === 'prev' ? ' on' : ''}" data-k="prev">الأسبوع الماضي</button><button class="chip sm${kind === 'incl' ? ' on' : ''}" data-k="incl">آخر ٧ أيام</button></div>
       <img class="hr-wimg" alt="التقرير الأسبوعي" src="${url}">
       <div class="hr-gact"><button type="button" class="btn-primary" id="wkShare">${icon('note')} مشاركة الصورة</button><button type="button" class="btn-outline" id="wkText">مشاركة كنص</button></div>
       <div class="hr-gact"><button type="button" class="btn-outline" id="wkXl">${icon('chart')} ملف Excel</button></div>`);
-    $('wkXl').onclick = () => shareBytes(HRReport.xlsxOf(HRReport.sheetsWeekly(D)), 'hr-weekly-' + D.range.to + '.xlsx', XLSX_MIME);
+    const wkFresh = async () => { if (await refreshData(null, D.range.from)) { D = rebuild(); cv = HRReport.toCanvas(D); url = cv.toDataURL('image/png'); const im = $('hrSheetBody').querySelector('.hr-wimg'); if (im) im.src = url; } };
+    $('wkXl').onclick = async () => { await wkFresh(); shareBytes(HRReport.xlsxOf(HRReport.sheetsWeekly(D)), 'hr-weekly-' + D.range.to + '.xlsx', XLSX_MIME); };
     const body = $('hrSheetBody');
     body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openWeekly(b.dataset.k); });
-    $('wkShare').onclick = () => {
+    $('wkShare').onclick = async () => {
+      await wkFresh();
       const name = 'hr-weekly-' + D.range.to + '.png', B = window.AndroidBridge;
       if (B && B.shareImage) { B.shareImage(url.split(',')[1], name, ''); return; }
       cv.toBlob((bl) => { const file = new File([bl], name, { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file] }).catch(() => {}); else { const a = document.createElement('a'); a.href = url; a.download = name; a.click(); } });
     };
-    $('wkText').onclick = () => { const t = HRReport.toText(D), B = window.AndroidBridge; if (B && B.share) B.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
+    $('wkText').onclick = async () => { await wkFresh(); const t = HRReport.toText(D), B = window.AndroidBridge; if (B && B.share) B.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
 
   /* ---------- مجموعات الموظفين (محلية على الجهاز) ---------- */
@@ -2387,13 +2414,14 @@
     const ym0 = today().slice(0, 7); revYm = revYm || ym0;
     const key = revYm + '|' + (HR.meta().lastSync || 0) + '|' + f.org + f.type + f.grp;
     if (!revCache || revCache.key !== key) revCache = { key, M: HRReview.month(revYm, (e) => orgOk(e) && typeOk(e)) };
-    const M = revCache.M;
+    let M = revCache.M;
     const shift = (n) => { const [y, m] = revYm.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); revYm = d.toISOString().slice(0, 7); render(); };
     const head = el('div', 'hr-dnav', `<button class="icon-btn flip" data-d="-1" aria-label="الشهر السابق">${icon('chev')}</button><label><b>${mLbl.format(new Date(revYm + '-15T12:00:00Z'))}</b><small>${M.workDays} يوم دوام مزامَن</small></label><button class="icon-btn" data-d="1" aria-label="الشهر التالي" ${revYm >= ym0 ? 'disabled' : ''}>${icon('chev')}</button>`);
     head.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => shift(+b.dataset.d); });
     body.appendChild(head);
     body.appendChild(el('div', 'hr-rvtop', `<button type="button" id="rvLock">${icon('alert')}قفل الآن</button><button type="button" id="rvPinCh">${hasPin() ? 'تغيير الرمز / إزالته' : 'تعيين رمز'}</button><button type="button" id="rvShare">${icon('note')}مشاركة</button><button type="button" id="rvXl">${icon('chart')}Excel</button>`));
-    $('rvXl').onclick = () => {
+    $('rvXl').onclick = async () => {
+      if (await refreshData(null, revYm + '-01')) { revCache = null; M = HRReview.month(revYm, (e) => orgOk(e) && typeOk(e)); }
       const ml = mLbl.format(new Date(M.ym + '-15T12:00:00Z')), sub = `${ml}  ·  الصفوف الحمراء = من تأخر`;
       const days = [].concat(...M.list.map((E) => Object.values(E.d).filter((r) => r.n || r.status !== 'off').map((r) => ({ E, r })))).sort((a, b) => a.r.ds.localeCompare(b.r.ds) || a.E.e.name.localeCompare(b.E.e.name, 'ar'));
       shareBytes(HRReport.xlsxOf([
