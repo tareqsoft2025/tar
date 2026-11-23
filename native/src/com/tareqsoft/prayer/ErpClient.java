@@ -258,6 +258,30 @@ final class ErpClient {
 
     static boolean hasSession(Context c) { return !cookies(c).isEmpty(); }
 
+    /* ---------- النظام يقبل جلسة واحدة فقط: تحرير الحساب وإيقاف الربط في الخلفية ---------- */
+    static boolean paused(Context c) {
+        if (!sp(c).getBoolean("paused", false)) return false;
+        long u = sp(c).getLong("pausedUntil", 0);
+        if (u > 0 && System.currentTimeMillis() > u) { sp(c).edit().putBoolean("paused", false).putLong("pausedUntil", 0).apply(); return false; }
+        return true;
+    }
+    static long pausedUntil(Context c) { return paused(c) ? sp(c).getLong("pausedUntil", 0) : 0; }
+    static void pause(Context c, int minutes) { sp(c).edit().putBoolean("paused", true).putLong("pausedUntil", minutes > 0 ? System.currentTimeMillis() + minutes * 60000L : 0).apply(); }
+    static void resume(Context c) { sp(c).edit().putBoolean("paused", false).putLong("pausedUntil", 0).apply(); }
+    /** يُنهي جلسة هذا التطبيق على الخادم (ليتمكن المستخدم من الدخول من المتصفح) دون حذف بيانات الدخول أو البيانات. */
+    static void release(Context c) {
+        try { request(c, "POST", "/api/auth/logout", "{}"); } catch (Exception e) { /* ignore */ }
+        sp(c).edit().remove("cookies").apply();
+    }
+    static boolean idleRelease(Context c) { return sp(c).getBoolean("idleRel", true); }
+    static void setIdleRelease(Context c, boolean on) { sp(c).edit().putBoolean("idleRel", on).apply(); }
+    /** يحرّر الحساب تلقائياً بعد ترك التطبيق أو انتهاء مزامنة خلفية، ما لم تكن المراقبة الحية مفعّلة (تُبقي الجلسة). */
+    static void releaseIfIdle(Context c) {
+        if (!idleRelease(c) || !hasCreds(c) || HrWatchService.minutes(c) > 0 || MainActivity.visible || !hasSession(c)) return;   // بلا بيانات محفوظة لا نحرّر حتى لا يُطلب الدخول من جديد
+        release(c);
+    }
+
+
     /* ---------- تخزين بيانات الموارد البشرية في ملفات خاصة بالتطبيق ---------- */
     private static File dir(Context c) { File d = new File(c.getFilesDir(), "hr"); d.mkdirs(); return d; }
     private static String safe(String name) { return name.replaceAll("[^A-Za-z0-9_\\-]", "_"); }

@@ -129,6 +129,7 @@ public class HrWatchService extends Service {
         if (running) return;
         // والتطبيق مفتوح أمام المستخدم فهو يزامن بنفسه ويعرض النافذة داخله
         if (MainActivity.visible) { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("watch_hint", 0).apply(); return; }
+        if (ErpClient.paused(this)) return;
         if (!ErpClient.hasSession(this) && !ErpClient.hasCreds(this)) return;
         running = true;
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);

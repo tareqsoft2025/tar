@@ -16,13 +16,16 @@ public class AutoReportJob extends JobService {
 
     @Override
     public boolean onStartJob(final JobParameters params) {
+        if (ErpClient.paused(this)) { AutoReport.status(this, false, "الربط متوقف (تم تحرير الحساب) — استأنف الربط من الموارد البشرية"); return false; }
         if (!ErpClient.hasSession(this) && !ErpClient.hasCreds(this)) { AutoReport.status(this, false, "غير مسجَّل الدخول"); return false; }
         h.post(new Runnable() { public void run() {
             final boolean[] done = { false };
             final Runnable finish = new Runnable() { public void run() {
                 if (done[0]) return; done[0] = true;
                 try { if (web != null) web.destroy(); } catch (Exception e) { /* ignore */ }
-                web = null; jobFinished(params, false);
+                web = null;
+                new Thread(new Runnable() { public void run() { ErpClient.releaseIfIdle(getApplicationContext()); } }).start();
+                jobFinished(params, false);
             } };
             web = new WebView(getApplicationContext());
             WebSettings s = web.getSettings();
