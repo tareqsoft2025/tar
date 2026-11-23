@@ -95,7 +95,7 @@ public class AutoReport extends BroadcastReceiver {
         if (!ErpClient.hasSession(app) && !ErpClient.hasCreds(app)) { status(app, false, "غير مسجَّل الدخول في نظام PEF"); return; }
         JobScheduler js = (JobScheduler) app.getSystemService(Context.JOB_SCHEDULER_SERVICE);
         js.schedule(new JobInfo.Builder(JOB_ID, new ComponentName(app, AutoReportJob.class))
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setOverrideDeadline(120000).build());
+            .setMinimumLatency(0).setOverrideDeadline(15000).build());
     }
 
     // ===== قائمة المستلمين: واتساب يُفتح لكل رقم بالتتابع، وتضغط الخدمة «إرسال» ثم ننتقل للتالي =====
