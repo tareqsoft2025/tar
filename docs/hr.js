@@ -450,7 +450,7 @@
         <div class="hr3-sec"><small>٢ · النطاق</small><div class="chips hr-fc">${[['cur', 'الكشف المعروض'], ['PEF', 'PEF'], ['HHO', 'HHO'], ['both', 'PEF + HHO']].map(([v, n]) => `<button type="button" class="chip sm${expSel.scope === v ? ' on' : ''}" data-x="scope" data-v="${v}">${n}</button>`).join('')}</div></div>
         <div class="hr3-sec" id="dyXP"><small>٣ · الأوراق التي تظهر في Excel <button type="button" class="hr3-lnk" id="xkAll">الكل</button><button type="button" class="hr3-lnk" id="xkNone">لا شيء</button></small><div class="hr3-ks">${HRReport.SHEET_KEYS.map(([v, n]) => `<label class="hr3-ck"><input type="checkbox" data-p="${v}"${expSel.keys.includes(v) ? ' checked' : ''}><span>${n}</span></label>`).join('')}</div>
           <label class="hr3-mon">شهر «التأخر الشهري»<select id="dyMon" class="hr-in">${monOpts().map(([v, n]) => `<option value="${v}"${v === dyMon ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div>
-        <div class="hr3-sec"><small>${'٤'} · الإرسال</small><div class="chips hr-fc">${[['share', 'مشاركة'], ['wa', 'واتساب تلقائي (PDF)']].map(([v, n]) => `<button type="button" class="chip sm${expSel.send === v ? ' on' : ''}" data-x="send" data-v="${v}">${n}</button>`).join('')}</div></div>
+        <div class="hr3-sec"><small>${'٤'} · الإرسال</small><div class="chips hr-fc">${[['share', 'مشاركة'], ['wa', 'واتساب تلقائي (PDF)'], ['mail', 'بريد (Excel)']].map(([v, n]) => `<button type="button" class="chip sm${expSel.send === v ? ' on' : ''}" data-x="send" data-v="${v}">${n}</button>`).join('')}</div></div>
         <button type="button" class="btn-primary wide" id="dyGo">تصدير الملف</button>
         <button type="button" class="btn-outline wide" id="dyAuto" style="margin-top:8px">⏰ إرسال تلقائي يومي لملف Excel…</button>
       </div>
@@ -503,7 +503,7 @@
     const panel = $('dyExpP');
     $('dyExp').onclick = () => { panel.hidden = !panel.hidden; if (!panel.hidden) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
     const syncPanel = () => { $('dyXP').hidden = expSel.fmt !== 'xlsx'; panel.querySelectorAll('[data-x]').forEach((b) => b.classList.toggle('on', expSel[b.dataset.x] === b.dataset.v)); };
-    panel.querySelectorAll('[data-x]').forEach((b) => { b.onclick = () => { expSel[b.dataset.x] = b.dataset.v; if (expSel.send === 'wa' && expSel.fmt !== 'pdf') expSel.fmt = 'pdf'; syncPanel(); }; });
+    panel.querySelectorAll('[data-x]').forEach((b) => { b.onclick = () => { expSel[b.dataset.x] = b.dataset.v; if (b.dataset.x === 'fmt' && expSel.send === 'mail' && b.dataset.v !== 'xlsx') expSel.send = 'share'; if (expSel.send === 'wa' && expSel.fmt !== 'pdf') expSel.fmt = 'pdf'; if (expSel.send === 'mail') expSel.fmt = 'xlsx'; syncPanel(); }; });
     const saveK = () => store.set('hrXlKeys', expSel.keys);
     panel.querySelectorAll('[data-p]').forEach((c) => { c.onchange = () => { const a = expSel.keys, k = c.dataset.p, n = a.indexOf(k); if (c.checked && n < 0) a.push(k); else if (!c.checked && n >= 0) a.splice(n, 1); saveK(); }; });
     const setAll = (on) => { expSel.keys = on ? ALLK() : []; panel.querySelectorAll('[data-p]').forEach((c) => { c.checked = on; }); saveK(); };
@@ -533,12 +533,69 @@
         if (has('wkC', 'wkP')) sheets = sheets.concat(weeksFor(f, pre));
       };
       for (const v of (orgs || [null])) await one(v);
-      shareBytes(HRReport.xlsxOf(HRReport.pickSheets(sheets, expSel.keys), xmeta), `hr-${base}-${ds}.xlsx`, XLSX_MIME);
+      { const u8 = HRReport.xlsxOf(HRReport.pickSheets(sheets, expSel.keys), xmeta), nm = `hr-${base}-${ds}.xlsx`; if (send === 'mail') sendMail(u8, nm, stamp); else shareBytes(u8, nm, XLSX_MIME); }
     };
     const tx = $('dyText'); if (tx) tx.onclick = async () => { await fresh(); const t = HRReport.dailyText(cur.D), Bq = window.AndroidBridge; if (Bq && Bq.share) Bq.share(t); else if (navigator.share) navigator.share({ text: t }).catch(() => {}); else { navigator.clipboard && navigator.clipboard.writeText(t); toast('تم النسخ'); } };
   }
 
 
+
+
+  /* ---------- إرسال التقرير بالبريد الإلكتروني (SMTP) ---------- */
+  const MAIL_SUBJECT = 'تقرير الحضور والانصراف اليوم';
+  function mailBodyJs(stamp) {
+    const d = new Date(stamp || Date.now()), o = { timeZone: Core.TZ };
+    const day = new Intl.DateTimeFormat('ar-PS-u-nu-latn', Object.assign({ weekday: 'long' }, o)).format(d);
+    const dt = new Intl.DateTimeFormat('en-GB', Object.assign({ day: '2-digit', month: '2-digit', year: 'numeric' }, o)).format(d);
+    const tm = new Intl.DateTimeFormat('ar-PS-u-nu-latn', Object.assign({ hour: 'numeric', minute: '2-digit', hour12: true }, o)).format(d);
+    return `مرفق تقرير اكسل بحالة الدوام\nتاريخ تحديث البيانات والسجلات: ${day} ${dt} — الساعة ${tm}`;
+  }
+  const mailCfg = () => { const Bx = window.AndroidBridge; try { return JSON.parse((Bx && Bx.mailGet ? Bx.mailGet() : localStorage.getItem('hrMailCfg')) || '{}'); } catch (e) { return {}; } };
+  const u8b64 = (u8) => { let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(bin); };
+  // يرسل الملف بالبريد: SMTP صامت إن كان مضبوطاً، وإلا يفتح تطبيق البريد بالنص والمرفق جاهزين
+  function sendMail(u8, name, stamp) {
+    const Bx = window.AndroidBridge, body = mailBodyJs(stamp), cfg = mailCfg(), to = (cfg.to || []).join(',');
+    if (Bx && Bx.mailEnabled && Bx.mailEnabled()) {
+      const id = 'm' + Date.now(); toast('جارٍ إرسال البريد…');
+      window.onMailResult = (rid, ok, msg) => { if (rid !== id) return; toast(ok ? '✓ تم إرسال التقرير بالبريد' : '✗ تعذّر البريد: ' + msg); };
+      Bx.mailSendFile(id, u8b64(u8), name, MAIL_SUBJECT, body);
+    } else if (Bx && Bx.mailIntent) { Bx.mailIntent(u8b64(u8), name, MAIL_SUBJECT, body, to); }
+    else { shareBytes(u8, name, XLSX_MIME); toast('اضبط البريد من إعدادات التقرير للإرسال المباشر'); }
+  }
+  function openMailSettings(back) {
+    const Bx = window.AndroidBridge, has = !!(Bx && Bx.mailSet);
+    const PRE = { gmail: ['smtp.gmail.com', 465], outlook: ['smtp.office365.com', 587], yahoo: ['smtp.mail.yahoo.com', 465], custom: ['', 465] };
+    const c = Object.assign({ on: false, host: 'smtp.gmail.com', port: 465, user: '', from: '', to: [], hasPass: false }, mailCfg());
+    const preOf = () => Object.entries(PRE).find(([k, v]) => k !== 'custom' && v[0] === c.host && v[1] === +c.port);
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('inbox')}</span><div><b>إرسال التقرير بالبريد</b><small>مرفق Excel + موضوع «${MAIL_SUBJECT}»</small></div></div>
+      ${has ? '' : '<div class="hr-warnbox">' + icon('alert') + '<span>الإرسال المباشر يعمل داخل تطبيق الأندرويد فقط.</span></div>'}
+      <div class="hr3-sec"><div class="chips hr-fc"><button type="button" class="chip sm${c.on ? ' on' : ''}" id="mlOn">${c.on ? '● مفعّل (يُرسل مع التقرير اليومي)' : 'متوقف — اضغط للتفعيل'}</button></div></div>
+      <div class="hr3-sec"><small>المستلمون (عنوان في كل سطر أو مفصولة بفاصلة)</small><textarea id="mlTo" class="hr-in" rows="3" placeholder="manager@example.org">${esc((c.to || []).join('\n'))}</textarea></div>
+      <div class="hr3-sec"><small>حساب الإرسال</small>
+        <div class="chips hr-fc">${[['gmail', 'Gmail'], ['outlook', 'Outlook'], ['yahoo', 'Yahoo'], ['custom', 'مخصّص']].map(([k, n]) => `<button type="button" class="chip sm${(preOf() ? preOf()[0] : 'custom') === k ? ' on' : ''}" data-pre="${k}">${n}</button>`).join('')}</div>
+        <div class="hr3-sv2"><input id="mlHost" class="hr-in" placeholder="خادم SMTP" value="${esc(c.host)}" dir="ltr"><input id="mlPort" class="hr-in" inputmode="numeric" style="max-width:26%" value="${esc(c.port)}" dir="ltr"></div>
+        <input id="mlUser" class="hr-in" placeholder="البريد المُرسِل (اسم المستخدم)" value="${esc(c.user)}" dir="ltr" autocomplete="off" style="margin-bottom:8px">
+        <input id="mlPass" class="hr-in" type="password" placeholder="${c.hasPass ? '•••••• محفوظة — اتركها فارغة للإبقاء' : 'كلمة مرور التطبيق'}" dir="ltr" autocomplete="new-password">
+        <small class="hr3-none">Gmail: فعّل التحقق بخطوتين ثم أنشئ «كلمة مرور تطبيق» من حساب Google واستخدمها هنا (لا كلمة المرور العادية). المنفذ 465 (SSL) أو 587 (STARTTLS). تُحفظ كلمة المرور مشفّرة بمفتاح أندرويد الآمن.</small></div>
+      <div class="hr-gact"><button type="button" class="btn-primary" id="mlSave">حفظ</button><button type="button" class="btn-outline" id="mlTest"${has ? '' : ' disabled'}>اختبار الإرسال</button></div>
+      <small class="hr-pgn" id="mlMsg"></small>
+      <button type="button" class="btn-outline wide" id="mlBack" style="margin-top:8px">رجوع</button>`);
+    const b = $('hrSheetBody');
+    b.querySelectorAll('[data-pre]').forEach((x) => { x.onclick = () => { const p = PRE[x.dataset.pre]; if (x.dataset.pre !== 'custom') { $('mlHost').value = p[0]; $('mlPort').value = p[1]; } b.querySelectorAll('[data-pre]').forEach((y) => y.classList.toggle('on', y === x)); }; });
+    $('mlOn').onclick = () => { c.on = !c.on; $('mlOn').classList.toggle('on', c.on); $('mlOn').textContent = c.on ? '● مفعّل (يُرسل مع التقرير اليومي)' : 'متوقف — اضغط للتفعيل'; };
+    const read = () => ({ on: c.on, host: $('mlHost').value.trim(), port: +$('mlPort').value || 465, user: $('mlUser').value.trim(), from: $('mlUser').value.trim(), to: $('mlTo').value.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /.+@.+\..+/.test(x)), pass: $('mlPass').value });
+    const save = () => { const o = read(); if (o.on && (!o.host || !o.user || (!c.hasPass && !o.pass) || !o.to.length)) { toast('أكمل الخادم والبريد وكلمة المرور والمستلمين'); return false; }
+      const pass = o.pass; localStorage.setItem('hrMailCfg', JSON.stringify(Object.assign({}, o, { pass: '' }))); if (has) Bx.mailSet(JSON.stringify(o)); if (pass) { c.hasPass = true; $('mlPass').value = ''; $('mlPass').placeholder = '•••••• محفوظة — اتركها فارغة للإبقاء'; } return true; };
+    $('mlSave').onclick = () => { if (save()) toast('تم حفظ إعدادات البريد'); };
+    $('mlTest').onclick = () => {
+      if (!save()) return; const o = read(); if (!o.to.length) { toast('أضف مستلماً واحداً على الأقل'); return; }
+      const u8 = HRXlsx.build([{ name: 'اختبار', title: 'اختبار إرسال البريد', subtitle: new Date().toLocaleString('ar'), rows: [['البند', 'الحالة'], ['إرسال البريد من تطبيق مواقيت الصلاة', 'يعمل']] }]), id = 't' + Date.now();
+      $('mlMsg').textContent = 'جارٍ إرسال رسالة اختبار…';
+      window.onMailResult = (rid, ok, msg) => { if (rid !== id) return; $('mlMsg').textContent = ok ? '✓ وصلت رسالة الاختبار بنجاح' : '✗ فشل: ' + msg; };
+      Bx.mailSendFile(id, u8b64(u8), 'test.xlsx', MAIL_SUBJECT + ' (اختبار)', mailBodyJs(Date.now()));
+    };
+    $('mlBack').onclick = () => (back ? back() : closeSheet());
+  }
 
   /* ---------- مركز تصدير Excel اليدوي: نطاق + يوم + أوراق مخصّصة + قوالب جاهزة ---------- */
   const XL_PRESETS = [['all', 'الكل', null], ['att', 'الحضور والمتأخرون', ['att', 'late', 'unreg', 'excl']], ['lv', 'الإجازات والمهام', ['leave', 'mis', 'rqT', 'rqM']], ['lm', 'التأخر الشهري', ['lm']], ['wk', 'ساعات الأسبوعين', ['wkC', 'wkP']]];
@@ -564,7 +621,8 @@
       <div class="hr3-sec"><small>الأوراق (<b id="xcN"></b>)</small><div id="xcPick"></div></div>
       <div class="hr3-sec"><label class="hr3-mon">شهر «التأخر الشهري»<select id="xcMon" class="hr-in">${mons.map(([v, n]) => `<option value="${v}"${v === st.ym ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
         <label class="ag-check hr-rem"><input id="xcSync" type="checkbox" checked> مزامنة آخر البيانات قبل التصدير</label></div>
-      <div class="hr-gact"><button type="button" class="btn-primary" id="xcGo">📊 تصدير ومشاركة</button><button type="button" class="btn-outline" id="xcAuto">⏰ الإرسال التلقائي</button></div>
+      <div class="hr-gact"><button type="button" class="btn-primary" id="xcGo">📊 تصدير ومشاركة</button><button type="button" class="btn-outline" id="xcMail">✉️ إرسال بالبريد</button></div>
+      <div class="hr-gact"><button type="button" class="btn-outline" id="xcAuto">⏰ الإرسال التلقائي</button><button type="button" class="btn-outline" id="xcMs">⚙ إعداد البريد</button></div>
       <small class="hr-pgn" id="xcMsg"></small>`);
     const b = $('hrSheetBody'), save = () => { store.set('hrXlCenter', { scope: st.scope, day: st.day, date: st.date, ym: st.ym, keys: st.keys.slice() }); $('xcN').textContent = st.keys.length + ' من ' + xlAll().length; };
     const mark = () => { b.querySelectorAll('[data-xs]').forEach((x) => x.classList.toggle('on', x.dataset.xs === st.scope)); b.querySelectorAll('[data-xd]').forEach((x) => x.classList.toggle('on', x.dataset.xd === st.day)); $('xcDate').hidden = st.day !== 'date'; };
@@ -574,19 +632,22 @@
     $('xcMon').onchange = () => { st.ym = $('xcMon').value; save(); };
     sheetPicker($('xcPick'), st.keys, save); mark(); save();
     $('xcAuto').onclick = () => openAutoReport(() => openXlCenter(back));
-    $('xcGo').onclick = async () => {
-      if (!st.keys.length) { toast('اختر ورقة واحدة على الأقل'); return; }
-      $('xcGo').disabled = true; $('xcMsg').textContent = 'جارٍ بناء الملف…';
+    const xcBuild = async (btn) => {
+      if (!st.keys.length) { toast('اختر ورقة واحدة على الأقل'); return null; }
+      btn.disabled = true; $('xcMsg').textContent = 'جارٍ بناء الملف…';
       try {
         const cfg = { scope: st.scope, keys: st.keys.slice(), noSync: !$('xcSync').checked };
         if (st.day === 'date' && st.date) cfg.date = st.date; else cfg.day = st.day;
         const r = await HRAuto.build(cfg);
         store.set('hrXlKeys', st.keys.slice());
-        shareBytes(r.u8, r.name, XLSX_MIME);
         $('xcMsg').textContent = `تم: ${r.name} — ${r.sheets} ورقة`;
-      } catch (e) { $('xcMsg').textContent = 'تعذّر إنشاء الملف: ' + (e && e.message || e); toast('تعذّر إنشاء الملف'); }
-      $('xcGo').disabled = false;
+        return r;
+      } catch (e) { $('xcMsg').textContent = 'تعذّر إنشاء الملف: ' + (e && e.message || e); toast('تعذّر إنشاء الملف'); return null; }
+      finally { btn.disabled = false; }
     };
+    $('xcGo').onclick = async () => { const r = await xcBuild($('xcGo')); if (r) shareBytes(r.u8, r.name, XLSX_MIME); };
+    $('xcMail').onclick = async () => { const r = await xcBuild($('xcMail')); if (r) sendMail(r.u8, r.name, r.stamp); };
+    $('xcMs').onclick = () => openMailSettings(() => openXlCenter(back));
   }
 
   /* ---------- إرسال تلقائي يومي لملف Excel (يعمل والتطبيق مغلق) ---------- */
@@ -620,6 +681,7 @@
           ${perm(waOn, 'خدمة الإرسال التلقائي (إمكانية الوصول)', 'تفعيل', 'arWa')}${perm(ovOn, 'العرض فوق التطبيقات (لفتح واتساب والتطبيق مغلق)', 'السماح', 'arOv')}${perm(exOn, 'المنبّهات الدقيقة (ليبدأ في الدقيقة المحددة)', '', '')}</div>
         ${c.lastAt ? `<div class="hr3-last ${c.lastOk ? 'ok' : 'no'}">آخر تشغيل: ${esc(new Intl.DateTimeFormat('ar-PS-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: Core.TZ }).format(new Date(c.lastAt)))} — ${esc(c.lastMsg || '')}</div>` : ''}
         <div class="hr-gact"><button type="button" class="btn-primary" id="arSave">حفظ</button><button type="button" class="btn-outline" id="arTest"${has ? '' : ' disabled'}>جرّب الآن</button></div>
+        <button type="button" class="btn-outline wide" id="arMail" style="margin-top:8px">✉️ إرسال بالبريد الإلكتروني (إعداد)</button>
         <button type="button" class="btn-outline wide" id="arSendNow" style="margin-top:8px"${has ? '' : ' disabled'}>📤 إرسال آخر تقرير جاهز الآن</button>
         <button type="button" class="btn-outline wide" id="arBack" style="margin-top:8px">رجوع</button>
         <small class="hr-pgn">يبني التطبيق الملف من آخر بيانات يزامنها من النظام ثم يفتح واتساب على الرقم ويضغط «إرسال». يحتاج الجوال مفتوحاً غير مقفل شاشته لأفضل نتيجة، واتصالاً بالإنترنت، وألا يوقف النظام التطبيق (استثنِه من توفير البطارية).</small>`);
@@ -649,6 +711,7 @@
         }, 2000);
       };
       sheetPicker($('arPick'), c.keys, () => { const n = b.querySelector('.hr3-none b'); if (n) n.textContent = c.keys.length; });
+      $('arMail').onclick = () => { rd(); openMailSettings(() => openAutoReport(back)); };
       $('arSendNow').onclick = () => { if (!save()) return; if (!Bx.autoReportSendPrepared()) toast('لا يوجد ملف جاهز بعد — اضغط «جرّب الآن» أولاً'); else toast('جارٍ فتح واتساب…'); };
       $('arBack').onclick = () => (back ? back() : closeSheet());
     };

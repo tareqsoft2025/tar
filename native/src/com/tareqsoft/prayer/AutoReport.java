@@ -203,6 +203,14 @@ public class AutoReport extends BroadcastReceiver {
         ReminderActivity.popup(app, "report", "أرسل التقرير اليومي", body, "sendreport");
     }
 
+    /** نص البريد: الموضوع ثابت، والمتن فيه تاريخ ووقت تحديث البيانات والسجلات. */
+    static String mailSubject() { return "تقرير الحضور والانصراف اليوم"; }
+    static String mailBody(long stampMs) {
+        java.util.Calendar u = java.util.Calendar.getInstance(); if (stampMs > 0) u.setTimeInMillis(stampMs);
+        String when = DAYS[u.get(java.util.Calendar.DAY_OF_WEEK) - 1] + " " + new java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(u.getTime()) + " — الساعة " + stampText(stampMs > 0 ? stampMs : System.currentTimeMillis());
+        return "مرفق تقرير اكسل بحالة الدوام\nتاريخ تحديث البيانات والسجلات: " + when;
+    }
+
     /** يسلّم الملف: واتساب تلقائي إن أمكن، وإشعار للمشاركة اليدوية دائماً. */
     static void deliver(Context c, String b64, String name, String info, long stamp) {
         Context app = c.getApplicationContext();
@@ -215,6 +223,12 @@ public class AutoReport extends BroadcastReceiver {
             Uri u = Uri.parse("content://com.tareqsoft.prayer.share/" + fn);
             String mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", cap = caption(stamp);
             sp(app).edit().putString("pName", fn).putLong("pStamp", stamp).putLong("pAt", System.currentTimeMillis()).apply();
+            String mailMsg = "";
+            if (MailSender.enabled(app)) {
+                String err = MailSender.send(app, mailSubject(), mailBody(stamp), fn, data);
+                mailMsg = err == null ? " · أُرسل بالبريد" : " · تعذّر البريد: " + err;
+            }
+            msg += mailMsg;
             if (!"auto".equals(o.optString("mode", "ask"))) { status(app, true, msg + " — بانتظار ضغطك على «إرسال» في الإشعار"); notifyReady(app, fn, stamp); return; }
             java.util.List<String> nums = numbersOf(o);
             boolean sentWa = false;

@@ -1,6 +1,6 @@
 {
-  "versionCode": 102,
-  "versionName": "8.56",
-  "notes": "جلب آخر السجلات تلقائياً قبل أي تصدير",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-102.apk"
+  "versionCode": 103,
+  "versionName": "8.57",
+  "notes": "إرسال التقرير بالبريد الإلكتروني",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-103.apk"
 }
