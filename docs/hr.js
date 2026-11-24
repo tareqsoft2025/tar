@@ -2360,19 +2360,74 @@
   }
   const telLink = (k, v) => /mobile|phone/i.test(k) ? (phoneInfo(v) ? `<button class="hr-tel" onclick="hrDial('${phoneInfo(v).dial}')">${icon('phone')}${esc(v)}</button>` : esc(v)) : /email/i.test(k) ? `<a href="mailto:${esc(v)}">${esc(v)}</a>` : esc(v);
   function openRaw(title, o) { sheet(`<div class="hr-ph"><b>${title}</b></div>${rawTable(o)}`); }
+
+  /* ---------- حضور الموظف: آخر 14 يوماً أو الشهر كاملاً + زر جانبي لتصدير Excel ---------- */
+  let empAtt = { mode: '14', ym: today().slice(0, 7) };
+  const empDay = (id, ds) => (HR.events(ds) ? HR.dayReport(ds).rows.find((x) => x.e.id === id) : null);
+  function empRange() {   // [من، إلى] للنطاق المعروض
+    if (empAtt.mode === '14') return [addDays(today(), -13), today()];
+    const [y, m] = empAtt.ym.split('-').map(Number), last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    return [empAtt.ym + '-01', last > today() ? today() : last];
+  }
+  function drawEmpAtt(id, e) {
+    const host = $('empAtt'); if (!host) return;
+    const [from, to] = empRange(), month = empAtt.mode === 'month', cells = [], cnt = { ok: 0, late: 0, abs: 0, lv: 0, none: 0 };
+    let lateMin = 0, workMin = 0;
+    const cell = (ds) => {
+      const r = empDay(id, ds), st = r ? STATUS[r.status] : ['غير مزامن', 'none'];
+      if (r) { if (r.status === 'late') { cnt.late++; cnt.ok++; lateMin += r.lateMin || 0; } else if (r.status === 'present' || r.status === 'noin' || r.status === 'hwork') cnt.ok++; else if (r.status === 'absent') cnt.abs++; else if (r.status === 'leave') cnt.lv++; workMin += r.workMin || 0; } else cnt.none++;
+      return `<i class="${st[1]}${ds === today() ? ' tday' : ''}" data-day="${ds}" title="${fd(ds)}: ${st[0]}${r && r.firstIn ? ' ' + tf.format(new Date(r.firstIn)) : ''}"><em class="cwd">${wdSh.format(noon(ds))}</em><small>${+ds.slice(8)}</small></i>`;
+    };
+    if (month) {   // الشهر: محاذاة أول يوم لعمود يومه (الأحد أول الأسبوع) ثم أيام الشهر كلها
+      const first = empAtt.ym + '-01', pad = new Date(first + 'T12:00:00Z').getUTCDay(), [y, m] = empAtt.ym.split('-').map(Number), nd = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      for (let k = 0; k < pad; k++) cells.push('<i class="pad"></i>');
+      for (let d = 1; d <= nd; d++) { const ds = empAtt.ym + '-' + String(d).padStart(2, '0'); cells.push(ds > today() ? `<i class="none fut" data-fut="1"><em class="cwd">${wdSh.format(noon(ds))}</em><small>${d}</small></i>` : cell(ds)); }
+    } else for (let ds = from; ds <= to; ds = addDays(ds, 1)) cells.push(cell(ds));
+    const ml = mLbl.format(new Date(empAtt.ym + '-15T12:00:00Z')), ym0 = today().slice(0, 7);
+    host.innerHTML = `<div class="hr-sec"><span>${month ? 'حضور ' + esc(ml) : 'الحضور آخر 14 يوماً'}</span><small>اضغط على يوم لعرض التفاصيل</small></div>
+      ${month ? `<div class="hr-dnav"><button class="icon-btn flip" data-m="-1" aria-label="الشهر السابق">${icon('chev')}</button><label><b>${esc(ml)}</b><small>${cnt.ok} حضور · ${cnt.late} تأخر${lateMin ? ' (' + lateMin + ' د)' : ''} · ${cnt.abs} بلا تسجيل · ${cnt.lv} إجازة${cnt.none ? ' · ' + cnt.none + ' غير مزامن' : ''}</small></label><button class="icon-btn" data-m="1" aria-label="الشهر التالي" ${empAtt.ym >= ym0 ? 'disabled' : ''}>${icon('chev')}</button></div>` : ''}
+      <div class="hr-calwrap"><div class="hr-cal14">${cells.join('')}</div>
+        <div class="hr-calside"><button type="button" class="hr-cs${month ? ' on' : ''}" id="empMode" title="${month ? 'عرض آخر 14 يوماً' : 'عرض الشهر'}">${icon('cal')}<span>${month ? '14 يوماً' : 'الشهر'}</span></button>
+          <button type="button" class="hr-cs xl" id="empXl" title="تصدير Excel للموظف">${icon('chart')}<span>Excel</span></button></div></div>
+      ${cnt.none && !(month && empAtt.ym > ym0) ? `<button type="button" class="btn-outline wide" id="empSync" style="margin-top:6px">${icon('refresh')}<span>جلب الأيام غير المزامنة (${cnt.none})</span></button>` : ''}
+      ${month ? '' : `<small class="hr3-none">${cnt.ok} حضور · ${cnt.late} تأخر · ${cnt.abs} بلا تسجيل · ${cnt.lv} إجازة${cnt.none ? ' · ' + cnt.none + ' غير مزامن' : ''}</small>`}`;
+    host.querySelectorAll('[data-day]').forEach((c) => { c.onclick = () => openDay(id, c.dataset.day); });
+    host.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => { const [y, m] = empAtt.ym.split('-').map(Number); empAtt.ym = new Date(Date.UTC(y, m - 1 + +b.dataset.m, 1)).toISOString().slice(0, 7); drawEmpAtt(id, e); }; });
+    if ($('empSync')) $('empSync').onclick = async () => { $('empSync').disabled = true; await refreshData(null, from); drawEmpAtt(id, e); };
+    $('empMode').onclick = () => { empAtt.mode = month ? '14' : 'month'; drawEmpAtt(id, e); };
+    $('empXl').onclick = () => exportEmpXl(id, e);
+  }
+  // ملف Excel للموظف عن النطاق المعروض: ملخص + تفاصيل كل يوم (الدخول، الخروج، التأخر، الساعات، الموقع، الطلبات)
+  async function exportEmpXl(id, e) {
+    const [from, to] = empRange();
+    await refreshData(null, from);
+    const days = [], sum = { ok: 0, late: 0, lateMin: 0, abs: 0, lv: 0, work: 0, hw: 0, none: 0 };
+    for (let ds = from; ds <= to; ds = addDays(ds, 1)) {
+      const rep = HR.dayReport(ds), r = rep.synced ? rep.rows.find((x) => x.e.id === id) : null;
+      if (!r) { days.push([ds, wdS.format(noon(ds)), 'غير مزامن', '', '', '', '', '', '']); sum.none++; continue; }
+      const first = r.list && r.list[0], pl = first ? HR.place(first) : null, fi = r.list ? r.list.find((x) => x.eventType === 'check_in') : null;
+      const reqs = (r.reqs || []).map((q) => RQ[q.kind] ? RQ[q.kind][0] + (q.kind === 'daily' && q.nature ? ' · ' + leaveLbl(q.nature) : '') : q.kind).join(' | ');
+      const stt = r.holidayWork || (rep.weekend && r.list && r.list.length) ? 'دوام في عطلة' : (STATUS[r.status] || [r.status])[0];
+      if (r.status === 'late') { sum.late++; sum.ok++; sum.lateMin += r.lateMin || 0; } else if (r.status === 'present' || r.status === 'noin' || r.status === 'hwork') sum.ok++; else if (r.status === 'absent') sum.abs++; else if (r.status === 'leave') sum.lv++;
+      sum.work += r.workMin || 0;
+      days.push([ds, wdS.format(noon(ds)), stt, r.firstIn ? tf.format(new Date(r.firstIn)) : '', r.lastOut ? tf.format(new Date(r.lastOut)) : (r.live ? 'مستمر' : ''), r.lateMin || '', r.workMin ? { v: Math.round(r.workMin / 6) / 10, f: 'hrs' } : '', pl ? plName(pl) : '', reqs]);
+    }
+    const rowSt = days.map((d) => (d[2] === 'متأخر' ? 'late' : d[2] === 'بلا تسجيل' ? 'late' : null));
+    const sub = `${fd(from)} ← ${fd(to)}  ·  ${[e.pos, e.dept].filter(Boolean).join(' · ')}  ·  ${e.org}`;
+    const sheets = [
+      { name: 'ملخص', title: `حضور ${e.name}`, subtitle: sub, widths: [30, 34], rows: [['البند', 'القيمة'], ['الاسم', e.name], ['المسمى الوظيفي', e.pos || ''], ['القسم', e.dept || ''], ['السلم', e.org || ''], ['الفترة', fd(from) + ' ← ' + fd(to)], ['أيام الحضور', sum.ok], ['مرات التأخر', sum.late], ['دقائق التأخر', sum.lateMin], ['بلا تسجيل', sum.abs], ['إجازات', sum.lv], ['ساعات العمل', { v: Math.round(sum.work / 6) / 10, f: 'hrs' }], ['أيام غير مزامنة', sum.none], ['آخر تحديث للبيانات', HR.meta().lastSync ? new Date(HR.meta().lastSync).toLocaleString('ar-PS-u-nu-latn', { timeZone: Core.TZ }) : '']] },
+      { name: 'تفاصيل الأيام', title: `تفاصيل الأيام — ${e.name}`, subtitle: sub + '  ·  الأحمر = تأخر أو بلا تسجيل', widths: [14, 12, 18, 12, 12, 12, 12, 34, 34], rows: [['التاريخ', 'اليوم', 'الحالة', 'الدخول', 'الخروج', 'تأخر (د)', 'ساعات العمل', 'الموقع', 'الطلبات']].concat(days), rowSt, foot: ['الإجمالي', '', `${days.length} يوم`, '', '', sum.lateMin, { v: Math.round(sum.work / 6) / 10, f: 'hrs' }, '', ''] }
+    ];
+    const nm = `hr-emp-${String(e.empId || e.id).replace(/[^A-Za-z0-9_-]/g, '')}-${empAtt.mode === 'month' ? empAtt.ym : to}.xlsx`;
+    shareBytes(HRReport.xlsxOf(sheets, { title: 'حضور ' + e.name }), nm, XLSX_MIME);
+  }
+
   function openEmp(id, focusCon) {
     const raw = HR.db.get('employees', {})[id];
     if (!raw) { toast('الموظف غير موجود في البيانات المحفوظة'); return; }
     const e = HR.emp(raw);
     const cons = HR.contracts().filter((c) => c.empId === id).sort((a, b) => String(b.start).localeCompare(String(a.start)));
     const asgs = HR.assignments().filter((a) => a.empId === id).sort((a, b) => String(b.start).localeCompare(String(a.start)));
-    const cells = [];
-    for (let i = 13; i >= 0; i--) {
-      const ds = addDays(today(), -i);
-      const r = HR.events(ds) ? HR.dayReport(ds).rows.find((x) => x.e.id === id) : null;
-      const st = r ? STATUS[r.status] : ['غير مزامن', 'none'];
-      cells.push(`<i class="${st[1]}${i === 0 ? ' tday' : ''}" data-day="${ds}" title="${fd(ds)}: ${st[0]}${r && r.firstIn ? ' ' + tf.format(new Date(r.firstIn)) : ''}"><em class="cwd">${wdSh.format(noon(ds))}</em><small>${+ds.slice(8)}</small></i>`);
-    }
     // بطاقة «اليوم»: حالة الدوام ووقت الدخول والخروج والموقع والطلبات
     const tdy = today(), trep = HR.dayReport(tdy), tr = trep.synced ? trep.rows.find((x) => x.e.id === id) : null;
     let tcard;
@@ -2401,13 +2456,13 @@
       ${contactBar(e.phone, e.id, e.name)}
       <button class="btn-outline wide hr-mbtn" id="hrMsgEmp">${icon('note')}<span>إرسال رسالة بقالب جاهز</span></button>
       ${groups.map(([title, ic, cells]) => `<div class="hr-grp"><div class="hr-grph">${icon(ic)}<span>${title}</span></div><div class="hr-info">${cells.map(([k, v, key]) => `<div><small>${esc(k)}</small><b>${telLink(key, v)}</b></div>`).join('')}</div></div>`).join('')}
-      <div class="hr-sec"><span>الحضور آخر 14 يوماً</span><small>اضغط على يوم لعرض التفاصيل</small></div><div class="hr-cal14">${cells.join('')}</div>
+      <div id="empAtt"></div>
       <div class="hr-sec"><span>العقود (${cons.length})</span></div>
       ${cons.map((c) => conCard(c, c.id === focusCon)).join('') || '<div class="hr-none">لا عقود محفوظة</div>'}
       <div class="hr-sec"><span>التكليفات (${asgs.length})</span></div>
       ${asgs.map(asgCard).join('') || '<div class="hr-none">لا تكليفات</div>'}
       ${rawTable(raw)}`);
-    $('hrSheetBody').querySelectorAll('[data-day]').forEach((c) => { c.onclick = () => openDay(id, c.dataset.day); });
+    drawEmpAtt(id, e);
     $('hrMsgEmp').onclick = () => openCompose([{ empId: id }], 'free');
     const tb = $('hrTodayBtn'); if (tb) tb.onclick = () => openDay(id, tdy);
   }
