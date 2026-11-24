@@ -68,6 +68,9 @@
       nav.appendChild(b);
     });
     box.appendChild(nav);
+    let fab = $('hrFab');
+    if (!fab) { fab = el('button', 'hr5-fab', `${icon('send')}<span>تصدير</span>`); fab.id = 'hrFab'; fab.type = 'button'; fab.onclick = () => openXlCenter(null); $('hrBody').parentNode.appendChild(fab); }
+    fab.hidden = !['dash', 'att', 'emp', 'act'].includes(tab);
     if (secOf() === 'rep') {
       const sub = el('div', 'chips hr-tabs');
       [['att', 'الحضور', 'clock'], ['sites', 'المواقع', 'pin'], ['wk', 'ساعات الأسبوع', 'chart'], ['bal', 'الأرصدة', 'cal'], ['con', 'العقود', 'note'], ['asg', 'التكليفات', 'briefcase']].forEach(([k, n, ic]) => {
@@ -1136,19 +1139,19 @@
     gs.onsubmit = (ev) => { ev.preventDefault(); const v = $('hrGS').value.trim(); if (!v) return; tab = 'emp'; f.es = 'all'; f.q = v; store.set('hrTab', tab); render(); };
     body.appendChild(gs);
     filterBar(body);
-    // حلقة حال اليوم
+    // بطاقة الحال الرئيسية: نسبة الحضور برقم كبير + شريط مقسّم بالحالات
     const nPresent = cnt('present') + cnt('noin'), nLate = cnt('late'), nAbs = cnt('absent'), nLv = cnt('leave'), tot = rows.length || 1;
-    const seg = [[nPresent, 'var(--ok)'], [nLate, '#F0A64B'], [nAbs, '#F2716A'], [nLv, '#5B9DFF']];
-    let acc = 0; const stops = seg.map(([n, c]) => { const a0 = acc; acc += n / tot * 100; return `${c} ${a0}% ${acc}%`; });
-    if (acc < 100) stops.push(`var(--line) ${acc}% 100%`);
-    const went = nPresent + nLate;
-    const hero = el('div', 'hr2-hero', `<div class="hr2-ring" style="background:conic-gradient(${stops.join(',')})"><div><b>${went}</b><small>من ${rows.length} حضروا</small></div></div>
-      <div class="hr2-sum"><b>${tot ? Math.round(went * 100 / (rows.filter((r) => r.status !== 'off' && r.status !== 'exempt').length || 1)) : 0}%</b><small>نسبة الحضور اليوم</small><small>${rows.length} موظف${flN() ? ' (حسب الفلتر)' : ''}</small></div>`);
+    const went = nPresent + nLate, base = rows.filter((r) => r.status !== 'off' && r.status !== 'exempt').length || 1, pct = Math.round(went * 100 / base);
+    const seg = [[nPresent, '#7CF0BE', 'في الموعد', 'in'], [nLate, '#FFC857', 'متأخر', 'late'], [nAbs, '#FF9B94', 'بلا تسجيل', 'absent'], [nLv, '#9CC4FF', 'إجازة', 'leave']];
+    const hero = el('div', 'hr5-hero', `<small>نسبة الحضور اليوم${flN() ? ' (حسب الفلتر)' : ''}</small><div class="big num">${pct}<em>%</em></div><small>حضر ${went} من ${rows.length} موظف${rep.synced ? '' : ' · غير مزامَن بعد'}</small>
+      <div class="hr5-seg">${seg.map(([n, c]) => `<i style="width:${(n / tot * 100).toFixed(1)}%;background:${c}"></i>`).join('')}</div>
+      <div class="hr5-lg">${seg.map(([n, c, l, st]) => `<button type="button" data-st="${st}" style="--c:${c}"><i></i>${l} ${n}</button>`).join('')}</div>`);
+    hero.querySelectorAll('[data-st]').forEach((x) => { x.onclick = () => { tab = 'att'; f.st = x.dataset.st; f.day = t; f.q = ''; store.set('hrTab', tab); render(); }; });
     const nMis = rows.filter((r) => (r.reqs || []).some((q) => q.kind === 'mission' || q.kind === 'hourly')).length, nPend = pendingReqs().length;
     const kp = el('div', 'hr3-kpi');
-    [[nPresent, 'حضور', 'var(--ok)', () => { tab = 'att'; f.st = 'in'; }], [nLate, 'تأخر', '#F2716A', () => { tab = 'att'; f.st = 'late'; }], [nAbs, 'بلا تسجيل', '#F0A64B', () => { tab = 'att'; f.st = 'absent'; }],
-      [nLv, 'إجازة', '#8AA0A6', () => { tab = 'att'; f.st = 'leave'; }], [nMis, 'مهام ومغادرات', '#A579E0', () => { tab = 'att'; f.st = 'rq_mission'; }], [nPend, 'طلب معلّق', '#6FB7FF', () => { tab = 'lv'; f.lv = 'req'; f.rs = 'pending'; f.rk = 'all'; f.am = today().slice(0, 7); }]].forEach(([n, l, c, go]) => {
-      const k = el('button', 'hr3-k', `<b style="color:${c}">${n}</b><small>${l}</small>`); k.type = 'button'; k.style.setProperty('--c', c);
+    [[nPresent, 'حضور', 'var(--s-ok)', 'check', () => { tab = 'att'; f.st = 'in'; }], [nLate, 'تأخر', 'var(--s-late)', 'clock', () => { tab = 'att'; f.st = 'late'; }], [nAbs, 'بلا تسجيل', 'var(--s-abs)', 'alert', () => { tab = 'att'; f.st = 'absent'; }],
+      [nLv, 'إجازة', 'var(--s-lv)', 'cal', () => { tab = 'att'; f.st = 'leave'; }], [nMis, 'مهام ومغادرات', 'var(--s-ms)', 'briefcase', () => { tab = 'att'; f.st = 'rq_mission'; }], [nPend, 'طلب معلّق', 'var(--gold)', 'inbox', () => { tab = 'lv'; f.lv = 'req'; f.rs = 'pending'; f.rk = 'all'; f.am = today().slice(0, 7); }]].forEach(([n, l, c, ic, go]) => {
+      const k = el('button', 'hr3-k', `<span class="hr3-ki">${icon(ic)}</span><b class="num">${n}</b><small>${l}</small>`); k.type = 'button'; k.style.setProperty('--c', c);
       k.onclick = () => { go(); f.day = t; f.q = ''; store.set('hrTab', tab); render(); }; kp.appendChild(k);
     });
     body.appendChild(hero); body.appendChild(kp);
@@ -1284,7 +1287,7 @@
       if (r && trep.synced) { const st = STATUS[r.status]; right = (r.status === 'late' ? badge('+' + r.lateMin + ' د', 'warn') : r.status === 'leave' ? badge(leaveLbl(r.leave), 'info') : badge(st[0], st[1])) + (r.firstIn ? `<small>${tf.format(new Date(r.firstIn))}</small>` : ''); }
       const st = strip[e.id] || '';
       const orgB = e.org ? `<span class="hr3-tag ${e.org === 'HHO' ? 'hho' : 'pef'}">${esc(e.org)}</span>` : '';
-      return personRow(e, right, `${esc([e.pos, e.dept].filter(Boolean).join(' · ') || TYPE[e.type] || '')} ${orgB}${st ? `<span class="hr3-strip">${st}</span>` : ''}`);
+      return personRow(e, right, `${esc([e.pos, e.dept].filter(Boolean).join(' · ') || TYPE[e.type] || '')} ${orgB}${st ? `<span class="hr3-strip">${st}</span>` : ''}`, r && trep.synced ? (r.status === 'late' || r.status === 'noin' ? 'warn' : r.status === 'absent' ? 'bad' : r.status === 'leave' ? 'info' : r.status === 'off' || r.status === 'exempt' ? 'mute' : 'ok') : 'mute');
     }), 'لا نتائج');
   }
 
