@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>مواقيت الصلاة - فلسطين</title>
-<script>try{var t=JSON.parse(localStorage.getItem('theme'));if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<script>try{var t=JSON.parse(localStorage.getItem('theme')),v2=localStorage.getItem('designV2');document.documentElement.setAttribute('data-theme',(!t||!v2)?'eco':t)}catch(e){document.documentElement.setAttribute('data-theme','eco')}</script>
 <link rel="stylesheet" href="lib/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>

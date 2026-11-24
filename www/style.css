@@ -1824,3 +1824,54 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-cs svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}.hr-cs.on{background:color-mix(in srgb,var(--gold) 14%,transparent);border-color:var(--gold);color:var(--gold)}
 .hr-cs.xl{color:var(--ok)}
 .hr-cal14 i.pad{background:transparent;border:0}.hr-cal14 i.fut{opacity:.35}
+
+/* =====================================================================
+   8.59 — نظام التصميم الجديد «أخضر البيئة»: ثيمان (فاتح eco / داكن ecod) + رموز حالة + مكوّنات
+   ===================================================================== */
+:root{--elev:0 1px 2px rgba(0,0,0,.18),0 10px 28px rgba(0,0,0,.28);--s-ok:#2FBF8A;--s-late:#F0A64B;--s-abs:#F2716A;--s-lv:#5B9DFF;--s-ms:#A579E0;--accent2:#D8B36A}
+:root[data-theme="eco"]{--bg:#F6F4EE;--card:#FFFFFF;--card-2:#EFEBDD;--line:#E7E3D8;--text:#14211C;--muted:#6B7A74;--gold:#0F6B4F;--on-gold:#FFFFFF;--ok:#1E9E6A;--off:#D9D4C4;--nav-bg:#FFFFFF;--scrim:rgba(20,33,28,.55);--shade:rgba(0,0,0,.05);--pattern:none;--warn:#E07B1F;--elev:0 1px 2px rgba(20,33,28,.05),0 8px 24px rgba(20,33,28,.07);--s-ok:#1E9E6A;--s-late:#E07B1F;--s-abs:#D64545;--s-lv:#3B7DDD;--s-ms:#7B5CC8;--accent2:#C99A2E}
+:root[data-theme="ecod"]{--bg:#0B1512;--card:#12211C;--card-2:#192B24;--line:#1F3229;--text:#E8EFEA;--muted:#8FA39B;--gold:#3FC592;--on-gold:#04170F;--ok:#3FC592;--off:#2A4036;--nav-bg:#0E1B16;--scrim:rgba(2,8,6,.85);--shade:rgba(0,0,0,.3);--pattern:none;--elev:0 10px 28px rgba(0,0,0,.4);--s-ok:#3FC592;--s-late:#F0A64B;--s-abs:#F2716A;--s-lv:#6FA8FF;--s-ms:#B196F0;--accent2:#E8C46A}
+:root[data-theme="eco"] .ag-in,:root[data-theme="eco"] .ag-tpick input,:root[data-theme="eco"] .hr-f input,:root[data-theme="eco"] .hr-set input{color-scheme:light}
+:root[data-theme="eco"] .hm-map{background:#e8eef2}
+body{background:var(--bg)}
+/* شريط الأقسام: كبسولة بخلفية ناعمة بدل الخط السفلي */
+.hr2-nav{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:5px;box-shadow:var(--elev);margin:6px 0 12px;top:6px}
+.hr2-n{border-radius:15px;padding:7px 2px;font-weight:600}
+.hr2-n.on{background:var(--gold);color:var(--on-gold)}
+/* بطاقة الحال الرئيسية */
+.hr5-hero{background:linear-gradient(150deg,var(--gold),color-mix(in srgb,var(--gold) 62%,#000));color:var(--on-gold);border-radius:26px;padding:16px 18px;margin:10px 0;position:relative;overflow:hidden;box-shadow:var(--elev)}
+.hr5-hero:after{content:"";position:absolute;inset-inline-end:-46px;top:-46px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.08)}
+.hr5-hero small{opacity:.85;font-size:.78rem}.hr5-hero .big{font-size:3rem;font-weight:800;line-height:1.05;letter-spacing:-.02em}.hr5-hero .big em{font-style:normal;font-size:1.3rem;opacity:.8;margin-inline-start:2px}
+.hr5-seg{display:flex;gap:2px;height:10px;border-radius:99px;overflow:hidden;margin-top:14px;background:rgba(255,255,255,.2)}.hr5-seg i{display:block;height:100%;min-width:0;transition:width .5s var(--ease)}
+.hr5-lg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:.72rem}.hr5-lg button{background:none;border:0;color:inherit;font:inherit;display:inline-flex;align-items:center;gap:5px;cursor:pointer;opacity:.95}.hr5-lg i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+/* مؤشرات */
+.hr3-kpi{gap:10px}
+.hr3-k{display:grid;gap:5px;justify-items:start;text-align:start;border:0;border-radius:20px;box-shadow:var(--elev);padding:11px 12px}
+.hr3-ki{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c)}.hr3-ki svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8}
+.hr3-k b{font-size:1.5rem}
+/* بطاقات «يحتاج انتباهك» */
+.hr2-ac{border:0;border-radius:20px;box-shadow:var(--elev);padding:12px 14px;position:relative;overflow:hidden}
+.hr2-ac:before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:5px;background:var(--s-lv)}
+.hr2-ac.bad:before{background:var(--s-abs)}.hr2-ac.warn:before{background:var(--s-late)}.hr2-ac.info:before{background:var(--s-lv)}
+.hr2-ac .hr2-ic{border-radius:50%}
+.hr2-ac.bad .hr2-ic{background:color-mix(in srgb,var(--s-abs) 15%,transparent);color:var(--s-abs)}.hr2-ac.warn .hr2-ic{background:color-mix(in srgb,var(--s-late) 15%,transparent);color:var(--s-late)}.hr2-ac.info .hr2-ic{background:color-mix(in srgb,var(--s-lv) 15%,transparent);color:var(--s-lv)}
+/* قوائم الموظفين كبطاقات */
+.hr-list{background:transparent;border:0;border-radius:0;overflow:visible;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.hr-list .hr-row{background:var(--card);border-radius:20px;box-shadow:var(--elev);border-top:0!important;padding:12px 14px}
+.hr-ava{width:44px;height:44px;border:3px solid transparent;background-clip:padding-box;box-shadow:0 0 0 0 transparent}
+.hr-ava.ok{box-shadow:0 0 0 3px var(--s-ok)}.hr-ava.warn{box-shadow:0 0 0 3px var(--s-late)}.hr-ava.bad{box-shadow:0 0 0 3px var(--s-abs)}.hr-ava.info{box-shadow:0 0 0 3px var(--s-lv)}.hr-ava.mute{box-shadow:0 0 0 3px var(--off)}
+.hr3-strip{gap:3px;margin-top:8px;width:100%}.hr3-strip i{flex:1;height:18px;width:auto;border-radius:6px;border:0;background:var(--off)}
+.hr3-strip .s-ok{background:var(--s-ok)}.hr3-strip .s-late{background:var(--s-late)}.hr3-strip .s-abs{background:var(--s-abs)}.hr3-strip .s-lv{background:var(--s-lv)}.hr3-strip .s-off,.hr3-strip .s-na{background:color-mix(in srgb,var(--muted) 14%,transparent);border:0}
+/* بحث وفلاتر وأزرار */
+.hr2-search{border:0;border-radius:16px;box-shadow:var(--elev)}
+.chip{border-radius:99px}
+.btn-gold,.btn-primary{border-radius:14px}
+/* زر التصدير العائم */
+.hr5-fab{position:fixed;inset-inline-start:50%;transform:translateX(50%);bottom:calc(var(--nav-h) + 14px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--accent2);color:#2a1d02;border:0;border-radius:18px;padding:12px 20px;font:inherit;font-weight:800;font-size:.85rem;display:flex;gap:8px;align-items:center;box-shadow:0 10px 24px color-mix(in srgb,var(--accent2) 45%,transparent);cursor:pointer}
+.hr5-fab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9}
+.hr5-fab[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.hr5-seg i{transition:none}}
+
+.hr-list .hr-row{min-width:0;max-width:100%}.hr-rt{min-width:0}
+
+.hr-acc{padding:8px 12px!important;border-radius:14px;box-shadow:none;margin-bottom:2px}.hr-acc .hr-av{display:none}

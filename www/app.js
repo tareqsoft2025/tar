@@ -328,6 +328,8 @@
 
   /* ---------- الثيمات ---------- */
   const THEMES = [
+    { id: 'eco', name: 'أخضر البيئة (فاتح)', bg: '#F6F4EE', nav: '#ffffff', light: true, sw: 'linear-gradient(135deg,#F6F4EE 50%,#0F6B4F 50%)' },
+    { id: 'ecod', name: 'أخضر البيئة (داكن)', bg: '#0B1512', nav: '#0E1B16', light: false, sw: 'linear-gradient(135deg,#12211C 50%,#3FC592 50%)' },
     { id: 'navy', name: 'ليلي كلاسيكي', bg: '#0b1620', nav: '#101e2b', light: false, sw: 'linear-gradient(135deg,#132433 50%,#D8B36A 50%)' },
     { id: 'emerald', name: 'زمرد وذهب', bg: '#06231a', nav: '#082b20', light: false, sw: 'linear-gradient(135deg,#0d3325 50%,#E2BC6A 50%)' },
     { id: 'midnight', name: 'ليل أزرق', bg: '#07122B', nav: '#0a1836', light: false, sw: 'linear-gradient(135deg,#102349 50%,#7CB7FF 50%)' },
@@ -352,7 +354,9 @@
     b.onclick = () => applyTheme(t.id, true);
     $('themes').appendChild(b);
   });
-  applyTheme(store.get('theme', 'navy'), false);
+  // التصميم الجديد: يُطبَّق مرة واحدة للجميع (ويمكن الرجوع لأي ثيم قديم من الإعدادات)
+  if (!store.get('designV2', false)) { store.set('designV2', true); store.set('theme', 'eco'); }
+  applyTheme(store.get('theme', 'eco'), false);
 
   /* ---------- الإعدادات ---------- */
   const optText = (sel) => { const o = sel.options[sel.selectedIndex]; return o ? o.textContent : ''; };
