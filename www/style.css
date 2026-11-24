@@ -1875,3 +1875,14 @@ body{background:var(--bg)}
 .hr-list .hr-row{min-width:0;max-width:100%}.hr-rt{min-width:0}
 
 .hr-acc{padding:8px 12px!important;border-radius:14px;box-shadow:none;margin-bottom:2px}.hr-acc .hr-av{display:none}
+
+/* إصلاح: شبكة الأيام تنكمش بجانب العمود الجانبي ولا تتداخل معه */
+.hr-calwrap{gap:10px}
+.hr-calwrap .hr-cal14{grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;align-content:start}
+.hr-cal14 i{min-width:0;overflow:hidden;border-radius:9px}
+.hr-cal14 i .cwd{font-size:.5rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hr-cal14 i small{font-size:.72rem}
+.hr-calside{width:62px;gap:8px}
+.hr-cs{border-radius:14px;min-height:58px;box-shadow:var(--elev);border:0;font-size:.68rem;gap:4px}
+.hr-cs.on{background:var(--gold);color:var(--on-gold)}
+.hr-cs.xl{background:color-mix(in srgb,var(--s-ok) 14%,var(--card));color:var(--s-ok)}
