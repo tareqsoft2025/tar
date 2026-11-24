@@ -1816,3 +1816,11 @@ html:has(#tab-times.active){overflow:hidden}
 .hr-outb svg{stroke:var(--gold)}
 
 .hr3-xlb{width:auto;padding:8px 14px;font-size:.8rem;margin-top:6px}
+
+/* حضور الموظف: أيام + زر جانبي */
+.hr-calwrap{display:flex;gap:8px;align-items:stretch}.hr-calwrap .hr-cal14{flex:1;min-width:0}
+.hr-calside{display:flex;flex-direction:column;gap:6px;width:56px;flex:none}
+.hr-cs{flex:1;display:grid;place-items:center;align-content:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--text);font:inherit;font-size:.62rem;font-weight:700;cursor:pointer;padding:4px 2px}
+.hr-cs svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}.hr-cs.on{background:color-mix(in srgb,var(--gold) 14%,transparent);border-color:var(--gold);color:var(--gold)}
+.hr-cs.xl{color:var(--ok)}
+.hr-cal14 i.pad{background:transparent;border:0}.hr-cal14 i.fut{opacity:.35}
