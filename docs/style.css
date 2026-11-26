@@ -1931,3 +1931,13 @@ body{background:var(--bg)}
 .mc-form{padding:12px;display:grid;gap:8px}.mc-form label{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:4px 0}.mc-form label small{width:42px;color:var(--muted);flex:none}.mc-form input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text);font:inherit;padding:8px 0}
 .mc-lnk{background:none;border:0;color:var(--gold);font:inherit;font-size:.78rem;cursor:pointer}
 .mc-form textarea{min-height:44vh;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--text);font:inherit;line-height:1.7;resize:vertical}
+
+/* ===== الأخبار ===== */
+.nw-head{margin-bottom:8px}.nw-ch{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:18px;box-shadow:var(--elev);padding:12px}.nw-ch img,.nw-ch>span{width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none;font-size:1.6rem;display:grid;place-items:center}.nw-ch div{display:grid;min-width:0}.nw-ch small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nw-list{display:grid;gap:10px;padding-bottom:20px}.nw-day{font-size:.78rem;color:var(--muted);font-weight:700;margin:8px 4px 0}
+.nw-post{background:var(--card);border-radius:18px;box-shadow:var(--elev);padding:12px;display:grid;gap:8px;overflow:hidden}
+.nw-img{width:100%;max-height:340px;object-fit:cover;border-radius:12px;display:block}.nw-vid{position:relative}.nw-vid span{position:absolute;inset-inline-start:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:8px;padding:2px 8px;font-size:.75rem}
+.nw-tx{line-height:1.85;word-break:break-word;font-size:.95rem}.nw-tx a{color:var(--gold);text-decoration:underline}.nw-fw{color:var(--muted)}
+.nw-doc{background:color-mix(in srgb,var(--muted) 12%,transparent);border-radius:12px;padding:8px 10px;font-size:.85rem}
+.nw-lp{display:flex;gap:10px;border-inline-start:3px solid var(--gold);padding:4px 10px;background:color-mix(in srgb,var(--muted) 8%,transparent);border-radius:10px;cursor:pointer}.nw-lp img{width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none}.nw-lp div{display:grid;gap:2px;min-width:0}.nw-lp small{color:var(--gold)}.nw-lp span{color:var(--muted);font-size:.8rem}
+.nw-ft{display:flex;justify-content:space-between;align-items:center;gap:8px}.nw-ft small{color:var(--muted)}.nw-ft button{background:none;border:0;color:var(--gold);font:inherit;font-size:.78rem;cursor:pointer;padding:2px 6px}

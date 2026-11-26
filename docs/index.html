@@ -252,6 +252,7 @@
     </div>
     <button id="fxBar" class="fxbar" type="button" aria-label="سعر الدولار مقابل الشيكل"><span class="fx-l"><svg class="ic"><use href="#i-chart"/></svg><b>دولار / شيكل</b></span><span class="fx-v"><em id="fxUsd">$1 = ₪--</em><em id="fxIls">₪1 = $--</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <button id="payBar" class="fxbar paybar" type="button" aria-label="تحويل بنكي عبر محفظتي"><span class="fx-l"><svg class="ic"><use href="#i-wallet"/></svg><b>تحويل بنكي</b></span><span class="fx-v"><em>محفظتي · جوال بي</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+    <button id="newsBar" class="fxbar paybar" type="button" aria-label="الأخبار"><span class="fx-l"><svg class="ic"><use href="#i-note"/></svg><b>الأخبار</b></span><span class="fx-v"><em id="newsBarTxt">قناة تيليجرام · محفوظة</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <button id="mailBar" class="fxbar paybar" type="button" aria-label="البريد الإلكتروني"><span class="fx-l"><svg class="ic"><use href="#i-mail"/></svg><b>البريد الإلكتروني</b></span><span class="fx-v"><em>حساب · إرسال · إشعار الوارد</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <button id="jumahBanner" class="jbanner" type="button" hidden></button>
     <button id="asmaCard" class="asma-card" type="button"></button>
@@ -322,6 +323,7 @@
       <button class="hub-card ag-hub mg-hub" data-go="mgmt"><span class="hub-ic"><svg class="ic"><use href="#i-note"/></svg></span><b>النظام المساعد HR</b><small>توجيهات الإدارة، وأدوات أخرى ستضاف تدريجياًة إلى الموارد البشرية وتنفيذها</small></button>
       <button class="hub-card ag-hub" data-go="agenda"><span class="hub-ic"><svg class="ic"><use href="#i-cal"/></svg></span><b>الأجندة</b><small>مهامك ومواعيدك بالتاريخ والوقت، مع تذكير في منتصف الشاشة</small></button>
       <button class="hub-card" data-go="jumah"><span class="hub-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>يوم الجمعة</b><small>سنن وساعة الإجابة والصلاة على النبي</small></button>
+      <button class="hub-card" id="hubNews" type="button"><span class="hub-ic"><svg class="ic"><use href="#i-note"/></svg></span><b>الأخبار</b><small>منشورات القناة محفوظة</small></button>
       <button class="hub-card" id="hubMail" type="button"><span class="hub-ic"><svg class="ic"><use href="#i-mail"/></svg></span><b>البريد الإلكتروني</b><small>حساب، إرسال التقارير، إشعار الوارد</small></button>
       <button class="hub-card" data-go="fx"><span class="hub-ic"><svg class="ic"><use href="#i-chart"/></svg></span><b>الدولار والشيكل</b><small>سعر الصرف والتحويل</small></button>
       <button class="hub-card" data-go="khatma"><span class="hub-ic"><svg class="ic"><use href="#i-quran"/></svg></span><b>ختمة القرآن</b><small>خطة يومية وتقدّم</small></button>
@@ -355,6 +357,22 @@
     <div id="fxChips" class="chips" style="margin-top:12px"></div>
     <button id="fxRefresh" class="btn-outline wide" type="button"><svg class="ic"><use href="#i-refresh"/></svg><span>تحديث السعر الآن</span></button>
     <p class="note c"><span>السعر مرجعي (متوسط السوق) ويتحدّث تلقائياً، وقد يختلف عن أسعار الصرافين والبنوك.</span></p>
+  </section>
+
+  <!-- الأخبار: منشورات قناة تيليجرام العامة محفوظة محلياً -->
+  <section id="tab-news" class="tab">
+    <div class="mail-top">
+      <button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button>
+      <div class="mail-ttl"><b>الأخبار</b><small id="nwSub"></small></div>
+      <button id="nwSearchB" class="icon-btn" type="button" aria-label="بحث"><svg class="ic"><use href="#i-search"/></svg></button>
+      <button id="nwRefresh" class="icon-btn" type="button" aria-label="تحديث"><svg class="ic"><use href="#i-refresh"/></svg></button>
+      <button id="nwSet" class="icon-btn" type="button" aria-label="إعدادات"><svg class="ic"><use href="#i-sliders"/></svg></button>
+    </div>
+    <div id="nwSearchRow" class="mail-search" hidden><svg class="ic"><use href="#i-search"/></svg><input id="nwQ" type="search" placeholder="ابحث في الأخبار المحفوظة"></div>
+    <div id="nwHead" class="nw-head"></div>
+    <div id="nwList" class="nw-list"></div>
+    <div class="hr-gact" id="nwMoreRow" hidden><button id="nwOlder" class="btn-outline" type="button">تحميل الأقدم</button><button id="nwAll" class="btn-outline" type="button">حفظ كل الأرشيف</button></div>
+    <small id="nwMsg" class="hr-pgn"></small>
   </section>
 
   <!-- البريد الإلكتروني (محاكاة Outlook) -->
@@ -731,6 +749,7 @@
 <script src="fx.js"></script>
 <script src="pay.js"></script>
 <script src="mail.js"></script>
+<script src="news.js"></script>
 <script src="agenda-core.js"></script>
 <script src="remind-ui.js"></script>
 <script src="agenda.js"></script>

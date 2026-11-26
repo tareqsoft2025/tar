@@ -783,6 +783,29 @@ public class MainActivity extends Activity {
                 js("window.onMailOp&&window.onMailOp(" + org.json.JSONObject.quote(id) + "," + org.json.JSONObject.quote(res) + ")");
             } }).start();
         }
+        /** الأخبار: جلب صفحة معاينة تيليجرام (HTML) -> window.onNewsGet(id, ok, body). */
+        @JavascriptInterface public void newsGet(final String id, final String url) {
+            new Thread(new Runnable() { public void run() {
+                boolean ok = true; String body;
+                try { body = new String(NewsFetch.get(url, 3 * 1024 * 1024), "UTF-8"); } catch (Exception e) { ok = false; body = e.getMessage() == null ? e.toString() : e.getMessage(); }
+                js("window.onNewsGet&&window.onNewsGet(" + org.json.JSONObject.quote(id) + "," + ok + "," + org.json.JSONObject.quote(body) + ")");
+            } }).start();
+        }
+        /** حفظ صورة محلياً -> window.onNewsImg(id, ok, path). */
+        @JavascriptInterface public void newsImg(final String id, final String url) {
+            new Thread(new Runnable() { public void run() {
+                boolean ok = true; String r;
+                try { r = NewsFetch.image(MainActivity.this, url); } catch (Exception e) { ok = false; r = ""; }
+                js("window.onNewsImg&&window.onNewsImg(" + org.json.JSONObject.quote(id) + "," + ok + "," + org.json.JSONObject.quote(r) + ")");
+            } }).start();
+        }
+        /** إعداد إشعار الأخبار: القناة وتفعيل الفحص الدوري. */
+        @JavascriptInterface public void newsConfig(String chan, boolean notify) {
+            android.content.SharedPreferences.Editor e = NewsFetch.sp(MainActivity.this).edit().putString("chan", chan).putBoolean("notify", notify);
+            if (!chan.equals(NewsFetch.sp(MainActivity.this).getString("chan", ""))) e.remove("lastId");
+            e.apply(); NewsFetch.arm(MainActivity.this);
+        }
+        @JavascriptInterface public void newsMark(double lastId) { NewsFetch.sp(MainActivity.this).edit().putLong("lastId", (long) lastId).apply(); }
         @JavascriptInterface public boolean mailEnabled() { return MailSender.enabled(MainActivity.this); }
         /** يرسل ملفاً بالبريد في الخلفية؛ النتيجة تصل إلى window.onMailResult(id, ok, msg). */
         @JavascriptInterface public void mailSendFile(final String id, final String b64, final String name, final String subject, final String body) {
