@@ -1,8 +1,13 @@
-// تحويل بنكي عبر محفظتي (USSD): *370*1*1*رقم الجوال*المبلغ#
-// لا ينفّذ التطبيق التحويل بنفسه: يفتح لوحة الاتصال بالرمز جاهزاً بعد تأكيدك، ويضغط المستخدم «اتصال» ويُدخل رمزه السري على شاشة الشبكة.
+// تحويل بنكي عبر USSD: محفظتي *370*1*1*الجوال*المبلغ#  ·  جوال بي *110*1*الرقم السري*الجوال*المبلغ*1#
+// لا ينفّذ التطبيق التحويل بنفسه: يفتح لوحة الاتصال بالرمز جاهزاً بعد تأكيدك، ويضغط المستخدم «اتصال».
+// الرقم السري (جوال بي) لا يُحفظ أبداً ولا يُنسخ، ويُمسح من الحقل بعد الإرسال.
 (function () {
   const { $, store, toast, go, B } = App;
-  const PREFIX = '*370*1*1*';
+  const PROVIDERS = {
+    mahfazti: { name: 'محفظتي', title: 'محفظتي — تحويل الأموال برمز USSD', pin: false, build: (n, a) => `*370*1*1*${n}*${a}#` },
+    jawwalpay: { name: 'جوال بي', title: 'جوال بي — تحويل الأموال برمز USSD', pin: true, build: (n, a, pin) => `*110*1*${pin}*${n}*${a}*1#` }
+  };
+  let prov = store.get('payProv', 'mahfazti'); if (!PROVIDERS[prov]) prov = 'mahfazti';
   const digits = (v) => String(v || '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '');
   // الصيغة المحلية 05XXXXXXXX؛ يُحوَّل +970/+972/00970 تلقائياً
   function normNum(v) {
@@ -17,17 +22,21 @@
     store.set('payRecents', l.slice(0, 8));
   };
   function check() {
-    const n = normNum($('payNum').value), a = +$('payAmt').value;
+    const P = PROVIDERS[prov], n = normNum($('payNum').value), a = +$('payAmt').value, pin = digits($('payPin').value);
+    if (P.pin && !/^\d{4,8}$/.test(pin)) return { err: 'اكتب الرقم السري (من 4 إلى 8 أرقام)' };
     if (!/^05\d{8}$/.test(n)) return { err: 'اكتب رقم جوال صحيحاً من 10 أرقام يبدأ بـ 05 (مثال 0599123456)' };
     if (!(a > 0)) return { err: 'اكتب مبلغاً أكبر من صفر' };
     if (a > 100000) return { err: 'المبلغ كبير جداً، تحقق منه' };
     const amt = String(Math.round(a * 100) / 100);
-    return { n, a: amt, code: PREFIX + n + '*' + amt + '#' };
+    return { n, a: amt, code: P.build(n, amt, pin), shown: P.build(n, amt, '••••') };
   }
   function paint() {
-    const r = check(), show = r.code || (PREFIX + (normNum($('payNum').value) || 'رقم الجوال') + '*' + ($('payAmt').value || 'المبلغ') + '#');
-    $('payCode').textContent = show;
-    const hasInput = $('payNum').value || $('payAmt').value;
+    const P = PROVIDERS[prov], r = check();
+    $('payTitle').textContent = P.title;
+    $('payPinRow').hidden = !P.pin; $('payPinNote').hidden = !P.pin; $('payCopy').hidden = P.pin;
+    document.querySelectorAll('#payProv [data-p]').forEach((b) => b.classList.toggle('on', b.dataset.p === prov));
+    $('payCode').textContent = r.shown || P.build(normNum($('payNum').value) || 'رقم الجوال', $('payAmt').value || 'المبلغ', P.pin ? '••••' : '');
+    const hasInput = $('payNum').value || $('payAmt').value || $('payPin').value;
     $('payErr').hidden = !(r.err && hasInput); $('payErr').textContent = r.err || '';
   }
   function drawRecents() {
@@ -43,21 +52,25 @@
       b.appendChild(t); b.appendChild(d); box.appendChild(b);
     });
   }
-  $('payBar').onclick = () => { go('pay'); paint(); drawRecents(); };
-  ['payNum', 'payAmt'].forEach((id) => { $(id).oninput = paint; });
+  $('payBar').onclick = () => { $('payPin').value = ''; go('pay'); paint(); drawRecents(); };
+  document.querySelectorAll('#payProv [data-p]').forEach((b) => { b.onclick = () => { prov = b.dataset.p; store.set('payProv', prov); $('payPin').value = ''; paint(); }; });
+  ['payNum', 'payAmt', 'payPin'].forEach((id) => { $(id).oninput = paint; });
   $('payGo').onclick = () => {
     const r = check(); if (r.err) { $('payErr').hidden = false; $('payErr').textContent = r.err; toast(r.err); return; }
-    const who = $('payName').value.trim();
-    if (!confirm(`تأكيد التحويل عبر محفظتي\n\nإلى: ${r.n}${who ? ' (' + who + ')' : ''}\nالمبلغ: ${r.a} ₪\n\nستُفتح لوحة الاتصال بالرمز جاهزاً، ثم تضغط «اتصال».`)) return;
+    const who = $('payName').value.trim(), P = PROVIDERS[prov];
+    if (!confirm(`تأكيد التحويل عبر ${P.name}\n\nإلى: ${r.n}${who ? ' (' + who + ')' : ''}\nالمبلغ: ${r.a} ₪\n\nستُفتح لوحة الاتصال بالرمز جاهزاً، ثم تضغط «اتصال».`)) return;
     saveRecent(r.n, who); drawRecents();
     const url = 'tel:' + r.code.replace(/#/g, '%23');
     if (B && B.openExternal) B.openExternal(url); else window.open(url, '_blank');
     toast('اضغط «اتصال» لإتمام التحويل');
+    if (P.pin) setTimeout(() => { $('payPin').value = ''; paint(); }, 800);   // لا يبقى الرقم السري في الحقل
   };
   $('payCopy').onclick = () => {
     const r = check(); if (r.err) { toast(r.err); return; }
+    if (PROVIDERS[prov].pin) { toast('نسخ الرمز معطّل لهذه الخدمة لحماية الرقم السري'); return; }
     if (B && B.copy) B.copy(r.code); else if (navigator.clipboard) navigator.clipboard.writeText(r.code);
     toast('تم نسخ الرمز');
   };
-  window.payCode = (n, a) => PREFIX + normNum(n) + '*' + a + '#';   // للاختبار
+  paint();
+  window.payCode = (p, n, a, pin) => PROVIDERS[p].build(normNum(n), a, pin);   // للاختبار
 })();
