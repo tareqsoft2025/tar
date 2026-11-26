@@ -246,6 +246,10 @@ public class ReminderActivity extends Activity {
             startActivity(new Intent(ReminderActivity.this, MainActivity.class).putExtra("tab", "hr").putExtra("go", go == null || go.isEmpty() ? "inbox" : go).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
             close();
         }
+        @JavascriptInterface public void openMail() {
+            try { startActivity(MailInbox.mailApp(ReminderActivity.this)); } catch (Exception e) { /* لا تطبيق بريد */ }
+            close();
+        }
         @JavascriptInterface public void sendReport() {
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).cancel(AutoReport.NOTIF_ID);
             AutoReport.sendPrepared(ReminderActivity.this);

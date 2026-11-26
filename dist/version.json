@@ -1,6 +1,6 @@
 {
-  "versionCode": 109,
-  "versionName": "8.63",
-  "notes": "سجل التحويلات المالية",
-  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-109.apk"
+  "versionCode": 110,
+  "versionName": "8.64",
+  "notes": "حساب البريد IMAP/SMTP وإشعار منبثق بالبريد الجديد",
+  "apk": "https://raw.githubusercontent.com/tareqsoft2025/tar/main/dist/prayer-110.apk"
 }
