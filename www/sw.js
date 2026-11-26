@@ -1,8 +1,8 @@
 // خدمة تخزين مؤقت: تعمل الصفحة دون إنترنت بعد أول زيارة
-const CACHE = 'prayer-v105';
-const FILES = ['./', 'lib/leaflet.js', 'lib/pmtiles.js', 'lib/protomaps-leaflet.js', 'lib/leaflet.css', 'hr-map.js', 'index.html', 'style.css', 'app.js', 'places.js', 'core.js', 'content.js', 'content-ui.js', 'jumah.js', 'data2.js', 'features.js', 'weather.js', 'fx.js', 'pay.js', 'mail.js', 'news.js', 'agenda-core.js', 'remind-ui.js', 'agenda.js', 'hr-data.js', 'hr-xlsx.js', 'hr-report.js', 'hr-policy.js', 'hr-auto.js', 'hr-review.js', 'hr.js', 'mgmt.js', 'hr-sync.html', 'reminder.html', 'quran-data.js', 'tracker.js', 'screens.js', 'azkar.js', 'lib/adhan.umd.min.js', 'manifest.webmanifest',
+const CACHE = 'prayer-v106';
+const FILES = ['./', 'lib/leaflet.js', 'lib/pmtiles.js', 'lib/protomaps-leaflet.js', 'lib/leaflet.css', 'hr-map.js', 'index.html', 'style.css', 'v3.css', 'app.js', 'places.js', 'core.js', 'content.js', 'content-ui.js', 'jumah.js', 'data2.js', 'features.js', 'weather.js', 'fx.js', 'pay.js', 'mail.js', 'news.js', 'agenda-core.js', 'remind-ui.js', 'agenda.js', 'hr-data.js', 'hr-xlsx.js', 'hr-report.js', 'hr-policy.js', 'hr-auto.js', 'hr-review.js', 'hr.js', 'mgmt.js', 'hr-sync.html', 'reminder.html', 'quran-data.js', 'tracker.js', 'screens.js', 'azkar.js', 'lib/adhan.umd.min.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
-  'fonts/plex-400.ttf', 'fonts/plex-500.ttf', 'fonts/plex-700.ttf', 'fonts/amiri-400.ttf'];
+  'fonts/plex-400.ttf', 'fonts/plex-500.ttf', 'fonts/plex-700.ttf', 'fonts/readex-300.ttf', 'fonts/readex-400.ttf', 'fonts/readex-500.ttf', 'fonts/readex-600.ttf', 'fonts/readex-700.ttf', 'fonts/naskh-700.ttf', 'fonts/amiri-400.ttf'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));

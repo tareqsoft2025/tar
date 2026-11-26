@@ -1,0 +1,77 @@
+/* ===== التصميم الجديد v3: خط Readex + ثيمات «السماء» التفاعلية + زجاج ===== */
+@font-face{font-family:"Readex";font-weight:300;font-display:swap;src:url(fonts/readex-300.ttf) format("truetype")}
+@font-face{font-family:"Readex";font-weight:400;font-display:swap;src:url(fonts/readex-400.ttf) format("truetype")}
+@font-face{font-family:"Readex";font-weight:500;font-display:swap;src:url(fonts/readex-500.ttf) format("truetype")}
+@font-face{font-family:"Readex";font-weight:600;font-display:swap;src:url(fonts/readex-600.ttf) format("truetype")}
+@font-face{font-family:"Readex";font-weight:700;font-display:swap;src:url(fonts/readex-700.ttf) format("truetype")}
+@font-face{font-family:"Naskh";font-weight:700;font-display:swap;src:url(fonts/naskh-700.ttf) format("truetype")}
+
+:root[data-theme="fajr"],:root[data-theme="dhuhr"],:root[data-theme="asr"],:root[data-theme="maghrib"],:root[data-theme="isha"]{--pattern:linear-gradient(transparent,transparent);--shade:rgba(0,0,0,.25)}
+:root[data-theme="fajr"]{--bg:#171738;--bg-grad:linear-gradient(180deg,#171738 0%,#3B2F66 52%,#B8748A 100%);--card:rgba(255,255,255,.09);--card-2:#3a3066;--line:rgba(255,255,255,.15);--text:#FFF6EE;--muted:#CBBFD4;--gold:#FFC8A0;--on-gold:#2a1530;--ok:#8FE3B8;--off:#5a4a80;--nav-bg:rgba(32,26,66,.72);--scrim:rgba(10,8,28,.82);--stars:.9;--glow:#FFB38A}
+:root[data-theme="dhuhr"]{--bg:#FBF7EC;--bg-grad:linear-gradient(180deg,#FBF7EC 0%,#E3EEF1 100%);--card:rgba(255,255,255,.75);--card-2:#FFFFFF;--line:rgba(19,32,29,.11);--text:#13201D;--muted:#5F706B;--gold:#0D6B5B;--on-gold:#FFFFFF;--ok:#0D6B5B;--off:#C9D3CF;--nav-bg:rgba(255,255,255,.82);--scrim:rgba(19,32,29,.5);--stars:0;--glow:#9AD6C2}
+:root[data-theme="asr"]{--bg:#FFF1D6;--bg-grad:linear-gradient(180deg,#FFF1D6 0%,#F4C58A 100%);--card:rgba(255,255,255,.62);--card-2:#FFF8EA;--line:rgba(51,32,10,.14);--text:#33200A;--muted:#7D5E38;--gold:#B2540D;--on-gold:#FFFFFF;--ok:#2F7D4F;--off:#E3CBA6;--nav-bg:rgba(255,247,232,.84);--scrim:rgba(51,32,10,.5);--stars:0;--glow:#FFC46B}
+:root[data-theme="maghrib"]{--bg:#2A1236;--bg-grad:linear-gradient(180deg,#2A1236 0%,#8E2F4C 55%,#E07A44 100%);--card:rgba(255,255,255,.1);--card-2:#6a2a48;--line:rgba(255,255,255,.18);--text:#FFF4EA;--muted:#F0D4C8;--gold:#FFD9AA;--on-gold:#3a1226;--ok:#A6EDC0;--off:#8a4560;--nav-bg:rgba(60,20,50,.72);--scrim:rgba(24,8,30,.82);--stars:.35;--glow:#FF9A5A}
+:root[data-theme="isha"]{--bg:#050816;--bg-grad:linear-gradient(180deg,#050816 0%,#0D1433 100%);--card:rgba(255,255,255,.07);--card-2:#18204a;--line:rgba(255,255,255,.1);--text:#EEF0FF;--muted:#A9B1D6;--gold:#A9B8FF;--on-gold:#0a1030;--ok:#7FE0B0;--off:#2a3566;--nav-bg:rgba(14,20,48,.8);--scrim:rgba(2,4,14,.85);--stars:1;--glow:#5B6CFF}
+
+body{font-family:"Readex","Plex","Segoe UI",Tahoma,sans-serif}
+html{background:var(--bg)}
+body{background:var(--bg-grad,var(--bg)) fixed;transition:color .6s}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:var(--stars,0);transition:opacity 1s;
+  background-image:radial-gradient(1.4px 1.4px at 20% 10%,#fff,transparent),radial-gradient(1px 1px at 70% 7%,#fff,transparent),radial-gradient(1.2px 1.2px at 42% 20%,#fff,transparent),radial-gradient(1px 1px at 88% 24%,#fff,transparent),radial-gradient(1.2px 1.2px at 10% 32%,#fff,transparent),radial-gradient(1px 1px at 58% 3%,#fff,transparent),radial-gradient(1.1px 1.1px at 32% 40%,#fff,transparent),radial-gradient(1px 1px at 80% 44%,#fff,transparent);animation:twinkle 5s ease-in-out infinite alternate}
+body::after{content:"";position:fixed;z-index:0;pointer-events:none;width:440px;height:440px;border-radius:50%;left:50%;top:-190px;margin-left:-220px;filter:blur(60px);opacity:.38;background:radial-gradient(circle,var(--glow,transparent),transparent 65%);transition:opacity 1s}
+@keyframes twinkle{from{filter:brightness(.7)}to{filter:brightness(1.25)}}
+@media (prefers-reduced-motion:reduce){body::before{animation:none}}
+html:not([data-theme="fajr"]):not([data-theme="maghrib"]):not([data-theme="isha"]):not([data-theme="dhuhr"]):not([data-theme="asr"]) body::after{opacity:0}
+main,.topbar2{position:relative;z-index:1}
+
+/* انتقال الثيم الدائري */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:skyReveal .9s cubic-bezier(.4,0,.2,1) both;z-index:9999}
+::view-transition-old(root){z-index:1}
+@keyframes skyReveal{from{clip-path:circle(0 at var(--tx,50%) var(--ty,50%))}to{clip-path:circle(150% at var(--tx,50%) var(--ty,50%))}}
+
+/* زجاج */
+:root[data-theme="fajr"] .group,:root[data-theme="dhuhr"] .group,:root[data-theme="asr"] .group,:root[data-theme="maghrib"] .group,:root[data-theme="isha"] .group,
+:root[data-theme="fajr"] .tile,:root[data-theme="dhuhr"] .tile,:root[data-theme="asr"] .tile,:root[data-theme="maghrib"] .tile,:root[data-theme="isha"] .tile,
+:root[data-theme="fajr"] .fxbar,:root[data-theme="dhuhr"] .fxbar,:root[data-theme="asr"] .fxbar,:root[data-theme="maghrib"] .fxbar,:root[data-theme="isha"] .fxbar{-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+
+/* شريط التنقل العائم */
+.dock{inset-inline:20px;bottom:calc(14px + env(safe-area-inset-bottom));height:68px;padding:6px;border:1px solid var(--line);border-radius:34px;background:var(--nav-bg);-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);box-shadow:0 14px 34px rgba(0,0,0,.22);max-width:520px;margin-inline:auto}
+.dock button{border-radius:28px;transition:background .3s,color .3s,flex .3s}
+.dock button.on{background:var(--gold);color:var(--on-gold)}
+.dock button.on span{font-weight:600}
+.dock button span{font-size:.6875rem}
+main{padding-bottom:calc(var(--nav-h) + 46px + env(safe-area-inset-bottom))}
+
+/* الرئيسية */
+#tab-times .topbar2 .place,#tab-times .date-h{font-family:"Readex"}
+#tab-times .hero{flex-direction:column;align-items:center;text-align:center;gap:8px;padding:6px 0 0;background:none;border:0;box-shadow:none;min-height:0;overflow:visible}
+#tab-times .hero-info{flex:none;width:100%;display:flex;flex-direction:column;align-items:center}
+#tab-times .hero-info .next-name{font-family:"Naskh","Amiri",serif;font-weight:700;font-size:clamp(3rem,13vw,4.25rem);line-height:1.15;color:var(--text);margin:0}
+#tab-times .hero-info .hdiv{display:none}
+#tab-times .hero-info .eyebrow{font-size:.75rem;letter-spacing:.1em;color:var(--muted)}
+#tab-times .hero-info .next-time{font-size:1.125rem;font-weight:500;color:var(--gold);margin:0}
+#tab-times .ring{margin:4px auto 0;width:min(70vw,268px);max-width:none;flex:none;border:0}
+#tab-times .ring .ring-bg{stroke:var(--line);stroke-width:3}
+#tab-times .ring .ring-fg{stroke:var(--gold);stroke-width:5;stroke-linecap:round;filter:drop-shadow(0 0 6px var(--gold))}
+#tab-times .ring .ring-dot{fill:var(--text)}
+#tab-times .ring-in .count{font-weight:300;font-size:2.25rem;letter-spacing:1px}
+#tab-times .plist{padding:6px;border-radius:26px;background:var(--card);border:1px solid var(--line);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+#tab-times .plist li,#tab-times .plist li.upcoming,#tab-times .plist li.past{border-color:var(--line)}
+#tab-times .plist li.next{background:var(--text);color:var(--bg);border:0;border-radius:20px;margin:3px 0}
+#tab-times .plist li.next .pn,#tab-times .plist li.next .pt{color:var(--bg)}
+:root[data-theme="fajr"] #tab-times .plist li.next,:root[data-theme="maghrib"] #tab-times .plist li.next,:root[data-theme="isha"] #tab-times .plist li.next{background:#fff;color:#201533}
+:root[data-theme="fajr"] #tab-times .plist li.next .pn,:root[data-theme="fajr"] #tab-times .plist li.next .pt,:root[data-theme="maghrib"] #tab-times .plist li.next .pn,:root[data-theme="maghrib"] #tab-times .plist li.next .pt,:root[data-theme="isha"] #tab-times .plist li.next .pn,:root[data-theme="isha"] #tab-times .plist li.next .pt{color:#201533}
+#tab-times .plist li.next .pic{border-color:currentColor;color:inherit;background:transparent}
+#tab-times .plist .pn{font-family:"Naskh","Amiri",serif;font-weight:700;font-size:1.375rem}
+#tab-times .plist .pt{font-weight:400;color:var(--muted)}
+#tab-times .plist li.past .pn,#tab-times .plist li.past .pt{opacity:.55}
+#tab-times .tile,#tab-times .quick .fxbar{background:var(--card);border-color:var(--line);border-radius:22px}
+
+/* ثيمات الإعدادات: أزرار الثيم + «تلقائي» */
+.theme-btn[data-id="auto"]{grid-column:1/-1;flex-direction:row;justify-content:center;gap:10px;font-weight:600}
+.theme-btn[data-id="auto"] .sw{width:100%;max-width:none;height:34px;border-radius:12px}
+
+/* الموارد البشرية */
+#tab-hr .head-row h1{font-size:1.5rem;white-space:nowrap;font-weight:600}
+#tab-hr .hr2-n.on,#tab-hr .hr2-nav .on{box-shadow:0 6px 16px rgba(0,0,0,.18)}

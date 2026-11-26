@@ -71,6 +71,7 @@
     const next = tl[ni];
     state.next = next;
     state.prev = tl[ni - 1];
+    if (window.applySkyTheme) window.applySkyTheme();
     $('nextName').textContent = Core.nameFor(state, next.key, next.time);
     const np = timeParts(next.time);
     $('nextAt').textContent = `${np.hm} ${np.ap}`;
@@ -338,25 +339,53 @@
     { id: 'palestine', name: 'علم فلسطين', bg: '#080A09', nav: '#0c0f0d', light: false, sw: 'linear-gradient(135deg,#0b0b0b 34%,#fff 34% 50%,#2FBF71 50% 72%,#E4312B 72%)' },
     { id: 'light', name: 'نهاري', bg: '#F4F1E8', nav: '#ffffff', light: true, sw: 'linear-gradient(135deg,#F4F1E8 50%,#0B6B3A 50%)' }
   ];
-  function applyTheme(id, save) {
-    const t = THEMES.find((x) => x.id === id) || THEMES[0];
-    document.documentElement.setAttribute('data-theme', t.id);
-    const m = document.querySelector('meta[name=theme-color]');
-    if (m) m.setAttribute('content', t.bg);
-    if (save) store.set('theme', t.id);
-    document.querySelectorAll('.theme-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === t.id)));
-    if (B && B.setTheme) B.setTheme(t.bg, t.nav, t.light);
+  const SKY = [
+    { id: 'auto', name: 'تلقائي · يتبع الصلاة', bg: '#171738', nav: '#201a42', light: false, sw: 'linear-gradient(90deg,#171738,#C27A8C 18%,#FBF7EC 38%,#F4C58A 62%,#8E2F4C 80%,#050816)' },
+    { id: 'fajr', name: 'الفجر', bg: '#171738', nav: '#201a42', light: false, sw: 'linear-gradient(135deg,#3B2F66 50%,#FFC8A0 50%)' },
+    { id: 'dhuhr', name: 'الظهيرة', bg: '#FBF7EC', nav: '#ffffff', light: true, sw: 'linear-gradient(135deg,#FBF7EC 50%,#0D6B5B 50%)' },
+    { id: 'asr', name: 'العصر', bg: '#FFF1D6', nav: '#FFF8EA', light: true, sw: 'linear-gradient(135deg,#F4C58A 50%,#B2540D 50%)' },
+    { id: 'maghrib', name: 'الغروب', bg: '#2A1236', nav: '#3c1432', light: false, sw: 'linear-gradient(135deg,#8E2F4C 50%,#FFD9AA 50%)' },
+    { id: 'isha', name: 'الليل', bg: '#050816', nav: '#0e1430', light: false, sw: 'linear-gradient(135deg,#0D1433 50%,#A9B8FF 50%)' }
+  ];
+  THEMES.unshift(...SKY);
+  const SKY_OF = { fajr: 'fajr', sunrise: 'dhuhr', dhuhr: 'dhuhr', asr: 'asr', maghrib: 'maghrib', isha: 'isha' };
+  function skyNow() { return (state && state.prev && SKY_OF[state.prev.key]) || store.get('skyLast', 'dhuhr'); }
+  let lastApplied = null;
+  function applyTheme(id, save, ev) {
+    const pick = id === 'auto' ? skyNow() : id;
+    const t = THEMES.find((x) => x.id === pick && x.id !== 'auto') || THEMES.find((x) => x.id === 'dhuhr');
+    if (save) store.set('theme', id);
+    if (id === 'auto') store.set('skyLast', pick);
+    document.querySelectorAll('.theme-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === id)));
+    if (lastApplied === t.id) return;
+    const apply = () => {
+      document.documentElement.setAttribute('data-theme', t.id);
+      const m = document.querySelector('meta[name=theme-color]');
+      if (m) m.setAttribute('content', t.bg);
+      if (B && B.setTheme) B.setTheme(t.bg, t.nav, t.light);
+    };
+    const first = lastApplied === null; lastApplied = t.id;
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if (!first && !reduce && document.startViewTransition) {
+      const r = document.documentElement.style;
+      const x = ev && ev.clientX != null ? ev.clientX : innerWidth / 2, y = ev && ev.clientY != null ? ev.clientY : innerHeight / 3;
+      r.setProperty('--tx', x + 'px'); r.setProperty('--ty', y + 'px');
+      try { document.startViewTransition(apply); } catch (e) { apply(); }
+      if (B && B.vibrate) { try { B.vibrate(15); } catch (e) {} }
+    } else apply();
   }
+  window.applySkyTheme = () => { if (store.get('theme', 'auto') === 'auto') applyTheme('auto', false); };
   THEMES.forEach((t) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'theme-btn'; b.dataset.id = t.id;
     b.innerHTML = `<span class="sw" style="background:${t.sw}"></span><span>${t.name}</span>`;
-    b.onclick = () => applyTheme(t.id, true);
+    b.onclick = (e) => applyTheme(t.id, true, e);
     $('themes').appendChild(b);
   });
   // التصميم الجديد: يُطبَّق مرة واحدة للجميع (ويمكن الرجوع لأي ثيم قديم من الإعدادات)
   if (!store.get('designV2', false)) { store.set('designV2', true); store.set('theme', 'eco'); }
-  applyTheme(store.get('theme', 'eco'), false);
+  if (!store.get('designV3', false)) { store.set('designV3', true); store.set('theme', 'auto'); }
+  applyTheme(store.get('theme', 'auto'), false);
 
   /* ---------- الإعدادات ---------- */
   const optText = (sel) => { const o = sel.options[sel.selectedIndex]; return o ? o.textContent : ''; };
