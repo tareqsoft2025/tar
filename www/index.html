@@ -49,6 +49,7 @@
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
     <symbol id="i-quran" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M9 7h6M9 11h6"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h13v4M3 7v11a2 2 0 002 2h14a1 1 0 001-1v-9a1 1 0 00-1-1H5a2 2 0 01-2-2zM16 14.5h.01"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
     <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -249,6 +250,7 @@
       </div>
     </div>
     <button id="fxBar" class="fxbar" type="button" aria-label="سعر الدولار مقابل الشيكل"><span class="fx-l"><svg class="ic"><use href="#i-chart"/></svg><b>دولار / شيكل</b></span><span class="fx-v"><em id="fxUsd">$1 = ₪--</em><em id="fxIls">₪1 = $--</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+    <button id="payBar" class="fxbar paybar" type="button" aria-label="تحويل بنكي عبر محفظتي"><span class="fx-l"><svg class="ic"><use href="#i-wallet"/></svg><b>تحويل بنكي</b></span><span class="fx-v"><em>محفظتي · USSD</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <button id="jumahBanner" class="jbanner" type="button" hidden></button>
     <button id="asmaCard" class="asma-card" type="button"></button>
     <button id="dailyHadith" class="hcard" type="button"></button>
@@ -350,6 +352,23 @@
     <div id="fxChips" class="chips" style="margin-top:12px"></div>
     <button id="fxRefresh" class="btn-outline wide" type="button"><svg class="ic"><use href="#i-refresh"/></svg><span>تحديث السعر الآن</span></button>
     <p class="note c"><span>السعر مرجعي (متوسط السوق) ويتحدّث تلقائياً، وقد يختلف عن أسعار الصرافين والبنوك.</span></p>
+  </section>
+
+  <!-- تحويل بنكي (محفظتي عبر USSD) -->
+  <section id="tab-pay" class="tab">
+    <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">تحويل بنكي</h1></div>
+    <div class="kh-hero"><div class="eyebrow">محفظتي — تحويل الأموال برمز USSD</div><div class="fx-big" dir="ltr" style="direction:ltr;text-align:center;font-size:1.15rem;font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:0" id="payCode">*370*1*1*رقم الجوال*المبلغ#</div><div class="muted small" style="margin-top:6px">تُفتح لوحة الاتصال بالرمز جاهزاً، وتضغط أنت «اتصال» لإتمام التحويل.</div></div>
+    <div class="group pad fx-conv">
+      <label class="fx-row"><span class="cur">رقم جوال المستلم</span><input id="payNum" type="tel" inputmode="numeric" maxlength="14" placeholder="0599123456" dir="ltr" autocomplete="off" aria-label="رقم الجوال"></label>
+      <label class="fx-row"><span class="cur">المبلغ (₪)</span><input id="payAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0" dir="ltr" aria-label="المبلغ"></label>
+      <label class="fx-row"><span class="cur">اسم المستلم (اختياري)</span><input id="payName" type="text" placeholder="لحفظه في المستلمين" aria-label="اسم المستلم"></label>
+    </div>
+    <div id="payErr" class="note c" style="color:var(--warn)" hidden></div>
+    <button id="payGo" class="btn-gold wide" type="button"><svg class="ic"><use href="#i-wallet"/></svg><span>تنفيذ التحويل</span></button>
+    <button id="payCopy" class="btn-outline wide" type="button" style="margin-top:8px">نسخ الرمز</button>
+    <div class="hr-sec" style="margin-top:18px"><span>المستلمون السابقون</span></div>
+    <div id="payRec" class="chips" style="flex-wrap:wrap"></div>
+    <p class="note c"><span>التحويل يتم عبر شبكة الاتصالات ومحفظتك، ويُطلب منك رمزك السري على شاشة الاتصال نفسها. التطبيق لا يحفظ أي رمز سري ولا يرى نتيجة التحويل؛ راجع رسالة التأكيد من المحفظة. تحقق من الرقم والمبلغ جيداً قبل الإرسال.</span></p>
   </section>
 
   <!-- أسماء الله الحسنى -->
@@ -682,6 +701,7 @@
 <script src="features.js"></script>
 <script src="weather.js"></script>
 <script src="fx.js"></script>
+<script src="pay.js"></script>
 <script src="agenda-core.js"></script>
 <script src="remind-ui.js"></script>
 <script src="agenda.js"></script>
