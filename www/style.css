@@ -1941,3 +1941,33 @@ body{background:var(--bg)}
 .nw-doc{background:color-mix(in srgb,var(--muted) 12%,transparent);border-radius:12px;padding:8px 10px;font-size:.85rem}
 .nw-lp{display:flex;gap:10px;border-inline-start:3px solid var(--gold);padding:4px 10px;background:color-mix(in srgb,var(--muted) 8%,transparent);border-radius:10px;cursor:pointer}.nw-lp img{width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none}.nw-lp div{display:grid;gap:2px;min-width:0}.nw-lp small{color:var(--gold)}.nw-lp span{color:var(--muted);font-size:.8rem}
 .nw-ft{display:flex;justify-content:space-between;align-items:center;gap:8px}.nw-ft small{color:var(--muted)}.nw-ft button{background:none;border:0;color:var(--gold);font:inherit;font-size:.78rem;cursor:pointer;padding:2px 6px}
+
+/* ===== تصميم الرئيسية الجديد (v8.68): تمرير طبيعي + شبكة اختصارات ===== */
+html:has(#tab-times.active),body:has(#tab-times.active){overflow:auto;height:auto}
+#tab-times.active{height:auto;min-height:0;display:flex;flex-direction:column;gap:14px}
+#tab-times .plist{flex:none;display:flex;flex-direction:column;gap:0;justify-content:flex-start;padding:4px 6px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
+#tab-times .plist li,#tab-times .plist li.upcoming,#tab-times .plist li.past{flex:none;min-height:60px;max-height:none}
+#tab-times .plist li.next{margin:3px 0}
+#tab-times .plist .pic{width:42px;height:42px}
+#tab-times .plist .pic .ic{width:21px;height:21px}
+#tab-times .plist .pn,#tab-times .plist .pt{font-size:1.125rem}
+#tab-times .duo{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+#tab-times .tile{min-height:84px;padding:12px}
+#tab-times .tile-ic{width:44px;height:44px}
+#tab-times .tile .chev{display:none}
+#tab-times .tile-tx b{font-size:1.375rem}
+#tab-times .ayah small{display:block}
+#tab-times .cd-units{display:flex}
+#tab-times .ayah{display:block}
+#tab-times #asmaCard,#tab-times #dailyHadith{display:block}
+#tab-times #asmaCard:empty,#tab-times #dailyHadith:empty{display:none}
+#tab-times .jbanner[hidden]{display:none}
+.quick{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+#tab-times .quick .fxbar{display:flex!important;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:10px;min-height:96px;padding:14px;border-radius:20px;position:relative;margin:0}
+#tab-times .quick .fx-l{flex-direction:row-reverse;gap:10px;width:100%;justify-content:flex-end;align-items:center}
+#tab-times .quick .fx-l .ic{width:38px;height:38px;padding:9px;border-radius:12px;background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);box-sizing:border-box;flex:none}
+#tab-times .quick .fx-l b{font-size:1rem;flex:1}
+#tab-times .quick .fx-v{width:100%;flex:none;flex-direction:column;gap:2px;direction:rtl;font-size:.8125rem;color:var(--muted);justify-content:flex-start}
+#tab-times .quick #fxBar .fx-v{direction:ltr;align-items:flex-end;color:var(--text);font-weight:700}
+#tab-times .quick .chev{display:none}
+#tab-times .quick .fxbar:active{transform:scale(.98)}
