@@ -250,7 +250,7 @@
       </div>
     </div>
     <button id="fxBar" class="fxbar" type="button" aria-label="سعر الدولار مقابل الشيكل"><span class="fx-l"><svg class="ic"><use href="#i-chart"/></svg><b>دولار / شيكل</b></span><span class="fx-v"><em id="fxUsd">$1 = ₪--</em><em id="fxIls">₪1 = $--</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-    <button id="payBar" class="fxbar paybar" type="button" aria-label="تحويل بنكي عبر محفظتي"><span class="fx-l"><svg class="ic"><use href="#i-wallet"/></svg><b>تحويل بنكي</b></span><span class="fx-v"><em>محفظتي · USSD</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+    <button id="payBar" class="fxbar paybar" type="button" aria-label="تحويل بنكي عبر محفظتي"><span class="fx-l"><svg class="ic"><use href="#i-wallet"/></svg><b>تحويل بنكي</b></span><span class="fx-v"><em>محفظتي · جوال بي</em></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <button id="jumahBanner" class="jbanner" type="button" hidden></button>
     <button id="asmaCard" class="asma-card" type="button"></button>
     <button id="dailyHadith" class="hcard" type="button"></button>
@@ -357,8 +357,10 @@
   <!-- تحويل بنكي (محفظتي عبر USSD) -->
   <section id="tab-pay" class="tab">
     <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">تحويل بنكي</h1></div>
-    <div class="kh-hero"><div class="eyebrow">محفظتي — تحويل الأموال برمز USSD</div><div class="fx-big" dir="ltr" style="direction:ltr;text-align:center;font-size:1.15rem;font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:0" id="payCode">*370*1*1*رقم الجوال*المبلغ#</div><div class="muted small" style="margin-top:6px">تُفتح لوحة الاتصال بالرمز جاهزاً، وتضغط أنت «اتصال» لإتمام التحويل.</div></div>
+    <div class="kh-hero"><div class="eyebrow" id="payTitle">محفظتي — تحويل الأموال برمز USSD</div><div class="fx-big" dir="ltr" style="direction:ltr;text-align:center;font-size:.95rem;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:0" id="payCode">*370*1*1*رقم الجوال*المبلغ#</div><div class="muted small" style="margin-top:6px">تُفتح لوحة الاتصال بالرمز جاهزاً، وتضغط أنت «اتصال» لإتمام التحويل.</div></div>
+    <div class="chips" id="payProv" style="margin-bottom:10px"><button type="button" class="chip" data-p="mahfazti">محفظتي</button><button type="button" class="chip" data-p="jawwalpay">جوال بي</button></div>
     <div class="group pad fx-conv">
+      <label class="fx-row" id="payPinRow" hidden><span class="cur">الرقم السري (لا يُحفظ)</span><input id="payPin" type="password" inputmode="numeric" maxlength="8" placeholder="••••" dir="ltr" autocomplete="new-password" aria-label="الرقم السري"></label>
       <label class="fx-row"><span class="cur">رقم جوال المستلم</span><input id="payNum" type="tel" inputmode="numeric" maxlength="14" placeholder="0599123456" dir="ltr" autocomplete="off" aria-label="رقم الجوال"></label>
       <label class="fx-row"><span class="cur">المبلغ (₪)</span><input id="payAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0" dir="ltr" aria-label="المبلغ"></label>
       <label class="fx-row"><span class="cur">اسم المستلم (اختياري)</span><input id="payName" type="text" placeholder="لحفظه في المستلمين" aria-label="اسم المستلم"></label>
@@ -368,6 +370,7 @@
     <button id="payCopy" class="btn-outline wide" type="button" style="margin-top:8px">نسخ الرمز</button>
     <div class="hr-sec" style="margin-top:18px"><span>المستلمون السابقون</span></div>
     <div id="payRec" class="chips" style="flex-wrap:wrap"></div>
+    <p class="note c" id="payPinNote" hidden style="color:var(--warn)"><span>جوال بي: الرمز السري جزء من رمز الاتصال نفسه، فسيظهر على شاشة الاتصال وقد يُسجَّل في سجل المكالمات؛ احذف السجل بعد التحويل. لا يحفظه التطبيق ويمسح الحقل بعد الإرسال، ونسخ الرمز معطّل لهذه الخدمة.</span></p>
     <p class="note c"><span>التحويل يتم عبر شبكة الاتصالات ومحفظتك، ويُطلب منك رمزك السري على شاشة الاتصال نفسها. التطبيق لا يحفظ أي رمز سري ولا يرى نتيجة التحويل؛ راجع رسالة التأكيد من المحفظة. تحقق من الرقم والمبلغ جيداً قبل الإرسال.</span></p>
   </section>
 
