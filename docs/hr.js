@@ -626,8 +626,6 @@
   }
 
   window.openMailSettings = (back) => openMailSettings(back || null);
-  if ($('mailBar')) $('mailBar').onclick = () => openMailSettings(null);
-  if ($('hubMail')) $('hubMail').onclick = () => openMailSettings(null);
 
   /* ---------- مركز تصدير Excel اليدوي: نطاق + يوم + أوراق مخصّصة + قوالب جاهزة ---------- */
   const XL_PRESETS = [['all', 'الكل', null], ['att', 'الحضور والمتأخرون', ['att', 'late', 'unreg', 'excl']], ['lv', 'الإجازات والمهام', ['leave', 'mis', 'rqT', 'rqM']], ['lm', 'التأخر الشهري', ['lm']], ['wk', 'ساعات الأسبوعين', ['wkC', 'wkP']]];

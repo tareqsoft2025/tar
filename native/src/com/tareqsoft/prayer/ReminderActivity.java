@@ -247,7 +247,7 @@ public class ReminderActivity extends Activity {
             close();
         }
         @JavascriptInterface public void openMail() {
-            try { startActivity(MailInbox.mailApp(ReminderActivity.this)); } catch (Exception e) { /* لا تطبيق بريد */ }
+            try { startActivity(new Intent(ReminderActivity.this, MainActivity.class).putExtra("tab", "mail").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)); } catch (Exception e) { /* ignore */ }
             close();
         }
         @JavascriptInterface public void sendReport() {
