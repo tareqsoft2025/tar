@@ -567,35 +567,60 @@
   }
   function openMailSettings(back) {
     const Bx = window.AndroidBridge, has = !!(Bx && Bx.mailSet);
-    const PRE = { gmail: ['smtp.gmail.com', 465], outlook: ['smtp.office365.com', 587], yahoo: ['smtp.mail.yahoo.com', 465], custom: ['', 465] };
-    const c = Object.assign({ on: false, host: 'smtp.gmail.com', port: 465, user: '', from: '', to: [], hasPass: false }, mailCfg());
-    const preOf = () => Object.entries(PRE).find(([k, v]) => k !== 'custom' && v[0] === c.host && v[1] === +c.port);
-    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('inbox')}</span><div><b>إرسال التقرير بالبريد</b><small>مرفق Excel + موضوع «${MAIL_SUBJECT}»</small></div></div>
-      ${has ? '' : '<div class="hr-warnbox">' + icon('alert') + '<span>الإرسال المباشر يعمل داخل تطبيق الأندرويد فقط.</span></div>'}
-      <div class="hr3-sec"><div class="chips hr-fc"><button type="button" class="chip sm${c.on ? ' on' : ''}" id="mlOn">${c.on ? '● مفعّل (يُرسل مع التقرير اليومي)' : 'متوقف — اضغط للتفعيل'}</button></div></div>
-      <div class="hr3-sec"><small>المستلمون (عنوان في كل سطر أو مفصولة بفاصلة)</small><textarea id="mlTo" class="hr-in" rows="3" placeholder="manager@example.org">${esc((c.to || []).join('\n'))}</textarea></div>
-      <div class="hr3-sec"><small>حساب الإرسال</small>
-        <div class="chips hr-fc">${[['gmail', 'Gmail'], ['outlook', 'Outlook'], ['yahoo', 'Yahoo'], ['custom', 'مخصّص']].map(([k, n]) => `<button type="button" class="chip sm${(preOf() ? preOf()[0] : 'custom') === k ? ' on' : ''}" data-pre="${k}">${n}</button>`).join('')}</div>
-        <div class="hr3-sv2"><input id="mlHost" class="hr-in" placeholder="خادم SMTP" value="${esc(c.host)}" dir="ltr"><input id="mlPort" class="hr-in" inputmode="numeric" style="max-width:26%" value="${esc(c.port)}" dir="ltr"></div>
-        <input id="mlUser" class="hr-in" placeholder="البريد المُرسِل (اسم المستخدم)" value="${esc(c.user)}" dir="ltr" autocomplete="off" style="margin-bottom:8px">
-        <input id="mlPass" class="hr-in" type="password" placeholder="${c.hasPass ? '•••••• محفوظة — اتركها فارغة للإبقاء' : 'كلمة مرور التطبيق'}" dir="ltr" autocomplete="new-password">
-        <small class="hr3-none">Gmail: فعّل التحقق بخطوتين ثم أنشئ «كلمة مرور تطبيق» من حساب Google واستخدمها هنا (لا كلمة المرور العادية). المنفذ 465 (SSL) أو 587 (STARTTLS). تُحفظ كلمة المرور مشفّرة بمفتاح أندرويد الآمن.</small></div>
+    // قوالب جاهزة: [خادم الصادر، منفذ، تشفير، خادم الوارد، منفذ، تشفير]
+    const PRE = { gmail: ['smtp.gmail.com', 465, 'ssl', 'imap.gmail.com', 993, 'ssl'], outlook: ['smtp.office365.com', 587, 'starttls', 'outlook.office365.com', 993, 'ssl'], yahoo: ['smtp.mail.yahoo.com', 465, 'ssl', 'imap.mail.yahoo.com', 993, 'ssl'], mynet: ['smtp.mynet.net', 587, 'auto', 'imap.mynet.net', 143, 'auto'], custom: ['', 587, 'auto', '', 143, 'auto'] };
+    const PN = { gmail: 'Gmail', outlook: 'Outlook', yahoo: 'Yahoo', mynet: 'Mynet (بريد المؤسسة)', custom: 'مخصّص' };
+    const c = Object.assign({ on: false, notify: false, host: 'smtp.mynet.net', port: 587, sec: 'auto', imapHost: 'imap.mynet.net', imapPort: 143, imapSec: 'auto', user: '', from: '', to: [], hasPass: false }, mailCfg());
+    c.notifyWas = !!c.notify;   // إعادة ضبط نقطة بداية الوارد فقط عند تفعيل الإشعار لأول مرة
+    const preOf = () => Object.entries(PRE).find(([k, v]) => k !== 'custom' && v[0] === c.host && +v[1] === +c.port && v[3] === c.imapHost && +v[4] === +c.imapPort);
+    const secSel = (id, val) => `<select id="${id}" class="hr-in">${[['auto', 'تلقائي (موصى)'], ['ssl', 'SSL/TLS'], ['starttls', 'STARTTLS'], ['none', 'بلا تشفير (غير آمن)']].map(([v, n]) => `<option value="${v}"${v === val ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
+    sheet(`<div class="hr-ph"><span class="hr-ava big info">${icon('inbox')}</span><div><b>البريد الإلكتروني</b><small>الحساب · الإرسال · إشعار الوارد</small></div></div>
+      ${has ? '' : '<div class="hr-warnbox">' + icon('alert') + '<span>الإرسال المباشر وإشعارات الوارد تعمل داخل تطبيق الأندرويد فقط.</span></div>'}
+      <div class="hr3-sec"><small>الحساب (للصادر والوارد)</small>
+        <div class="chips hr-fc">${Object.keys(PRE).map((k) => `<button type="button" class="chip sm${(preOf() ? preOf()[0] : 'custom') === k ? ' on' : ''}" data-pre="${k}">${PN[k]}</button>`).join('')}</div>
+        <input id="mlUser" class="hr-in" placeholder="البريد الإلكتروني (اسم المستخدم)" value="${esc(c.user)}" dir="ltr" autocomplete="off" style="margin-bottom:8px">
+        <input id="mlPass" class="hr-in" type="password" placeholder="${c.hasPass ? '•••••• محفوظة — اتركها فارغة للإبقاء' : 'كلمة المرور'}" dir="ltr" autocomplete="new-password">
+        <small class="hr3-none">تُحفظ كلمة المرور على هذا الجوال مشفّرة بمفتاح أندرويد الآمن (يمكنك تغييرها هنا في أي وقت). Gmail: استخدم «كلمة مرور تطبيق».</small></div>
+      <div class="hr3-sec"><small>الوارد (IMAP)</small>
+        <div class="hr3-sv2"><input id="mlIHost" class="hr-in" placeholder="خادم الوارد" value="${esc(c.imapHost)}" dir="ltr"><input id="mlIPort" class="hr-in" inputmode="numeric" style="max-width:26%" value="${esc(c.imapPort)}" dir="ltr"></div>${secSel('mlISec', c.imapSec)}</div>
+      <div class="hr3-sec"><small>الصادر (SMTP) — يستخدم نفس اسم المستخدم وكلمة المرور</small>
+        <div class="hr3-sv2"><input id="mlHost" class="hr-in" placeholder="خادم الصادر" value="${esc(c.host)}" dir="ltr"><input id="mlPort" class="hr-in" inputmode="numeric" style="max-width:26%" value="${esc(c.port)}" dir="ltr"></div>${secSel('mlSec', c.sec)}
+        <small class="hr3-none">«تلقائي»: يستخدم التشفير إن عرضه الخادم، وإلا يُرسل بلا تشفير (تنتقل كلمة المرور دون حماية على الشبكة) — اخترها فقط لخادم مؤسستك الموثوق.</small></div>
+      <div class="hr3-sec"><div class="chips hr-fc"><button type="button" class="chip sm${c.notify ? ' on' : ''}" id="mlNot">${c.notify ? '● إشعار منبثق بالبريد الجديد: مفعّل' : 'إشعار منبثق بالبريد الجديد: متوقف'}</button></div>
+        <small class="hr3-none">يفحص الوارد كل 15 دقيقة (والتطبيق مغلق) ويُظهر نافذة في منتصف الشاشة بالمرسل والموضوع، دون تغيير حالة الرسائل. أول فحص يضبط نقطة البداية فلا تصلك الرسائل القديمة.</small></div>
+      <div class="hr3-sec"><div class="chips hr-fc"><button type="button" class="chip sm${c.on ? ' on' : ''}" id="mlOn">${c.on ? '● إرسال التقرير اليومي بالبريد: مفعّل' : 'إرسال التقرير اليومي بالبريد: متوقف'}</button></div>
+        <small>المستلمون (عنوان في كل سطر أو مفصولة بفاصلة)</small><textarea id="mlTo" class="hr-in" rows="3" placeholder="manager@example.org">${esc((c.to || []).join('\n'))}</textarea></div>
       <div class="hr-gact"><button type="button" class="btn-primary" id="mlSave">حفظ</button><button type="button" class="btn-outline" id="mlTest"${has ? '' : ' disabled'}>اختبار الإرسال</button></div>
-      <small class="hr-pgn" id="mlMsg"></small>
-      <button type="button" class="btn-outline wide" id="mlBack" style="margin-top:8px">رجوع</button>`);
+      <div class="hr-gact"><button type="button" class="btn-outline" id="mlChk"${has ? '' : ' disabled'}>فحص الوارد الآن</button><button type="button" class="btn-outline" id="mlBack">رجوع</button></div>
+      <small class="hr-pgn" id="mlMsg"></small>`);
     const b = $('hrSheetBody');
-    b.querySelectorAll('[data-pre]').forEach((x) => { x.onclick = () => { const p = PRE[x.dataset.pre]; if (x.dataset.pre !== 'custom') { $('mlHost').value = p[0]; $('mlPort').value = p[1]; } b.querySelectorAll('[data-pre]').forEach((y) => y.classList.toggle('on', y === x)); }; });
-    $('mlOn').onclick = () => { c.on = !c.on; $('mlOn').classList.toggle('on', c.on); $('mlOn').textContent = c.on ? '● مفعّل (يُرسل مع التقرير اليومي)' : 'متوقف — اضغط للتفعيل'; };
-    const read = () => ({ on: c.on, host: $('mlHost').value.trim(), port: +$('mlPort').value || 465, user: $('mlUser').value.trim(), from: $('mlUser').value.trim(), to: $('mlTo').value.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /.+@.+\..+/.test(x)), pass: $('mlPass').value });
-    const save = () => { const o = read(); if (o.on && (!o.host || !o.user || (!c.hasPass && !o.pass) || !o.to.length)) { toast('أكمل الخادم والبريد وكلمة المرور والمستلمين'); return false; }
-      const pass = o.pass; localStorage.setItem('hrMailCfg', JSON.stringify(Object.assign({}, o, { pass: '' }))); if (has) Bx.mailSet(JSON.stringify(o)); if (pass) { c.hasPass = true; $('mlPass').value = ''; $('mlPass').placeholder = '•••••• محفوظة — اتركها فارغة للإبقاء'; } return true; };
+    b.querySelectorAll('[data-pre]').forEach((x) => { x.onclick = () => { const p = PRE[x.dataset.pre]; if (x.dataset.pre !== 'custom') { $('mlHost').value = p[0]; $('mlPort').value = p[1]; $('mlSec').value = p[2]; $('mlIHost').value = p[3]; $('mlIPort').value = p[4]; $('mlISec').value = p[5]; } b.querySelectorAll('[data-pre]').forEach((y) => y.classList.toggle('on', y === x)); }; });
+    const flip = (id, key, onT, offT) => { $(id).onclick = () => { c[key] = !c[key]; $(id).classList.toggle('on', c[key]); $(id).textContent = c[key] ? onT : offT; }; };
+    flip('mlOn', 'on', '● إرسال التقرير اليومي بالبريد: مفعّل', 'إرسال التقرير اليومي بالبريد: متوقف');
+    flip('mlNot', 'notify', '● إشعار منبثق بالبريد الجديد: مفعّل', 'إشعار منبثق بالبريد الجديد: متوقف');
+    const read = () => ({ on: c.on, notify: c.notify, host: $('mlHost').value.trim(), port: +$('mlPort').value || 587, sec: $('mlSec').value, imapHost: $('mlIHost').value.trim(), imapPort: +$('mlIPort').value || 143, imapSec: $('mlISec').value, user: $('mlUser').value.trim(), from: $('mlUser').value.trim(), to: $('mlTo').value.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /.+@.+\..+/.test(x)), pass: $('mlPass').value });
+    const save = () => {
+      const o = read(), needPass = !c.hasPass && !o.pass;
+      if ((o.on || o.notify) && (!o.user || needPass)) { toast('أدخل البريد وكلمة المرور'); return false; }
+      if (o.on && (!o.host || !o.to.length)) { toast('أكمل خادم الصادر والمستلمين'); return false; }
+      if (o.notify && !o.imapHost) { toast('أدخل خادم الوارد'); return false; }
+      const pass = o.pass; localStorage.setItem('hrMailCfg', JSON.stringify(Object.assign({}, o, { pass: '' })));
+      if (has) { Bx.mailSet(JSON.stringify(o)); if (o.notify && Bx.mailResetInbox && !c.notifyWas) { Bx.mailResetInbox(); } }
+      c.notifyWas = o.notify; if (pass) { c.hasPass = true; $('mlPass').value = ''; $('mlPass').placeholder = '•••••• محفوظة — اتركها فارغة للإبقاء'; }
+      return true;
+    };
     $('mlSave').onclick = () => { if (save()) toast('تم حفظ إعدادات البريد'); };
     $('mlTest').onclick = () => {
-      if (!save()) return; const o = read(); if (!o.to.length) { toast('أضف مستلماً واحداً على الأقل'); return; }
+      if (!save()) return; const o = read(); if (!o.to.length) { toast('أضف مستلماً واحداً على الأقل (لاستلام رسالة الاختبار)'); return; }
       const u8 = HRXlsx.build([{ name: 'اختبار', title: 'اختبار إرسال البريد', subtitle: new Date().toLocaleString('ar'), rows: [['البند', 'الحالة'], ['إرسال البريد من تطبيق مواقيت الصلاة', 'يعمل']] }]), id = 't' + Date.now();
       $('mlMsg').textContent = 'جارٍ إرسال رسالة اختبار…';
       window.onMailResult = (rid, ok, msg) => { if (rid !== id) return; $('mlMsg').textContent = ok ? '✓ وصلت رسالة الاختبار بنجاح' : '✗ فشل: ' + msg; };
       Bx.mailSendFile(id, u8b64(u8), 'test.xlsx', MAIL_SUBJECT + ' (اختبار)', mailBodyJs(Date.now()));
+    };
+    $('mlChk').onclick = () => {
+      if (!save()) return; const id = 'c' + Date.now(); $('mlMsg').textContent = 'جارٍ الاتصال بخادم الوارد…';
+      window.onMailCheck = (rid, ok, msg) => { if (rid !== id) return; $('mlMsg').textContent = (ok ? '✓ ' : '✗ ') + msg; };
+      Bx.mailCheck(id);
     };
     $('mlBack').onclick = () => (back ? back() : closeSheet());
   }
@@ -2127,6 +2152,7 @@
       <button type="button" class="btn-outline wide" id="wnLog">${icon('alert')}<span>سجل الإنذارات الرسمية (${warnLog().length})</span></button>
       <button type="button" class="btn-outline wide" id="waOpen">${icon('share')}<span>الإرسال التلقائي إلى واتساب (الأرقام والتفعيل)</span></button>
       <button type="button" class="btn-outline wide" id="rxOpen">${icon('x')}<span>أسماء مستثناة من تسجيل الحضور (${repExcl().size})</span></button>
+      <button type="button" class="btn-outline wide" id="mlOpen">${icon('inbox')}<span>البريد الإلكتروني: الحساب والإرسال وإشعار الوارد</span></button>
       <button type="button" class="btn-outline wide" id="arOpen">${icon('clock')}<span>التقرير اليومي التلقائي والأرقام المرسَل إليها</span></button>
       <button type="button" class="btn-outline wide" id="wkRep">${icon('note')}<span>التقرير الأسبوعي للمدير (صورة للمشاركة)</span></button>
       <label class="hr-srow"><span>إشعار لكل طلب جديد (إجازة، مغادرة، مهمة، عمل إضافي، عمل بعطلة)</span><input type="checkbox" id="rqOn" class="hr-tog" ${s.reqNotify === false ? '' : 'checked'}></label>
@@ -2140,6 +2166,7 @@
     $('wkRep').onclick = () => openWeekly('prev');
     $('rxOpen').onclick = () => openRepExcl(null);
     $('arOpen').onclick = () => openAutoReport(null);
+    $('mlOpen').onclick = () => openMailSettings(null);
     $('waOpen').onclick = () => openWaAuto(null, null);
     $('wnLog').onclick = openWarnLog;
     $('rvOpen').onclick = () => { tab = 'rev'; store.set('hrTab', 'set'); revFlt = 'need'; render(); };

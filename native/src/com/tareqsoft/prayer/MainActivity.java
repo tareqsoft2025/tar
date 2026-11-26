@@ -734,6 +734,20 @@ public class MainActivity extends Activity {
         /** إعدادات البريد (SMTP) — كلمة المرور تُحفظ مشفّرة ولا تعود للواجهة. */
         @JavascriptInterface public String mailGet() { return MailSender.get(MainActivity.this); }
         @JavascriptInterface public void mailSet(String json) { MailSender.set(MainActivity.this, json); }
+        /** فحص الوارد الآن للاختبار: النتيجة إلى window.onMailCheck(id, ok, msg). أول فحص يضبط نقطة البداية بلا إشعار. */
+        @JavascriptInterface public void mailCheck(final String id) {
+            new Thread(new Runnable() { public void run() {
+                String msg; boolean ok = true;
+                try {
+                    boolean first = MailSender.sp(MainActivity.this).getLong("lastUid", -1) < 0;
+                    java.util.List<MailInbox.Msg> l = MailInbox.check(MainActivity.this);
+                    msg = first ? "تم الاتصال بنجاح — ستصلك إشعارات الرسائل الجديدة من الآن" : (l.isEmpty() ? "لا توجد رسائل جديدة غير مقروءة" : l.size() + " رسالة جديدة");
+                    MailInbox.notifyNew(MainActivity.this, l);
+                } catch (Exception e) { ok = false; msg = e.getMessage() == null ? e.toString() : e.getMessage(); }
+                js("window.onMailCheck&&window.onMailCheck(" + org.json.JSONObject.quote(id) + "," + ok + "," + org.json.JSONObject.quote(msg) + ")");
+            } }).start();
+        }
+        @JavascriptInterface public void mailResetInbox() { MailSender.sp(MainActivity.this).edit().remove("lastUid").apply(); }
         @JavascriptInterface public boolean mailEnabled() { return MailSender.enabled(MainActivity.this); }
         /** يرسل ملفاً بالبريد في الخلفية؛ النتيجة تصل إلى window.onMailResult(id, ok, msg). */
         @JavascriptInterface public void mailSendFile(final String id, final String b64, final String name, final String subject, final String body) {

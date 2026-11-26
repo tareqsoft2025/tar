@@ -38,7 +38,14 @@ public class MailSender {
             SharedPreferences.Editor e = sp(c).edit().putString("cfg", o.toString());
             if (!pass.isEmpty()) e.putString("pw", ErpClient.encText(pass));
             e.apply();
+            MailCheckJob.arm(c);
         } catch (Exception e) { /* ignore */ }
+    }
+
+    /** إشعار البريد الجديد مفعّل وفيه بيانات الحساب. */
+    static boolean notifyEnabled(Context c) {
+        try { JSONObject o = new JSONObject(sp(c).getString("cfg", "{}")); return o.optBoolean("notify", false) && !o.optString("imapHost", "").isEmpty() && !o.optString("user", "").isEmpty() && !sp(c).getString("pw", "").isEmpty(); }
+        catch (Exception e) { return false; }
     }
 
     static boolean enabled(Context c) {
@@ -52,9 +59,10 @@ public class MailSender {
             JSONObject o = new JSONObject(sp(c).getString("cfg", "{}"));
             String host = o.optString("host", ""), user = o.optString("user", ""), from = o.optString("from", user), pass = ErpClient.decText(sp(c).getString("pw", ""));
             int port = o.optInt("port", 465);
+            String sec = o.optString("sec", "auto");
             JSONArray to = o.optJSONArray("to");
             if (host.isEmpty() || user.isEmpty() || pass.isEmpty() || to == null || to.length() == 0) return "إعدادات البريد ناقصة";
-            return smtp(host, port, user, pass, from.isEmpty() ? user : from, to, subject, body, fileName, file);
+            return smtp(host, port, sec, user, pass, from.isEmpty() ? user : from, to, subject, body, fileName, file);
         } catch (Exception e) { return "خطأ: " + e.getMessage(); }
     }
 
@@ -65,6 +73,13 @@ public class MailSender {
         String l, last = "";
         while ((l = r.readLine()) != null) { last = l; if (l.length() < 4 || l.charAt(3) != '-') break; }
         return last;
+    }
+    /** يقرأ ردّاً متعدد الأسطر كاملاً ويتحقق من الرمز، ويعيده كنص (لقراءة القدرات). */
+    static String readAll(BufferedReader r, String code, String what) throws Exception {
+        StringBuilder sb = new StringBuilder(); String l;
+        while ((l = r.readLine()) != null) { sb.append(l).append('\n'); if (l.length() < 4 || l.charAt(3) != '-') break; }
+        if (!sb.toString().startsWith(code)) throw new Exception(what + ": " + sb);
+        return sb.toString();
     }
     private static void cmd(OutputStream o, String s) throws Exception { o.write((s + "\r\n").getBytes("UTF-8")); o.flush(); }
     private static void expect(BufferedReader r, String code, String what) throws Exception {
@@ -82,22 +97,27 @@ public class MailSender {
         return ss;
     }
 
-    private static String smtp(String host, int port, String user, String pass, String from, JSONArray to, String subject, String body, String fileName, byte[] file) {
+    private static String smtp(String host, int port, String sec, String user, String pass, String from, JSONArray to, String subject, String body, String fileName, byte[] file) {
         Socket sock = null;
         try {
             SSLSocketFactory sf = (SSLSocketFactory) SSLSocketFactory.getDefault();
             Socket plain = new Socket(); plain.connect(new InetSocketAddress(host, port), 20000); plain.setSoTimeout(30000);
-            if (port == 465) sock = tls(sf, plain, host, port); else sock = plain;
+            boolean ssl = "ssl".equals(sec) || ("auto".equals(sec) && port == 465);
+            if (ssl) sock = tls(sf, plain, host, port); else sock = plain;
             sock.setSoTimeout(30000);
             BufferedReader r = new BufferedReader(new InputStreamReader(sock.getInputStream(), "UTF-8"));
             OutputStream o = sock.getOutputStream();
             expect(r, "220", "الخادم");
-            cmd(o, "EHLO prayer.local"); expect(r, "250", "EHLO");
-            if (port != 465) {   // STARTTLS
-                cmd(o, "STARTTLS"); expect(r, "220", "STARTTLS");
-                sock = tls(sf, sock, host, port); sock.setSoTimeout(30000);
-                r = new BufferedReader(new InputStreamReader(sock.getInputStream(), "UTF-8")); o = sock.getOutputStream();
-                cmd(o, "EHLO prayer.local"); expect(r, "250", "EHLO");
+            cmd(o, "EHLO prayer.local"); String caps = readAll(r, "250", "EHLO");
+            if (!ssl && !"none".equals(sec)) {   // STARTTLS: إلزامي إن اخترته، وانتهازي في «تلقائي» إن عرضه الخادم
+                boolean offers = caps.toUpperCase().contains("STARTTLS");
+                if ("starttls".equals(sec) && !offers) throw new Exception("الخادم لا يدعم STARTTLS");
+                if (offers) {
+                    cmd(o, "STARTTLS"); expect(r, "220", "STARTTLS");
+                    sock = tls(sf, sock, host, port); sock.setSoTimeout(30000);
+                    r = new BufferedReader(new InputStreamReader(sock.getInputStream(), "UTF-8")); o = sock.getOutputStream();
+                    cmd(o, "EHLO prayer.local"); readAll(r, "250", "EHLO");
+                }
             }
             cmd(o, "AUTH LOGIN"); expect(r, "334", "AUTH");
             cmd(o, b64(user.getBytes("UTF-8"))); expect(r, "334", "المستخدم");

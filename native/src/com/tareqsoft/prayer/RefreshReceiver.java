@@ -29,6 +29,7 @@ public class RefreshReceiver extends BroadcastReceiver {
         UpdateChecker.arm(app);
         HrWatchService.resume(app);
         AutoReport.schedule(app);
+        MailCheckJob.arm(app);
         String act = intent == null ? null : intent.getAction();
         if (Intent.ACTION_BOOT_COMPLETED.equals(act) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(act)) {
             new Thread(new Runnable() { public void run() { UpdateChecker.check(app); } }).start();
