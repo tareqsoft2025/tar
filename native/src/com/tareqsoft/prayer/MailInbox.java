@@ -176,7 +176,7 @@ public class MailInbox {
         if (Build.VERSION.SDK_INT >= 26) { nm.createNotificationChannel(new NotificationChannel("mail_new", "البريد الجديد", NotificationManager.IMPORTANCE_HIGH)); nb = new Notification.Builder(app, "mail_new"); }
         else nb = new Notification.Builder(app).setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
         int f = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
-        PendingIntent pi = PendingIntent.getActivity(app, 7616, mailApp(app), f | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pi = PendingIntent.getActivity(app, 7616, new Intent(app, MainActivity.class).putExtra("tab", "mail").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP), f | PendingIntent.FLAG_UPDATE_CURRENT);
         nb.setContentTitle("✉️ " + title).setContentText(text.replace('\n', ' ')).setStyle(new Notification.BigTextStyle().bigText(text)).setSmallIcon(R.drawable.ic_stat_digest).setContentIntent(pi).setAutoCancel(true);
         nm.notify(5616, nb.build());
         ReminderActivity.popup(app, "mail", title, text, "openmail");

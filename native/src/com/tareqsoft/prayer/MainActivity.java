@@ -205,6 +205,23 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == 7020) {   // مرفق للرسالة: قراءة الملف المختار (حتى 8 م.ب) وإرساله للواجهة base64
+            final String pid = pickId; pickId = null;
+            if (res != RESULT_OK || data == null || data.getData() == null || pid == null) { js("window.onFilePicked&&window.onFilePicked(" + org.json.JSONObject.quote(pid == null ? "" : pid) + ",'','','')"); return; }
+            final Uri uri = data.getData();
+            new Thread(new Runnable() { public void run() {
+                try {
+                    String nm = "attachment", mt = getContentResolver().getType(uri);
+                    android.database.Cursor cu = getContentResolver().query(uri, null, null, null, null);
+                    if (cu != null) { int i = cu.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME); if (cu.moveToFirst() && i >= 0) nm = cu.getString(i); cu.close(); }
+                    java.io.InputStream in = getContentResolver().openInputStream(uri); java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] buf = new byte[16384]; int n;
+                    while ((n = in.read(buf)) > 0) { bo.write(buf, 0, n); if (bo.size() > 8 * 1024 * 1024) { in.close(); js("window.onFilePicked&&window.onFilePicked(" + org.json.JSONObject.quote(pid) + ",'','','TOOBIG')"); return; } }
+                    in.close();
+                    js("window.onFilePicked&&window.onFilePicked(" + org.json.JSONObject.quote(pid) + "," + org.json.JSONObject.quote(nm) + "," + org.json.JSONObject.quote(mt == null ? "application/octet-stream" : mt) + "," + org.json.JSONObject.quote(MailCore.b64enc(bo.toByteArray())) + ")");
+                } catch (Exception e) { js("window.onFilePicked&&window.onFilePicked(" + org.json.JSONObject.quote(pid) + ",'','','')"); }
+            } }).start();
+            return;
+        }
         if ((req == 7001 || req == 7002) && res == RESULT_OK && data != null) {
             String kind = req == 7002 ? "fajr" : "adhan";
             Uri u = data.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
@@ -214,6 +231,8 @@ public class MainActivity extends Activity {
             }
         }
     }
+
+    private String pickId;
 
     private void js(final String code) {
         runOnUiThread(new Runnable() { public void run() { web.evaluateJavascript(code, null); } });
@@ -748,6 +767,22 @@ public class MainActivity extends Activity {
             } }).start();
         }
         @JavascriptInterface public void mailResetInbox() { MailSender.sp(MainActivity.this).edit().remove("lastUid").apply(); }
+        /** اختيار ملف لإرفاقه: النتيجة إلى window.onFilePicked(id, name, mime, b64). */
+        @JavascriptInterface public void pickFile(final String id) {
+            pickId = id;
+            runOnUiThread(new Runnable() { public void run() {
+                try { Intent i = new Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE); startActivityForResult(Intent.createChooser(i, "اختر ملفاً"), 7020); }
+                catch (Exception e) { js("window.onFilePicked&&window.onFilePicked(" + org.json.JSONObject.quote(id) + ",'','','')"); }
+            } });
+        }
+        /** عمليات البريد الكاملة (مجلدات، قائمة، قراءة، أعلام، نقل، حذف، إرسال، مسودات…). النتيجة JSON إلى window.onMailOp(id, json). */
+        @JavascriptInterface public void mailOp(final String id, final String json) {
+            new Thread(new Runnable() { public void run() {
+                String res;
+                try { res = MailOps.run(MainActivity.this, json); } catch (Throwable e) { res = "{\"ok\":false,\"err\":" + org.json.JSONObject.quote(e.getMessage() == null ? e.toString() : e.getMessage()) + "}"; }
+                js("window.onMailOp&&window.onMailOp(" + org.json.JSONObject.quote(id) + "," + org.json.JSONObject.quote(res) + ")");
+            } }).start();
+        }
         @JavascriptInterface public boolean mailEnabled() { return MailSender.enabled(MainActivity.this); }
         /** يرسل ملفاً بالبريد في الخلفية؛ النتيجة تصل إلى window.onMailResult(id, ok, msg). */
         @JavascriptInterface public void mailSendFile(final String id, final String b64, final String name, final String subject, final String body) {

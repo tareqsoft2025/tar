@@ -357,6 +357,25 @@
     <p class="note c"><span>السعر مرجعي (متوسط السوق) ويتحدّث تلقائياً، وقد يختلف عن أسعار الصرافين والبنوك.</span></p>
   </section>
 
+  <!-- البريد الإلكتروني (محاكاة Outlook) -->
+  <section id="tab-mail" class="tab">
+    <div class="mail-top">
+      <button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button>
+      <button id="mlMenu" class="icon-btn" type="button" aria-label="المجلدات" style="font-size:1.2rem">☰</button>
+      <div class="mail-ttl"><b id="mlTitle">البريد</b><small id="mlSub"></small></div>
+      <button id="mlSearchB" class="icon-btn" type="button" aria-label="بحث"><svg class="ic"><use href="#i-search"/></svg></button>
+      <button id="mlRefresh" class="icon-btn" type="button" aria-label="تحديث"><svg class="ic"><use href="#i-refresh"/></svg></button>
+      <button id="mlSet" class="icon-btn" type="button" aria-label="إعدادات الحساب"><svg class="ic"><use href="#i-mail"/></svg></button>
+    </div>
+    <div id="mlSearchRow" class="mail-search" hidden><svg class="ic"><use href="#i-search"/></svg><input id="mlQ" type="search" placeholder="ابحث في الرسائل: مرسل، موضوع، نص" enterkeyhint="search"></div>
+    <div class="chips mail-chips" id="mlChips"><button type="button" class="chip sm on" data-f="all">الكل</button><button type="button" class="chip sm" data-f="unseen">غير المقروءة</button><button type="button" class="chip sm" data-f="flag">المهمة</button><button type="button" class="chip sm" data-f="att">بمرفقات</button></div>
+    <div id="mlSel" class="mail-selbar" hidden></div>
+    <div id="mlList" class="mail-list"></div>
+    <button id="mlMore" class="btn-outline wide" type="button" hidden>تحميل المزيد</button>
+    <button id="mlCompose" class="mail-fab" type="button"><svg class="ic"><use href="#i-plus"/></svg><span>رسالة جديدة</span></button>
+    <div id="mlDrawer" class="mail-drawer" hidden><div class="md-scrim" data-close></div><div class="md-box"><div class="md-h"><b>المجلدات</b></div><div id="mlFolders"></div><button id="mlNewFolder" class="btn-outline wide" type="button">+ مجلد جديد</button></div></div>
+  </section>
+
   <!-- تحويل بنكي (محفظتي عبر USSD) -->
   <section id="tab-pay" class="tab">
     <div class="head-row start"><button class="icon-btn back" aria-label="رجوع"><svg class="ic"><use href="#i-back"/></svg></button><h1 class="page-title">تحويل بنكي</h1></div>
@@ -711,6 +730,7 @@
 <script src="weather.js"></script>
 <script src="fx.js"></script>
 <script src="pay.js"></script>
+<script src="mail.js"></script>
 <script src="agenda-core.js"></script>
 <script src="remind-ui.js"></script>
 <script src="agenda.js"></script>

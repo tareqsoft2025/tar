@@ -1898,3 +1898,36 @@ body{background:var(--bg)}
 .pl-s{border:0;border-radius:99px;padding:4px 10px;font:inherit;font-size:.7rem;font-weight:700;cursor:pointer;background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)}
 .pl-s.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}.pl-s.fail{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
 .pl-x{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 4px}
+
+/* ===== البريد (محاكاة Outlook) ===== */
+.mail-top{display:flex;align-items:center;gap:6px;margin:4px 0 8px}.mail-ttl{flex:1;min-width:0}.mail-ttl b{display:block;font-size:1.1rem}.mail-ttl small{color:var(--muted);font-size:.74rem}
+.mail-search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 12px;margin-bottom:8px}.mail-search input{flex:1;background:none;border:0;outline:0;color:var(--text);font:inherit}
+.mail-chips{margin-bottom:8px;overflow-x:auto;flex-wrap:nowrap}.mail-chips .chip{flex:none}
+.mail-list{display:grid;gap:8px;padding-bottom:90px}
+.mail-row{display:flex;gap:11px;align-items:center;background:var(--card);border-radius:16px;box-shadow:var(--elev);padding:10px 12px;cursor:pointer;border-inline-start:4px solid transparent}
+.mail-row.unread{border-inline-start-color:var(--gold)}.mail-row.unread .mail-l1 b,.mail-row.unread .mail-l2{font-weight:800}.mail-row.sel{outline:2px solid var(--gold)}
+.mail-av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;flex:none;font-size:.95rem}
+.mail-mid{flex:1;min-width:0}.mail-l1{display:flex;justify-content:space-between;gap:8px}.mail-l1 b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}.mail-l1 small{color:var(--muted);font-size:.72rem;flex:none}
+.mail-l2{color:var(--muted);font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-ic{display:flex;gap:4px;flex:none;font-size:.85rem}.mail-ic .fl{color:var(--s-late)}
+.mail-empty{display:grid;gap:8px;justify-items:center;text-align:center;color:var(--muted);padding:40px 16px}.mail-empty b{color:var(--text)}
+.mail-selbar{position:sticky;top:0;z-index:6;display:flex;gap:6px;overflow-x:auto;background:var(--gold);color:var(--on-gold);padding:8px 10px;border-radius:14px;margin-bottom:8px;align-items:center}
+.mail-selbar button{flex:none;background:rgba(255,255,255,.2);border:0;color:inherit;border-radius:10px;padding:6px 10px;font:inherit;font-size:.78rem;cursor:pointer}
+.mail-fab{position:fixed;inset-inline-start:50%;transform:translateX(50%);bottom:calc(var(--nav-h) + 14px);z-index:30;background:var(--accent2);color:#2a1d02;border:0;border-radius:18px;padding:12px 20px;font:inherit;font-weight:800;display:flex;gap:8px;align-items:center;box-shadow:0 10px 24px rgba(0,0,0,.25);cursor:pointer}.mail-fab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2}
+#tab-mail:not(.active) .mail-fab{display:none}
+.mail-drawer{position:fixed;inset:0;z-index:70}.mail-drawer[hidden]{display:none}.md-scrim{position:absolute;inset:0;background:var(--scrim)}
+.md-box{position:absolute;inset-block:0;inset-inline-start:0;width:min(82%,320px);background:var(--bg);padding:16px;overflow:auto;display:grid;align-content:start;gap:6px}
+.mail-pick{position:fixed;inset:0;z-index:90}.mail-pick .md-box{inset-block:auto 0;inset-inline:0;width:auto;max-height:70%;border-radius:22px 22px 0 0}
+.md-h{font-size:1.05rem;margin-bottom:6px}.md-f{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px;color:var(--text);font:inherit;cursor:pointer;text-align:start}
+.md-f.on{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,var(--card))}.md-f b{flex:1}.md-f em{font-style:normal;background:var(--gold);color:var(--on-gold);border-radius:99px;padding:1px 8px;font-size:.72rem;font-weight:700}
+.md-empty{background:none;border:0;color:var(--s-abs);font:inherit;font-size:.74rem;text-align:start;padding:0 12px 4px;cursor:pointer}
+.mail-read,.mail-comp{position:fixed;inset:0;z-index:80;background:var(--bg);overflow:auto}.mail-read[hidden],.mail-comp[hidden]{display:none}
+.mr-top,.mc-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;background:var(--bg);padding:10px 12px;border-bottom:1px solid var(--line)}.mc-top b{flex:1}
+.mr-acts{display:flex;gap:6px;margin-inline-start:auto}.mr-acts button{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:12px;min-width:40px;height:40px;font-size:1rem;cursor:pointer}
+.mr-body{padding:14px}.mr-body h2{font-size:1.15rem;margin-bottom:10px}.mr-from{display:flex;gap:10px;align-items:center;margin-bottom:8px}.mr-from div{display:grid}.mr-from small,.mr-meta small{color:var(--muted)}.mr-meta{font-size:.8rem;margin:2px 0;word-break:break-all}
+.mr-atts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.mr-atts button{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 11px;color:var(--text);font:inherit;font-size:.8rem;cursor:pointer}
+.mr-warn{background:color-mix(in srgb,var(--s-late) 14%,var(--card));border-radius:12px;padding:8px 12px;font-size:.78rem;margin:8px 0}.mr-warn button{background:none;border:0;color:var(--gold);font:inherit;font-weight:700;cursor:pointer}
+.mr-frame{width:100%;border:0;min-height:120px;background:transparent;margin-top:8px}
+.mc-b{background:none;border:1px solid var(--line);color:var(--text);border-radius:12px;padding:8px 12px;font:inherit;font-size:.8rem;cursor:pointer}.mc-send{background:var(--gold);color:var(--on-gold);border:0;border-radius:12px;padding:9px 16px;font:inherit;font-weight:800;cursor:pointer}.mc-send:disabled{opacity:.5}
+.mc-form{padding:12px;display:grid;gap:8px}.mc-form label{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:4px 0}.mc-form label small{width:42px;color:var(--muted);flex:none}.mc-form input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text);font:inherit;padding:8px 0}
+.mc-lnk{background:none;border:0;color:var(--gold);font:inherit;font-size:.78rem;cursor:pointer}
+.mc-form textarea{min-height:44vh;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--text);font:inherit;line-height:1.7;resize:vertical}
