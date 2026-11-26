@@ -1886,3 +1886,6 @@ body{background:var(--bg)}
 .hr-cs{border-radius:14px;min-height:58px;box-shadow:var(--elev);border:0;font-size:.68rem;gap:4px}
 .hr-cs.on{background:var(--gold);color:var(--on-gold)}
 .hr-cs.xl{background:color-mix(in srgb,var(--s-ok) 14%,var(--card));color:var(--s-ok)}
+
+.paybar .fx-l{color:var(--accent2)}
+#tab-pay .fx-row input{text-align:start}
