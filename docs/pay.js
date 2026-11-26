@@ -21,6 +21,35 @@
     const l = recents().filter((x) => x.n !== n); l.unshift({ n, name: name || (recents().find((x) => x.n === n) || {}).name || '' });
     store.set('payRecents', l.slice(0, 8));
   };
+  /* ---------- سجل التحويلات: وقت كل عملية والخدمة والمستلم والمبلغ (لا يُسجَّل الرمز السري ولا الرمز الكامل) ---------- */
+  const logs = () => store.get('payLog', []);
+  const ST = { sent: ['أُرسل للاتصال', 'sent'], ok: ['✓ تم', 'ok'], fail: ['✗ لم يتم', 'fail'] };
+  const tfmt = new Intl.DateTimeFormat('ar-PS-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: (window.Core && Core.TZ) || 'Asia/Hebron' });
+  const dayKey = (t) => new Intl.DateTimeFormat('en-CA', { timeZone: (window.Core && Core.TZ) || 'Asia/Hebron' }).format(new Date(t));
+  function addLog(prov, n, name, a) {
+    const l = logs(); l.unshift({ id: 'p' + Date.now(), t: Date.now(), p: prov, n, name: name || '', a, s: 'sent' });
+    store.set('payLog', l.slice(0, 200));
+  }
+  function drawLog() {
+    const box = $('payLog'), l = logs(); box.innerHTML = '';
+    $('payLogClr').hidden = !l.length;
+    const today = dayKey(Date.now()), ym = today.slice(0, 7), sum = (f) => l.filter((x) => x.s !== 'fail' && f(dayKey(x.t))).reduce((q, x) => q + (+x.a || 0), 0);
+    const r2 = (v) => Math.round(v * 100) / 100;
+    $('payLogSum').textContent = l.length ? `اليوم ${r2(sum((d) => d === today))} ₪ · الشهر ${r2(sum((d) => d.slice(0, 7) === ym))} ₪` : '';
+    if (!l.length) { box.innerHTML = '<small class="muted">لا توجد تحويلات بعد</small>'; return; }
+    l.forEach((x) => {
+      const row = document.createElement('div'); row.className = 'pl-row';
+      const P = PROVIDERS[x.p] || { name: x.p }, st = ST[x.s] || ST.sent;
+      row.innerHTML = `<div class="pl-m"><b></b><small></small></div><div class="pl-r"><b class="pl-a"></b><button type="button" class="pl-s ${st[1]}"></button><button type="button" class="pl-x" aria-label="حذف">✕</button></div>`;
+      row.querySelector('.pl-m b').textContent = (x.name ? x.name + ' · ' : '') + x.n;
+      row.querySelector('.pl-m small').textContent = `${P.name} · ${tfmt.format(new Date(x.t))}`;
+      row.querySelector('.pl-a').textContent = x.a + ' ₪';
+      const sb = row.querySelector('.pl-s'); sb.textContent = st[0];
+      sb.onclick = () => { const all = logs(), e = all.find((y) => y.id === x.id); if (!e) return; e.s = e.s === 'sent' ? 'ok' : e.s === 'ok' ? 'fail' : 'sent'; store.set('payLog', all); drawLog(); };
+      row.querySelector('.pl-x').onclick = () => { store.set('payLog', logs().filter((y) => y.id !== x.id)); drawLog(); };
+      box.appendChild(row);
+    });
+  }
   function check() {
     const P = PROVIDERS[prov], n = normNum($('payNum').value), a = +$('payAmt').value, pin = digits($('payPin').value);
     if (P.pin && !/^\d{4,8}$/.test(pin)) return { err: 'اكتب الرقم السري (من 4 إلى 8 أرقام)' };
@@ -52,14 +81,15 @@
       b.appendChild(t); b.appendChild(d); box.appendChild(b);
     });
   }
-  $('payBar').onclick = () => { $('payPin').value = ''; go('pay'); paint(); drawRecents(); };
+  $('payBar').onclick = () => { $('payPin').value = ''; go('pay'); paint(); drawRecents(); drawLog(); };
+  $('payLogClr').onclick = () => { if (confirm('مسح كل سجل التحويلات؟')) { store.set('payLog', []); drawLog(); } };
   document.querySelectorAll('#payProv [data-p]').forEach((b) => { b.onclick = () => { prov = b.dataset.p; store.set('payProv', prov); $('payPin').value = ''; paint(); }; });
   ['payNum', 'payAmt', 'payPin'].forEach((id) => { $(id).oninput = paint; });
   $('payGo').onclick = () => {
     const r = check(); if (r.err) { $('payErr').hidden = false; $('payErr').textContent = r.err; toast(r.err); return; }
     const who = $('payName').value.trim(), P = PROVIDERS[prov];
     if (!confirm(`تأكيد التحويل عبر ${P.name}\n\nإلى: ${r.n}${who ? ' (' + who + ')' : ''}\nالمبلغ: ${r.a} ₪\n\nستُفتح لوحة الاتصال بالرمز جاهزاً، ثم تضغط «اتصال».`)) return;
-    saveRecent(r.n, who); drawRecents();
+    saveRecent(r.n, who); drawRecents(); addLog(prov, r.n, who, +r.a); drawLog();
     const url = 'tel:' + r.code.replace(/#/g, '%23');
     if (B && B.openExternal) B.openExternal(url); else window.open(url, '_blank');
     toast('اضغط «اتصال» لإتمام التحويل');
