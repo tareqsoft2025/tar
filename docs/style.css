@@ -1889,3 +1889,12 @@ body{background:var(--bg)}
 
 .paybar .fx-l{color:var(--accent2)}
 #tab-pay .fx-row input{text-align:start}
+
+/* سجل التحويلات */
+.paylog{display:grid;gap:8px}
+.pl-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 12px}
+.pl-m{min-width:0}.pl-m b{display:block;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pl-m small{color:var(--muted);font-size:.72rem}
+.pl-r{display:flex;align-items:center;gap:8px;flex:none}.pl-a{font-size:.95rem;font-feature-settings:"tnum"}
+.pl-s{border:0;border-radius:99px;padding:4px 10px;font:inherit;font-size:.7rem;font-weight:700;cursor:pointer;background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)}
+.pl-s.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}.pl-s.fail{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pl-x{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 4px}
